@@ -5,13 +5,21 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-riff-background-b">
       <Header />
-      <main>
+      <main className="px-4 sm:px-6 lg:px-8 pt-6">
         {/* Hero Section */}
-        <section className="relative h-[500px] w-full overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-riff-background-b" />
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center">
-            <div className="max-w-2xl">
-              <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
+        <section 
+          className="relative h-[450px] w-full max-w-8xl mx-auto overflow-hidden rounded-lg"
+          style={{
+            backgroundImage: 'url(/images/portada.jpg)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}
+        >
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative z-10 h-full flex items-start pt-2 px-2 md:px-12 lg:px-6">
+            <div className="max-w-xl">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight" 
+                  style={{ textShadow: '2px 2px 8px rgba(0,0,0,0.7)' }}>
                 Con Riff, impulsa tu música al siguiente nivel
               </h1>
             </div>
