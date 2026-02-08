@@ -14,7 +14,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         <div className="absolute inset-0 bg-riff-overlay/40"></div>
       </div>
 
-      <div className="w-full lg:w-[38%] bg-white/50 backdrop-blur-md flex flex-col min-h-screen relative z-10">
+      <div className="w-full lg:w-[35%] bg-white/60 backdrop-blur-md flex flex-col min-h-screen relative z-10">
         <div className="p-8">
           <Image
             src="/images/logo_riff.png"

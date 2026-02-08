@@ -37,13 +37,13 @@ export default function Header({ onSearch }: HeaderProps) {
             {/* Búsqueda */}
             <form onSubmit={handleSearch} className="flex-1 max-w-xl hidden sm:block">
             <div className="relative">
-              <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-riff-background/60" />
               <input
               type="text"
               placeholder="Descubre nuevos artistas"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-2 bg-white/5 border border-white/10 rounded-sm text-white placeholder-gray-400 
+              className="w-full pl-12 pr-4 py-2 bg-riff-text-secondary/30 border border-white/10 rounded-sm text-white placeholder-riff-background/60
                      focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary focus:bg-white/10 
                      transition-all duration-300"
               />
@@ -54,7 +54,7 @@ export default function Header({ onSearch }: HeaderProps) {
           <nav className="flex items-center gap-8">
             <Link 
               href="/" 
-              className="text-riff-primary font-semibold hover:text-riff-secondary transition-colors relative
+              className="text-riff-primary font-semibold hover:text-riff-primary transition-colors relative
                          "
             >
               Inicio
@@ -62,7 +62,7 @@ export default function Header({ onSearch }: HeaderProps) {
 
             <Link 
               href="/perfil" 
-              className="flex items-center gap-2 text-gray-300 font-medium hover:text-white transition-colors"
+              className="flex items-center gap-2 text-riff-background font-medium hover:text-riff-primary transition-colors"
             >
               
               <span className="hidden sm:inline">Perfil</span>

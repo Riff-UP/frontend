@@ -12,7 +12,7 @@
   --riff-text-secondary: #555555;
   --riff-border: #3A3A3A;
   --riff-header: #2A2A2A;
-  --riff-background: #F5F5F5;
+  --riff-background: #FFFFFF;
   --riff-overlay: #000033;
   --riff-login: #00003C;
   --riff-registro: #1D489E;
@@ -32,6 +32,7 @@
   --color-riff-text-secondary: var(--riff-text-secondary);
   --color-riff-border: var(--riff-border);
   --color-riff-background: var(--riff-background);
+  --color-riff-background-b: var(--riff-text-primary);
   --color-riff-overlay: var(--riff-overlay);
   --color-riff-login: var(--riff-login);
   --color-riff-registro: var(--riff-registro);
