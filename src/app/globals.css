@@ -3,6 +3,18 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  
+  /* Colores Riff */
+  --riff-primary: #007BFF;
+  --riff-primary-dark: #002266;
+  --riff-secondary: #2B78D4;
+  --riff-text-primary: #212121;
+  --riff-text-secondary: #555555;
+  --riff-border: #3A3A3A;
+  --riff-background: #F5F5F5;
+  --riff-overlay: #000033;
+  --riff-login: #00003C;
+  --riff-registro: #1D489E;
 }
 
 @theme inline {
@@ -10,6 +22,18 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  
+  /* Colores personalizados Riff */
+  --color-riff-primary: var(--riff-primary);
+  --color-riff-primary-dark: var(--riff-primary-dark);
+  --color-riff-secondary: var(--riff-secondary);
+  --color-riff-text-primary: var(--riff-text-primary);
+  --color-riff-text-secondary: var(--riff-text-secondary);
+  --color-riff-border: var(--riff-border);
+  --color-riff-background: var(--riff-background);
+  --color-riff-overlay: var(--riff-overlay);
+  --color-riff-login: var(--riff-login);
+  --color-riff-registro: var(--riff-registro);
 }
 
 @media (prefers-color-scheme: dark) {
