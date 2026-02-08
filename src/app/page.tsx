@@ -1,13 +1,14 @@
 import Header from "@/app/components/Header";
+import Footer from "@/app/components/Footer";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-[#0D0D0D]">
+    <div className="min-h-screen bg-riff-background-b">
       <Header />
       <main>
         {/* Hero Section */}
         <section className="relative h-[500px] w-full overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#0D0D0D]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-riff-background-b" />
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center">
             <div className="max-w-2xl">
               <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
@@ -67,6 +68,8 @@ export default function Home() {
           </div>
         </section>
       </main>
+      
+      <Footer />
     </div>
   );
 }
