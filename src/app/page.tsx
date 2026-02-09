@@ -1,6 +1,7 @@
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import ArtistCard from "@/app/components/ArtistCard";
+import SongCard from "@/app/components/SongCard";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { FaCircleChevronLeft, FaCircleChevronRight } from "react-icons/fa6";
 
@@ -45,7 +46,13 @@ export default function Home() {
           
           {/* Grid de artistas */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {/* Los componentes de artistas iran aqui */}
+            <ArtistCard
+              id="1"
+              name="Furbies"
+              image="/images/laufey.jpg"
+              followers={45000000}
+              description="Somos una agrupacion dedicada al punk y rock dedicamos un vasto genero"
+            />
           </div>
         </section>
 
@@ -65,7 +72,13 @@ export default function Home() {
           
           {/* Grid de artistas */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {/* Los componentes de artistas iran aqui */}
+            <ArtistCard
+              id="5"
+              name="Furbies"
+              image="/images/laufey.jpg"
+              followers={32000000}
+              description="Somos una agrupacion dedicada al punk y rock dedicamos un vasto genero"
+            />
           </div>
         </section>
 
@@ -84,8 +97,14 @@ export default function Home() {
           </div>
           
           {/* Grid de canciones */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {/* Los componentes de canciones iran aqui */}
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-6">
+            <SongCard
+              id="1"
+              title="Plan C"
+              artist="Los no muertos"
+              image="/images/song.jpeg"
+              plays={2500000000}
+            />
           </div>
         </section>
       </main>
