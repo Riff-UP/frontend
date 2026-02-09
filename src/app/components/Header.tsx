@@ -22,28 +22,28 @@ export default function Header({ onSearch }: HeaderProps) {
   return (
     <header className="sticky top-0 z-40 w-full bg-riff-header  backdrop-blur-md">
       <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-8">
+        <div className="flex items-center justify-between h-14 sm:h-16 gap-2 sm:gap-8">
           {/* Logo */}
-          <Link href="/" className="flex items-center group">
+          <Link href="/" className="flex items-center group flex-shrink-0">
             <Image
               src="/images/logo_riff.png"
               alt="Riff Logo"
-              width={70}
-              height={35}
-              className="object-contain transition-transform group-hover:scale-105"
+              width={60}
+              height={30}
+              className="object-contain transition-transform group-hover:scale-105 sm:w-[70px] sm:h-[35px]"
             />
           </Link>
 
             {/* Búsqueda */}
-            <form onSubmit={handleSearch} className="flex-1 max-w-xl hidden sm:block">
+            <form onSubmit={handleSearch} className="flex-1 max-w-xl">
             <div className="relative">
-              <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-riff-background/60" />
+              <FiSearch className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-riff-background/60" />
               <input
               type="text"
-              placeholder="Descubre nuevos artistas"
+              placeholder="Descubre artistas"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-2 bg-riff-text-secondary/30 border border-white/10 rounded-sm text-white placeholder-riff-background/60
+              className="w-full pl-9 sm:pl-12 pr-2 sm:pr-4 py-1.5 sm:py-2 text-sm sm:text-base bg-riff-text-secondary/30 border border-white/10 rounded-sm text-white placeholder-riff-background/60
                      focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary focus:bg-white/10 
                      transition-all duration-300"
               />
@@ -51,21 +51,19 @@ export default function Header({ onSearch }: HeaderProps) {
             </form>
 
           {/* Navegación */}
-          <nav className="flex items-center gap-8">
+          <nav className="flex items-center gap-3 sm:gap-8">
             <Link 
               href="/" 
-              className="text-riff-primary font-semibold hover:text-riff-primary transition-colors relative
-                         "
+              className="text-riff-primary text-sm sm:text-base font-semibold hover:text-riff-primary transition-colors relative"
             >
               Inicio
             </Link>
 
             <Link 
               href="/perfil" 
-              className="flex items-center gap-2 text-riff-background font-medium hover:text-riff-primary transition-colors"
+              className="flex items-center gap-2 text-riff-background text-sm sm:text-base font-medium hover:text-riff-primary transition-colors"
             >
-              
-              <span className="hidden sm:inline">Perfil</span>
+              <span>Perfil</span>
             </Link>
           </nav>
         </div>
