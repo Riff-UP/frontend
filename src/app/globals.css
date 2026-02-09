@@ -12,6 +12,7 @@
   --riff-text-secondary: #555555;
   --riff-border: #3A3A3A;
   --riff-header: #2A2A2A;
+  --riff-card: #1A1A1A;
   --riff-background: #FFFFFF;
   --riff-overlay: #000033;
   --riff-login: #00003C;
@@ -37,6 +38,7 @@
   --color-riff-login: var(--riff-login);
   --color-riff-registro: var(--riff-registro);
   --color-riff-header: var(--riff-header);
+  --color-riff-card: var(--riff-card);
 }
 
 @media (prefers-color-scheme: dark) {
