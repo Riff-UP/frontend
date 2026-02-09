@@ -38,19 +38,19 @@ export default function SongCard({ id, title, artist, image, plays }: SongCardPr
           
           {/* Badge de reproducciones arriba a la derecha */}
           {plays && (
-            <div className="absolute top-3 right-3 bg-black/60 text-white text-sm font-medium px-2.5 py-1 rounded flex items-center gap-1.5">
-              <FaPlay className="w-3 h-3" />
+            <div className="absolute top-2 right-2 sm:top-3 sm:right-3 bg-black/60 text-white text-xs sm:text-sm font-medium px-2 py-0.5 sm:px-2.5 sm:py-1 rounded flex items-center gap-1 sm:gap-1.5">
+              <FaPlay className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
               {formatPlays(plays)}
             </div>
           )}
           
           {/* Informacion de la cancion sobre la imagen */}
-          <div className="absolute bottom-0 left-0 right-0 p-4">
-            <h3 className="text-white font-bold text-lg mb-1 truncate group-hover:text-riff-primary transition-colors">
+          <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
+            <h3 className="text-white font-bold text-base sm:text-lg mb-0.5 sm:mb-1 truncate group-hover:text-riff-primary transition-colors">
               {title}
             </h3>
             
-            <p className="text-white text-sm truncate">
+            <p className="text-white text-xs sm:text-sm truncate">
               {artist}
             </p>
           </div>
