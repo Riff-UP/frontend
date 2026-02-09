@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
 import { FiSearch, FiUser } from 'react-icons/fi';
 
 interface HeaderProps {
@@ -11,6 +12,7 @@ interface HeaderProps {
 
 export default function Header({ onSearch }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const pathname = usePathname();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,14 +56,22 @@ export default function Header({ onSearch }: HeaderProps) {
           <nav className="flex items-center gap-3 sm:gap-8">
             <Link 
               href="/" 
-              className="text-riff-primary text-sm sm:text-base font-semibold hover:text-riff-primary transition-colors relative"
+              className={`text-sm sm:text-base font-semibold transition-colors relative ${
+                pathname === '/' 
+                  ? 'text-riff-primary' 
+                  : 'text-riff-background hover:text-riff-primary'
+              }`}
             >
               Inicio
             </Link>
 
             <Link 
-              href="profile" 
-              className="flex items-center gap-2 text-riff-background text-sm sm:text-base font-medium hover:text-riff-primary transition-colors"
+              href="/profile" 
+              className={`flex items-center gap-2 text-sm sm:text-base font-semibold transition-colors ${
+                pathname === '/profile' 
+                  ? 'text-riff-primary' 
+                  : 'text-riff-background hover:text-riff-primary'
+              }`}
             >
               <span>Perfil</span>
             </Link>
