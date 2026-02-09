@@ -60,7 +60,7 @@ export default function Header({ onSearch }: HeaderProps) {
             </Link>
 
             <Link 
-              href="/perfil" 
+              href="profile" 
               className="flex items-center gap-2 text-riff-background text-sm sm:text-base font-medium hover:text-riff-primary transition-colors"
             >
               <span>Perfil</span>
