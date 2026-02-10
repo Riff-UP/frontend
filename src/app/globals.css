@@ -17,6 +17,10 @@
   --riff-overlay: #000033;
   --riff-login: #00003C;
   --riff-registro: #1D489E;
+  --riff-save: #28803C;
+  --riff-save-2: #679872;
+  --riff-delete: #AA2222;
+  --riff-delete-2: #BA4444;
 }
 
 @theme inline {
@@ -39,6 +43,10 @@
   --color-riff-registro: var(--riff-registro);
   --color-riff-header: var(--riff-header);
   --color-riff-card: var(--riff-card);
+  --color-riff-save: var(--riff-save);
+  --color-riff-save-2: var(--riff-save-2);
+  --color-riff-delete: var(--riff-delete);
+  --color-riff-delete-2: var(--riff-delete-2);
 }
 
 @media (prefers-color-scheme: dark) {

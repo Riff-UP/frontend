@@ -1,6 +1,7 @@
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import ProfileEdit from '../components/ProfileEdit';
 
 export default function ProfilePage() {
   return (
@@ -15,16 +16,7 @@ export default function ProfilePage() {
 
         {/* Main Content */}
         <main className="flex-1">
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-3xl font-bold text-white mb-8">Mi Perfil</h1>
-            
-            {/* Contenido del perfil - se implementará después */}
-            <div className="bg-riff-card border border-white/10 rounded-sm p-8">
-              <p className="text-riff-text-secondary">
-                Contenido del perfil (se implementará en el siguiente paso)
-              </p>
-            </div>
-          </div>
+          <ProfileEdit />
         </main>
       </div>
 
