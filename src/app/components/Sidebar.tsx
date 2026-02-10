@@ -34,7 +34,7 @@ export default function Sidebar({ activeSection = 'perfil' }: SidebarProps) {
       {/* User Info */}
       <div className="py-5 px-3 overflow-hidden">
         {/* Top line */}
-        <div className="w-10 h-0.5 bg-gradient-to-r from-riff-primary-dark to-riff-primary mx-auto mb-4 rounded-full"></div>
+        <div className="w-10 h-[2px] bg-gradient-to-r from-riff-primary-dark to-riff-primary mx-auto mb-4 rounded-full"></div>
         <div className="flex items-center gap-3 mb-4">
           <div className="relative w-10 h-10 rounded-full overflow-hidden bg-riff-text-secondary/30 flex-shrink-0 mx-auto group-hover:mx-0">
             <Image
@@ -51,7 +51,7 @@ export default function Sidebar({ activeSection = 'perfil' }: SidebarProps) {
         </div>
         
         {/* Bottom line */}
-        <div className="w-10 h-0.5 bg-gradient-to-r from-riff-primary-dark to-riff-primary mx-auto mt-4 rounded-full"></div>
+        <div className="w-10 h-[2px] bg-gradient-to-r from-riff-primary-dark to-riff-primary mx-auto mt-4 rounded-full"></div>
       </div>
 
       {/* Navigation Menu */}
