@@ -22,7 +22,7 @@ export default function MobileNav({ activeSection, onSectionChange }: MobileNavP
 
   return (
     <nav className="md:hidden sticky top-16 bg-gradient-to-b from-riff-card to-riff-header border-b border-white/10 z-10 mb-4">
-      <div className="flex overflow-x-auto scrollbar-hide">
+      <div className="flex justify-center overflow-x-auto scrollbar-hide">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeSection === item.id;
