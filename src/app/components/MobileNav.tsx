@@ -1,0 +1,48 @@
+'use client';
+
+import { CgProfile } from "react-icons/cg";
+import { BiImages } from "react-icons/bi";
+import { MdOutlineLibraryMusic } from "react-icons/md";
+import { IoIosCalendar } from "react-icons/io";
+import { FiBookmark } from 'react-icons/fi';
+
+interface MobileNavProps {
+  activeSection: string;
+  onSectionChange: (section: string) => void;
+}
+
+export default function MobileNav({ activeSection, onSectionChange }: MobileNavProps) {
+  const menuItems = [
+    { id: 'perfil', label: 'Perfil', icon: CgProfile },
+    { id: 'publicaciones', label: 'Posts', icon: BiImages },
+    { id: 'eventos', label: 'Eventos', icon: IoIosCalendar },
+    { id: 'musica', label: 'Música', icon: MdOutlineLibraryMusic },
+    { id: 'guardados', label: 'Guardados', icon: FiBookmark },
+  ];
+
+  return (
+    <nav className="md:hidden sticky top-16 bg-gradient-to-b from-riff-card to-riff-header border-b border-white/10 z-10 mb-4">
+      <div className="flex overflow-x-auto scrollbar-hide">
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeSection === item.id;
+          
+          return (
+            <button
+              key={item.id}
+              onClick={() => onSectionChange(item.id)}
+              className={`flex-shrink-0 flex flex-col items-center gap-1 px-4 py-3 transition-colors duration-200 border-b-2 ${
+                isActive 
+                  ? 'text-riff-primary border-riff-primary' 
+                  : 'text-white/60 border-transparent hover:text-riff-primary'
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              <span className="text-xs font-medium whitespace-nowrap">{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
