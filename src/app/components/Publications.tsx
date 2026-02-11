@@ -28,31 +28,7 @@ export default function Publications() {
   const [editText, setEditText] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   
-  const [publications, setPublications] = useState<Publication[]>([
-    {
-      id: 1,
-      author: {
-        name: 'Bisonte',
-        avatar: '/images/artist.jpg',
-      },
-      time: '24 hrs',
-      text: 'Muchas gracias por asistir al evento del día de ayer 🤘🔥',
-      image: '/images/portada.jpg',
-      likes: 213,
-      saved: 213,
-    },
-    {
-      id: 2,
-      author: {
-        name: 'Bisonte',
-        avatar: '/images/artist.jpg',
-      },
-      time: '2 days',
-      text: 'El día 18 de octubre de 2025 me presentaré en Las Palmas en un evento que realizamos entre muchos otros artistas. El evento comenzará a las 8 de la noche. Te esperamos.',
-      likes: 213,
-      saved: 213,
-    },
-  ]);
+  const [publications, setPublications] = useState<Publication[]>([]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -71,8 +47,8 @@ export default function Publications() {
     const newPublication: Publication = {
       id: Date.now(),
       author: {
-        name: 'Bisonte',
-        avatar: '/images/artist.jpg',
+        name: '',
+        avatar: '',
       },
       time: 'Ahora',
       text: newPost,
@@ -145,7 +121,7 @@ export default function Publications() {
   }, [openMenuId]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6">
+    <div className="w-full">
       {/* Delete Confirmation Modal */}
       {deleteConfirmId !== null && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm">
@@ -178,14 +154,14 @@ export default function Publications() {
         </div>
       )}
 
-      <div className="flex items-start gap-6">
+      <div className="flex flex-col lg:flex-row lg:items-start gap-6">
         {/* Publications List */}
-        <div className="flex-1">
-          <h2 className="text-white text-2xl font-bold mb-6">Publicaciones</h2>
+        <div className="flex-1 order-2 lg:order-1">
+          <h2 className="text-white text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Publicaciones</h2>
           
           <div className="space-y-4">
             {publications.map((pub) => (
-              <div key={pub.id} className="bg-riff-header border border-white/10 rounded-sm p-5">
+              <div key={pub.id} className="bg-riff-header border border-white/10 rounded-sm p-4 sm:p-5">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
@@ -264,7 +240,7 @@ export default function Publications() {
 
                 {/* Image */}
                 {pub.image && (
-                  <div className="relative w-full h-64 mb-3 rounded-sm overflow-hidden">
+                  <div className="relative w-full h-48 sm:h-64 mb-3 rounded-sm overflow-hidden">
                     <Image
                       src={pub.image}
                       alt="Publicación"
@@ -292,11 +268,11 @@ export default function Publications() {
         </div>
 
         {/* Create Publication Sidebar */}
-        <div className="w-80 flex-shrink-0">
-          <div className="bg-riff-header border border-white/10 rounded-sm p-4 sticky top-6">
+        <div className="w-full lg:w-80 flex-shrink-0 order-1 lg:order-2">
+          <div className="bg-riff-header border border-white/10 rounded-sm p-4 lg:sticky lg:top-6">
             <div className="space-y-3">
-              <h3 className="text-white font-semibold text-base mb-3">¿Qué tienes en mente?</h3>
-              <p className="text-riff-text-secondary text-sm mb-3">Comparte tus ideas...</p>
+              <h3 className="text-white font-semibold text-sm sm:text-base mb-2 sm:mb-3">¿Qué tienes en mente?</h3>
+              <p className="text-riff-text-secondary text-xs sm:text-sm mb-2 sm:mb-3">Comparte tus ideas...</p>
               
               <textarea
                 value={newPost}

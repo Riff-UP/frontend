@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Sidebar from '../components/Sidebar';
+import MobileNav from '../components/MobileNav';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ProfileEdit from '../components/ProfileEdit';
@@ -32,16 +33,22 @@ export default function ProfilePage() {
       {/* Header */}
       <Header />
 
+      {/* Mobile Navigation */}
+      <MobileNav 
+        activeSection={activeSection} 
+        onSectionChange={setActiveSection}
+      />
+
       {/* Main Content with Sidebar */}
-      <div className="flex flex-1 gap-6 p-8">
-        {/* Sidebar */}
+      <div className="flex flex-1 gap-4 sm:gap-6 p-4 sm:p-6 lg:p-8">
+        {/* Sidebar - Hidden on mobile */}
         <Sidebar 
           activeSection={activeSection} 
           onSectionChange={setActiveSection}
         />
 
         {/* Main Content */}
-        <main className="flex-1">
+        <main className="flex-1 min-w-0">
           {renderContent()}
         </main>
       </div>

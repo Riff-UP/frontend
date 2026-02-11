@@ -1,8 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
 import { FiBookmark  } from 'react-icons/fi';
 import { CgProfile } from "react-icons/cg";
 import { BiImages } from "react-icons/bi";
@@ -31,28 +29,21 @@ export default function Sidebar({ activeSection = 'perfil', onSectionChange }: S
   ];
 
   const handleLogout = () => {
-    // Aquí iría la lógica de cierre de sesión
-    console.log('Cerrar sesión');
+    // Lógica de cierre de sesión
   };
 
   return (
-    <aside className="group w-16 hover:w-64 bg-gradient-to-b from-riff-card to-riff-header border border-white/10 rounded-2xl flex flex-col transition-all duration-300 ease-in-out shadow-lg sticky top-24 self-start">
+    <aside className="hidden md:flex group w-16 hover:w-64 bg-gradient-to-b from-riff-card to-riff-header border border-white/10 rounded-2xl flex-col transition-all duration-300 ease-in-out shadow-lg sticky top-24 self-start">
       {/* User Info */}
       <div className="py-5 px-3 overflow-hidden">
         {/* Top line */}
         <div className="w-10 h-[2px] bg-gradient-to-r from-riff-primary-dark to-riff-primary mx-auto mb-4 rounded-full"></div>
         <div className="flex items-center gap-3 mb-4">
           <div className="relative w-10 h-10 rounded-full overflow-hidden bg-riff-text-secondary/30 flex-shrink-0 mx-auto group-hover:mx-0">
-            <Image
-              src="/images/artist.jpg"
-              alt="Usuario"
-              fill
-              className="object-cover"
-            />
           </div>
           <div className="flex-2 min-w-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <h3 className="text-white font-semibold text-sm truncate whitespace-nowrap">Bisonte</h3>
-            <p className="text-riff-text-secondary text-xs truncate whitespace-nowrap">bisonte@gmail.com</p>
+            <h3 className="text-white font-semibold text-sm truncate whitespace-nowrap"></h3>
+            <p className="text-riff-text-secondary text-xs truncate whitespace-nowrap"></p>
           </div>
         </div>
         
