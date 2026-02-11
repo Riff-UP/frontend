@@ -11,10 +11,16 @@ import { IoIosLogOut, IoIosCalendar } from "react-icons/io";
 
 interface SidebarProps {
   activeSection?: string;
+  onSectionChange?: (section: string) => void;
 }
 
-export default function Sidebar({ activeSection = 'perfil' }: SidebarProps) {
+export default function Sidebar({ activeSection = 'perfil', onSectionChange }: SidebarProps) {
   const [active, setActive] = useState(activeSection);
+
+  const handleSectionChange = (section: string) => {
+    setActive(section);
+    onSectionChange?.(section);
+  };
 
   const menuItems = [
     { id: 'perfil', label: 'Mi perfil', icon: CgProfile },
@@ -30,7 +36,7 @@ export default function Sidebar({ activeSection = 'perfil' }: SidebarProps) {
   };
 
   return (
-    <aside className="group w-16 hover:w-64 bg-gradient-to-b from-riff-card to-riff-header border border-white/10 rounded-2xl flex flex-col transition-all duration-300 ease-in-out shadow-lg">
+    <aside className="group w-16 hover:w-64 bg-gradient-to-b from-riff-card to-riff-header border border-white/10 rounded-2xl flex flex-col transition-all duration-300 ease-in-out shadow-lg sticky top-24 self-start">
       {/* User Info */}
       <div className="py-5 px-3 overflow-hidden">
         {/* Top line */}
@@ -64,7 +70,7 @@ export default function Sidebar({ activeSection = 'perfil' }: SidebarProps) {
             return (
               <li key={item.id}>
                 <button
-                  onClick={() => setActive(item.id)}
+                  onClick={() => handleSectionChange(item.id)}
                   className={`w-full flex items-center gap-3 px-3 py-3 rounded-sm transition-all duration-200
                     ${isActive 
                       ? 'text-riff-primary' 

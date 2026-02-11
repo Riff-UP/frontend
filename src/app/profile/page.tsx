@@ -1,22 +1,48 @@
+'use client';
+
+import { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ProfileEdit from '../components/ProfileEdit';
+import Publications from '../components/Publications';
 
 export default function ProfilePage() {
+  const [activeSection, setActiveSection] = useState('perfil');
+
+  const renderContent = () => {
+    switch (activeSection) {
+      case 'perfil':
+        return <ProfileEdit />;
+      case 'publicaciones':
+        return <Publications />;
+      case 'eventos':
+        return <div className="text-white text-center py-20">Sección de Eventos - Próximamente</div>;
+      case 'musica':
+        return <div className="text-white text-center py-20">Sección de Música - Próximamente</div>;
+      case 'guardados':
+        return <div className="text-white text-center py-20">Sección de Guardados - Próximamente</div>;
+      default:
+        return <ProfileEdit />;
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-riff-text-primary">
       {/* Header */}
       <Header />
 
       {/* Main Content with Sidebar */}
-      <div className="flex flex-1 gap-6 p-6">
+      <div className="flex flex-1 gap-6 p-8">
         {/* Sidebar */}
-        <Sidebar activeSection="perfil" />
+        <Sidebar 
+          activeSection={activeSection} 
+          onSectionChange={setActiveSection}
+        />
 
         {/* Main Content */}
         <main className="flex-1">
-          <ProfileEdit />
+          {renderContent()}
         </main>
       </div>
 

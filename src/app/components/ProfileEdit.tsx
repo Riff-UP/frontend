@@ -44,7 +44,7 @@ export default function ProfileEdit() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6">
+    <div className="max-w-7xl mx-auto px-2 sm:px-6">
       <div className="bg-riff-header border border-white/0 rounded-sm p-4 sm:p-6">
         {/* Header con foto y seguidores */}
         <div className="flex items-center gap-3 pb-4">
@@ -78,7 +78,7 @@ export default function ProfileEdit() {
                 type="text"
                 value={profileData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
-                className="w-full px-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white placeholder-riff-text-secondary
+                className="w-full px-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary
                          focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                          transition-all duration-200"
               />
@@ -91,7 +91,7 @@ export default function ProfileEdit() {
                 value={profileData.description}
                 onChange={(e) => handleChange('description', e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white placeholder-riff-text-secondary
+                className="w-full px-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary
                          focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                          transition-all duration-200 resize-none"
               />
@@ -118,7 +118,7 @@ export default function ProfileEdit() {
                   type="text"
                   value={profileData.instagram}
                   onChange={(e) => handleChange('instagram', e.target.value)}
-                  className="flex-1 px-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white placeholder-riff-text-secondary
+                  className="flex-1 px-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary
                            focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                            transition-all duration-200"
                 />
@@ -138,7 +138,7 @@ export default function ProfileEdit() {
                   type="text"
                   value={profileData.facebook}
                   onChange={(e) => handleChange('facebook', e.target.value)}
-                  className="flex-1 px-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white placeholder-riff-text-secondary
+                  className="flex-1 px-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary
                            focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                            transition-all duration-200"
                 />
@@ -158,7 +158,7 @@ export default function ProfileEdit() {
                   type="text"
                   value={profileData.whatsapp}
                   onChange={(e) => handleChange('whatsapp', e.target.value)}
-                  className="flex-1 px-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white placeholder-riff-text-secondary
+                  className="flex-1 px-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary
                            focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                            transition-all duration-200"
                 />
@@ -178,7 +178,7 @@ export default function ProfileEdit() {
                   type="email"
                   value={profileData.email}
                   onChange={(e) => handleChange('email', e.target.value)}
-                  className="flex-1 px-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white placeholder-riff-text-secondary
+                  className="flex-1 px-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary
                            focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                            transition-all duration-200"
                 />
