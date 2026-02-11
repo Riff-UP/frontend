@@ -7,6 +7,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ProfileEdit from '../components/ProfileEdit';
 import Publications from '../components/Publications';
+import Events from '../components/Events';
 
 export default function ProfilePage() {
   const [activeSection, setActiveSection] = useState('perfil');
@@ -18,7 +19,7 @@ export default function ProfilePage() {
       case 'publicaciones':
         return <Publications />;
       case 'eventos':
-        return <div className="text-white text-center py-20">Sección de Eventos - Próximamente</div>;
+        return <Events />;
       case 'musica':
         return <div className="text-white text-center py-20">Sección de Música - Próximamente</div>;
       case 'guardados':
