@@ -70,7 +70,7 @@ export default function ProfileEdit() {
                 type="text"
                 value={profileData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
-                className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
+                className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
                          focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                          transition-all duration-200"
               />
@@ -83,7 +83,7 @@ export default function ProfileEdit() {
                 value={profileData.description}
                 onChange={(e) => handleChange('description', e.target.value)}
                 rows={3}
-                className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
+                className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
                          focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                          transition-all duration-200 resize-none"
               />
@@ -111,7 +111,7 @@ export default function ProfileEdit() {
                   type="text"
                   value={profileData.instagram}
                   onChange={(e) => handleChange('instagram', e.target.value)}
-                  className="flex-1 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
+                  className="flex-1 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
                            focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                            transition-all duration-200"
                 />
@@ -132,7 +132,7 @@ export default function ProfileEdit() {
                   type="text"
                   value={profileData.facebook}
                   onChange={(e) => handleChange('facebook', e.target.value)}
-                  className="flex-1 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
+                  className="flex-1 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
                            focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                            transition-all duration-200"
                 />
@@ -153,7 +153,7 @@ export default function ProfileEdit() {
                   type="text"
                   value={profileData.whatsapp}
                   onChange={(e) => handleChange('whatsapp', e.target.value)}
-                  className="flex-1 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
+                  className="flex-1 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
                            focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                            transition-all duration-200"
                 />
@@ -174,7 +174,7 @@ export default function ProfileEdit() {
                   type="email"
                   value={profileData.email}
                   onChange={(e) => handleChange('email', e.target.value)}
-                  className="flex-1 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
+                  className="flex-1 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
                            focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                            transition-all duration-200"
                 />

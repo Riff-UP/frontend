@@ -312,7 +312,7 @@ export default function Events() {
 
         {/* Right Column: Upcoming Events List */}
         <div className="flex-1">
-          <div className="bg-riff-header border border-white/10 rounded-sm p-4 sm:p-6">
+          <div className="rounded-sm p-4 sm:p-0">
             <h3 className="text-white text-base sm:text-lg font-semibold mb-4">Próximos eventos</h3>
             <div className="space-y-3">
               {events.length === 0 ? (
@@ -350,7 +350,7 @@ export default function Events() {
       {/* Create Event Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm p-4">
-          <div className="bg-riff-card border border-white/20 rounded-lg w-full max-w-2xl shadow-2xl">
+          <div className="bg-riff-header border border-white/20 rounded-lg w-full max-w-2xl shadow-2xl">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-white/10">
               <h3 className="text-white text-lg sm:text-xl font-semibold">
@@ -373,7 +373,7 @@ export default function Events() {
                   type="text"
                   value={newEvent.title}
                   onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                  className="w-full px-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary
+                  className="w-full px-3 py-2 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary
                            focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                            transition-all duration-200"
                 />
@@ -388,7 +388,7 @@ export default function Events() {
                     type="date"
                     value={newEvent.date}
                     onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                    className="w-full pl-10 pr-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-sm
+                    className="w-full pl-10 pr-3 py-2 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm
                              focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                              transition-all duration-200"
                   />
@@ -404,7 +404,7 @@ export default function Events() {
                     type="text"
                     value={newEvent.location}
                     onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
-                    className="w-full pl-10 pr-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary
+                    className="w-full pl-10 pr-3 py-2 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary
                              focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                              transition-all duration-200"
                   />
@@ -420,7 +420,7 @@ export default function Events() {
                     type="time"
                     value={newEvent.time}
                     onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
-                    className="w-full pl-10 pr-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white text-sm
+                    className="w-full pl-10 pr-3 py-2 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm
                              focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                              transition-all duration-200"
                   />
