@@ -8,6 +8,7 @@ import Footer from '../components/Footer';
 import ProfileEdit from '../components/ProfileEdit';
 import Publications from '../components/Publications';
 import Events from '../components/Events';
+import Saved from '../components/Saved';
 
 export default function ProfilePage() {
   const [activeSection, setActiveSection] = useState('perfil');
@@ -23,7 +24,7 @@ export default function ProfilePage() {
       case 'musica':
         return <div className="text-white text-center py-20">Sección de Música - Próximamente</div>;
       case 'guardados':
-        return <div className="text-white text-center py-20">Sección de Guardados - Próximamente</div>;
+        return <Saved />;
       case 'estadisticas':
         return <div className="text-white text-center py-20">Sección de Estadísticas - Próximamente</div>;
       default:

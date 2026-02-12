@@ -313,7 +313,7 @@ export default function Publications() {
 
                 {/* Image */}
                 {pub.image && (
-                  <div className="mb-3 rounded-sm overflow-hidden border border-white/10 flex items-center justify-center bg-black/5">
+                  <div className="mb-3 overflow-hidden flex items-center justify-center bg-riff-header">
                     <img
                       src={pub.image}
                       alt="Publicación"
