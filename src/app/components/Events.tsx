@@ -199,7 +199,7 @@ export default function Events() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-white text-xl sm:text-2xl font-bold">Eventos</h2>
-          <p className="text-riff-text-secondary text-xs sm:text-sm mt-1">Gestiona y organiza tus próximos eventos.</p>
+          <p className="text-white/80 text-xs sm:text-sm mt-1">Gestiona y organiza tus próximos eventos.</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
