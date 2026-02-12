@@ -24,6 +24,8 @@ export default function ProfilePage() {
         return <div className="text-white text-center py-20">Sección de Música - Próximamente</div>;
       case 'guardados':
         return <div className="text-white text-center py-20">Sección de Guardados - Próximamente</div>;
+      case 'estadisticas':
+        return <div className="text-white text-center py-20">Sección de Estadísticas - Próximamente</div>;
       default:
         return <ProfileEdit />;
     }
@@ -41,7 +43,7 @@ export default function ProfilePage() {
       />
 
       {/* Main Content with Sidebar */}
-      <div className="flex flex-1 gap-4 sm:gap-6 p-4 sm:p-6 lg:p-8">
+      <div className="flex flex-1 gap-8 sm:gap-12 lg:gap-16 p-4 sm:p-6 lg:p-8">
         {/* Sidebar - Hidden on mobile */}
         <Sidebar 
           activeSection={activeSection} 
@@ -49,7 +51,7 @@ export default function ProfilePage() {
         />
 
         {/* Main Content */}
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 pr-4 sm:pr-8 lg:pr-12">
           {renderContent()}
         </main>
       </div>

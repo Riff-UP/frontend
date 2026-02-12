@@ -154,27 +154,100 @@ export default function Publications() {
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+      <div className="w-full flex flex-col items-center">
+        {/* Title */}
+        <div className="w-full lg:max-w-2xl mb-6">
+          <h2 className="text-white text-xl sm:text-2xl font-bold">Publicaciones</h2>
+          <p className="text-white/80 text-xs sm:text-sm mt-1">Sube tu contenido y comparte tus ideas con la comunidad.</p>
+        </div>
+
+        {/* Create Publication Form */}
+        <div className="w-full lg:max-w-2xl mb-6">
+          <div className="bg-riff-header rounded-sm p-4 sm:p-5">
+            <h3 className="text-white font-semibold text-base sm:text-lg mb-3">¿Qué tienes en mente?</h3>
+            <p className="text-riff-text-secondary text-sm mb-4">Comparte tus ideas...</p>
+            
+            <textarea
+              value={newPost}
+              onChange={(e) => setNewPost(e.target.value)}
+              placeholder="Escribe algo..."
+              rows={4}
+              className="w-full px-3 py-2 bg-riff-text-primary/40 border border-riff-text-secondary/80 rounded-sm text-white placeholder-riff-text-secondary text-sm
+                       focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
+                       transition-all duration-200 resize-none"
+            />
+
+            {selectedImage && (
+              <div className="relative rounded-sm overflow-hidden border border-white/10 flex items-center justify-center bg-black/5 mt-3">
+                <img
+                  src={selectedImage}
+                  alt="Preview"
+                  className="w-full h-auto max-h-[200px] object-contain"
+                />
+                <button
+                  onClick={() => setSelectedImage(null)}
+                  className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-black/80 transition-colors"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
+            <label className="flex items-center gap-2 text-white/60 hover:text-riff-primary cursor-pointer transition-colors mt-3">
+              <MdOutlineAddPhotoAlternate className="w-5 h-5" />
+              <span className="text-sm">Agregar imagen</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+            </label>
+
+            <div className="flex gap-2 pt-4">
+              <button
+                onClick={handleCancel}
+                className="flex-1 px-4 py-2 bg-riff-text-secondary/30 hover:bg-riff-text-secondary/40 text-white text-sm font-medium rounded-sm border border-white/20 transition-colors duration-200"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handlePublish}
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white text-sm font-medium rounded-sm hover:from-riff-primary hover:to-riff-primary-dark transition-all duration-200"
+                disabled={!newPost.trim() && !selectedImage}
+              >
+                Publicar
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Publications List */}
-        <div className="flex-1 order-2 lg:order-1">
-          <h2 className="text-white text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Publicaciones</h2>
+        <div className="w-full lg:max-w-2xl">
+          
           
           <div className="space-y-4">
             {publications.map((pub) => (
-              <div key={pub.id} className="bg-riff-header border border-white/10 rounded-sm p-4 sm:p-5">
+              <div key={pub.id} className="bg-riff-header rounded-sm p-4 sm:p-5">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="relative w-10 h-10 rounded-full overflow-hidden bg-riff-text-secondary/30 flex-shrink-0">
-                      <Image
-                        src={pub.author.avatar}
-                        alt={pub.author.name}
-                        fill
-                        className="object-cover"
-                      />
+                    <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-riff-primary-dark to-riff-primary flex-shrink-0 flex items-center justify-center">
+                      {pub.author.avatar ? (
+                        <Image
+                          src={pub.author.avatar}
+                          alt={pub.author.name}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <span className="text-white text-sm font-semibold">
+                          {pub.author.name ? pub.author.name.charAt(0).toUpperCase() : 'U'}
+                        </span>
+                      )}
                     </div>
                     <div>
-                      <h3 className="text-white font-semibold text-sm">{pub.author.name}</h3>
+                      <h3 className="text-white font-semibold text-sm">{pub.author.name || 'Usuario'}</h3>
                       <p className="text-riff-text-secondary text-xs">{pub.time}</p>
                     </div>
                   </div>
@@ -240,12 +313,11 @@ export default function Publications() {
 
                 {/* Image */}
                 {pub.image && (
-                  <div className="relative w-full h-48 sm:h-64 mb-3 rounded-sm overflow-hidden">
-                    <Image
+                  <div className="mb-3 rounded-sm overflow-hidden border border-white/10 flex items-center justify-center bg-black/5">
+                    <img
                       src={pub.image}
                       alt="Publicación"
-                      fill
-                      className="object-cover"
+                      className="w-full h-auto max-h-[400px] object-contain"
                     />
                   </div>
                 )}
@@ -264,69 +336,6 @@ export default function Publications() {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* Create Publication Sidebar */}
-        <div className="w-full lg:w-80 flex-shrink-0 order-1 lg:order-2">
-          <div className="bg-riff-header border border-white/10 rounded-sm p-4 lg:sticky lg:top-6">
-            <div className="space-y-3">
-              <h3 className="text-white font-semibold text-sm sm:text-base mb-2 sm:mb-3">¿Qué tienes en mente?</h3>
-              <p className="text-riff-text-secondary text-xs sm:text-sm mb-2 sm:mb-3">Comparte tus ideas...</p>
-              
-              <textarea
-                value={newPost}
-                onChange={(e) => setNewPost(e.target.value)}
-                placeholder="Escribe algo..."
-                rows={4}
-                className="w-full px-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white placeholder-riff-text-secondary text-sm
-                         focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
-                         transition-all duration-200 resize-none"
-              />
-
-              {selectedImage && (
-                <div className="relative w-full h-32 rounded-sm overflow-hidden">
-                  <Image
-                    src={selectedImage}
-                    alt="Preview"
-                    fill
-                    className="object-cover"
-                  />
-                  <button
-                    onClick={() => setSelectedImage(null)}
-                    className="absolute top-2 right-2 bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-black/70 transition-colors"
-                  >
-                  </button>
-                </div>
-              )}
-
-              <label className="flex items-center gap-2 text-white/60 hover:text-riff-primary cursor-pointer transition-colors">
-                <MdOutlineAddPhotoAlternate className="w-5 h-5" />
-                <span className="text-sm">Agregar imagen</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageSelect}
-                  className="hidden"
-                />
-              </label>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={handleCancel}
-                  className="flex-1 px-3 py-2 bg-riff-text-secondary/30 hover:bg-riff-text-secondary/40 text-white text-sm font-medium rounded-sm border border-white/20 transition-colors duration-200"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handlePublish}
-                  className="flex-1 px-3 py-2 bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white text-sm font-medium rounded-sm hover:from-riff-primary hover:to-riff-primary-dark transition-all duration-200"
-                  disabled={!newPost.trim() && !selectedImage}
-                >
-                  Publicar
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </div>
