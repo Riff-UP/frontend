@@ -41,8 +41,9 @@ export default function ProfileEdit() {
   };
 
   return (
-    <div className="w-full">
-      <div className="bg-riff-header border border-white/0 rounded-sm p-3 sm:p-4 md:p-6">
+    <div className="w-full flex justify-center">
+      <div className="w-full max-w-4xl">
+        <div className="bg-riff-header border border-white/0 rounded-sm p-3 sm:p-4 md:p-6">
         {/* Header con foto y seguidores */}
         <div className="flex items-center gap-2 sm:gap-3 pb-3 sm:pb-4">
           <div className="relative w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-riff-text-secondary/30 flex-shrink-0">
@@ -214,6 +215,7 @@ export default function ProfileEdit() {
             Eliminar cuenta
           </button>
         </div>
+      </div>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { CgProfile } from "react-icons/cg";
 import { BiImages } from "react-icons/bi";
-import { MdOutlineLibraryMusic } from "react-icons/md";
+import { MdOutlineLibraryMusic, MdOutlineQueryStats } from "react-icons/md";
 import { IoIosCalendar } from "react-icons/io";
 import { FiBookmark } from 'react-icons/fi';
 
@@ -18,6 +18,7 @@ export default function MobileNav({ activeSection, onSectionChange }: MobileNavP
     { id: 'eventos', label: 'Eventos', icon: IoIosCalendar },
     { id: 'musica', label: 'Música', icon: MdOutlineLibraryMusic },
     { id: 'guardados', label: 'Guardados', icon: FiBookmark },
+    { id: 'estadisticas', label: 'Stats', icon: MdOutlineQueryStats },
   ];
 
   return (
