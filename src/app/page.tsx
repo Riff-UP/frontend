@@ -1,7 +1,7 @@
-import Header from "@/app/components/Header";
-import Footer from "@/app/components/Footer";
-import ArtistCard from "@/app/components/ArtistCard";
-import SongCard from "@/app/components/SongCard";
+import Header from "@/app/components/layout/Header";
+import Footer from "@/app/components/layout/Footer";
+import ArtistCard from "@/app/components/cards/ArtistCard";
+import SongCard from "@/app/components/cards/SongCard";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { FaCircleChevronLeft, FaCircleChevronRight } from "react-icons/fa6";
 

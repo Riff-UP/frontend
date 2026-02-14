@@ -2,16 +2,8 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-
-interface ProfileData {
-  name: string;
-  description: string;
-  followers: number;
-  instagram: string;
-  facebook: string;
-  whatsapp: string;
-  email: string;
-}
+import { ProfileData } from '@/app/types';
+import SocialMediaInput from './profile/SocialMediaInput';
 
 export default function ProfileEdit() {
   const [profileData, setProfileData] = useState<ProfileData>({
@@ -146,89 +138,26 @@ export default function ProfileEdit() {
             <h3 className="text-riff-primary text-sm sm:text-base font-semibold mb-2 sm:mb-3">Redes y contacto</h3>
             
             <div className="space-y-2 sm:space-y-2.5">
-              {/* Instagram */}
-              <div className="flex items-center gap-2 sm:gap-2.5">
-                <div className="w-7 h-7 sm:w-9 sm:h-9 flex-shrink-0 flex items-center justify-center">
-                  <Image
-                    src="/images/instagram.png"
-                    alt="Instagram"
-                    width={24}
-                    height={24}
-                    className="sm:w-[30px] sm:h-[30px]"
-                  />
-                </div>
-                <input
-                  type="text"
-                  value={profileData.instagram}
-                  onChange={(e) => handleChange('instagram', e.target.value)}
-                  className="flex-1 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
-                           focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
-                           transition-all duration-200"
-                />
-              </div>
-
-              {/* Facebook */}
-              <div className="flex items-center gap-2 sm:gap-2.5">
-                <div className="w-7 h-7 sm:w-9 sm:h-9 flex-shrink-0 flex items-center justify-center">
-                  <Image
-                    src="/images/facebook_n.png"
-                    alt="Facebook"
-                    width={24}
-                    height={24}
-                    className="sm:w-[30px] sm:h-[30px]"
-                  />
-                </div>
-                <input
-                  type="text"
-                  value={profileData.facebook}
-                  onChange={(e) => handleChange('facebook', e.target.value)}
-                  className="flex-1 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
-                           focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
-                           transition-all duration-200"
-                />
-              </div>
-
-              {/* WhatsApp */}
-              <div className="flex items-center gap-2 sm:gap-2.5">
-                <div className="w-7 h-7 sm:w-9 sm:h-9 flex-shrink-0 flex items-center justify-center">
-                  <Image
-                    src="/images/whatsapp.png"
-                    alt="WhatsApp"
-                    width={24}
-                    height={24}
-                    className="sm:w-[30px] sm:h-[30px]"
-                  />
-                </div>
-                <input
-                  type="text"
-                  value={profileData.whatsapp}
-                  onChange={(e) => handleChange('whatsapp', e.target.value)}
-                  className="flex-1 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
-                           focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
-                           transition-all duration-200"
-                />
-              </div>
-
-              {/* Email */}
-              <div className="flex items-center gap-2 sm:gap-2.5">
-                <div className="w-7 h-7 sm:w-9 sm:h-9 flex-shrink-0 flex items-center justify-center">
-                  <Image
-                    src="/images/gmail.png"
-                    alt="Gmail"
-                    width={24}
-                    height={24}
-                    className="sm:w-[30px] sm:h-[30px]"
-                  />
-                </div>
-                <input
-                  type="email"
-                  value={profileData.email}
-                  onChange={(e) => handleChange('email', e.target.value)}
-                  className="flex-1 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
-                           focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
-                           transition-all duration-200"
-                />
-              </div>
+              <SocialMediaInput
+                platform="instagram"
+                value={profileData.instagram}
+                onChange={(value) => handleChange('instagram', value)}
+              />
+              <SocialMediaInput
+                platform="facebook"
+                value={profileData.facebook}
+                onChange={(value) => handleChange('facebook', value)}
+              />
+              <SocialMediaInput
+                platform="whatsapp"
+                value={profileData.whatsapp}
+                onChange={(value) => handleChange('whatsapp', value)}
+              />
+              <SocialMediaInput
+                platform="email"
+                value={profileData.email}
+                onChange={(value) => handleChange('email', value)}
+              />
             </div>
           </div>
         </div>

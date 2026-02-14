@@ -1,24 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
-import { BsThreeDots } from 'react-icons/bs';
-import { AiOutlineHeart } from 'react-icons/ai';
-import { BsBookmark } from 'react-icons/bs';
-import { MdOutlineAddPhotoAlternate, MdEdit, MdDelete } from 'react-icons/md';
-
-interface Publication {
-  id: number;
-  author: {
-    name: string;
-    avatar: string;
-  };
-  time: string;
-  text: string;
-  image?: string;
-  likes: number;
-  saved: number;
-}
+import { Publication } from '@/app/types';
+import PublicationForm from './publications/PublicationForm';
+import PublicationListCard from './publications/PublicationListCard';
+import DeleteConfirmModal from './common/DeleteConfirmModal';
 
 export default function Publications() {
   const [newPost, setNewPost] = useState('');
@@ -122,223 +108,55 @@ export default function Publications() {
 
   return (
     <div className="w-full">
-      {/* Delete Confirmation Modal */}
-      {deleteConfirmId !== null && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-riff-card border border-white/20 rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
-                <MdDelete className="w-6 h-6 text-red-400" />
-              </div>
-              <h3 className="text-white text-lg font-semibold">Eliminar publicación</h3>
-            </div>
-            <p className="text-riff-text-secondary text-sm mb-6">
-              ¿Estás seguro de que quieres eliminar esta publicación? Esta acción no se puede deshacer.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={cancelDelete}
-                className="flex-1 px-4 py-2.5 bg-riff-text-secondary/30 hover:bg-riff-text-secondary/40 text-white text-sm font-medium rounded-sm border border-white/20 transition-colors duration-200"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-riff-delete to-riff-delete-2 hover:from-riff-delete-2 hover:to-riff-delete text-white text-sm font-medium rounded-sm transition-all duration-200 flex items-center justify-center gap-2"
-              >
-                <MdDelete className="w-4 h-4" />
-                Eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="w-full flex flex-col items-center">
         {/* Title */}
         <div className="w-full lg:max-w-2xl mb-6">
           <h2 className="text-white text-xl sm:text-2xl font-bold">Publicaciones</h2>
-          <p className="text-white/80 text-xs sm:text-sm mt-1">Sube tu contenido y comparte tus ideas con la comunidad.</p>
+          <p className="text-white/80 text-xs sm:text-sm mt-1">
+            Sube tu contenido y comparte tus ideas con la comunidad.
+          </p>
         </div>
 
         {/* Create Publication Form */}
-        <div className="w-full lg:max-w-2xl mb-6">
-          <div className="bg-riff-header rounded-sm p-4 sm:p-5">
-            <h3 className="text-white font-semibold text-base sm:text-lg mb-3">¿Qué tienes en mente?</h3>
-            <p className="text-riff-text-secondary text-sm mb-4">Comparte tus ideas...</p>
-            
-            <textarea
-              value={newPost}
-              onChange={(e) => setNewPost(e.target.value)}
-              placeholder="Escribe algo..."
-              rows={4}
-              className="w-full px-3 py-2 bg-riff-text-primary/40 border border-riff-text-secondary/80 rounded-sm text-white placeholder-riff-text-secondary text-sm
-                       focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
-                       transition-all duration-200 resize-none"
-            />
-
-            {selectedImage && (
-              <div className="relative rounded-sm overflow-hidden border border-white/10 flex items-center justify-center bg-black/5 mt-3">
-                <img
-                  src={selectedImage}
-                  alt="Preview"
-                  className="w-full h-auto max-h-[200px] object-contain"
-                />
-                <button
-                  onClick={() => setSelectedImage(null)}
-                  className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-black/80 transition-colors"
-                >
-                  ×
-                </button>
-              </div>
-            )}
-
-            <label className="flex items-center gap-2 text-white/60 hover:text-riff-primary cursor-pointer transition-colors mt-3">
-              <MdOutlineAddPhotoAlternate className="w-5 h-5" />
-              <span className="text-sm">Agregar imagen</span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageSelect}
-                className="hidden"
-              />
-            </label>
-
-            <div className="flex gap-2 pt-4">
-              <button
-                onClick={handleCancel}
-                className="flex-1 px-4 py-2 bg-riff-text-secondary/30 hover:bg-riff-text-secondary/40 text-white text-sm font-medium rounded-sm border border-white/20 transition-colors duration-200"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handlePublish}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white text-sm font-medium rounded-sm hover:from-riff-primary hover:to-riff-primary-dark transition-all duration-200"
-                disabled={!newPost.trim() && !selectedImage}
-              >
-                Publicar
-              </button>
-            </div>
-          </div>
-        </div>
+        <PublicationForm
+          text={newPost}
+          selectedImage={selectedImage}
+          onTextChange={setNewPost}
+          onImageSelect={handleImageSelect}
+          onPublish={handlePublish}
+          onCancel={handleCancel}
+        />
 
         {/* Publications List */}
         <div className="w-full lg:max-w-2xl">
-          
-          
           <div className="space-y-4">
             {publications.map((pub) => (
-              <div key={pub.id} className="bg-riff-header rounded-sm p-4 sm:p-5">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-riff-primary-dark to-riff-primary flex-shrink-0 flex items-center justify-center">
-                      {pub.author.avatar ? (
-                        <Image
-                          src={pub.author.avatar}
-                          alt={pub.author.name}
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <span className="text-white text-sm font-semibold">
-                          {pub.author.name ? pub.author.name.charAt(0).toUpperCase() : 'U'}
-                        </span>
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="text-white font-semibold text-sm">{pub.author.name || 'Usuario'}</h3>
-                      <p className="text-riff-text-secondary text-xs">{pub.time}</p>
-                    </div>
-                  </div>
-                  <div className="relative menu-container">
-                    <button 
-                      onClick={() => setOpenMenuId(openMenuId === pub.id ? null : pub.id)}
-                      className="text-white/50 hover:text-riff-primary transition-colors"
-                    >
-                      <BsThreeDots className="w-5 h-5" />
-                    </button>
-                    
-                    {/* Dropdown Menu */}
-                    {openMenuId === pub.id && (
-                      <div className="absolute right-0 top-8 bg-riff-text-primary border border-white/20 rounded-sm shadow-lg z-10 min-w-[140px] overflow-hidden">
-                        <button
-                          onClick={() => handleEdit(pub.id, pub.text)}
-                          className="w-full px-4 py-2 text-left text-white text-sm hover:bg-riff-primary/20 transition-colors flex items-center gap-2"
-                        >
-                          <MdEdit className="w-4 h-4" />
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleDelete(pub.id)}
-                          className="w-full px-4 py-2 text-left text-red-400 text-sm hover:bg-red-500/20 transition-colors flex items-center gap-2"
-                        >
-                          <MdDelete className="w-4 h-4" />
-                          Eliminar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Content */}
-                {editingId === pub.id ? (
-                  <div className="mb-3 space-y-2">
-                    <textarea
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                      rows={3}
-                      className="w-full px-3 py-2 bg-riff-text-secondary/40 border border-white/10 rounded-sm text-white placeholder-riff-text-secondary text-sm
-                               focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
-                               transition-all duration-200 resize-none"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => saveEdit(pub.id)}
-                        className="px-3 py-1.5 bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white text-xs font-medium rounded-sm hover:from-riff-primary hover:to-riff-primary-dark transition-all duration-200"
-                      >
-                        Guardar
-                      </button>
-                      <button
-                        onClick={cancelEdit}
-                        className="px-3 py-1.5 bg-riff-text-secondary/30 hover:bg-riff-text-secondary/40 text-white text-xs font-medium rounded-sm border border-white/20 transition-colors duration-200"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-white text-sm mb-3">{pub.text}</p>
-                )}
-
-                {/* Image */}
-                {pub.image && (
-                  <div className="mb-3 overflow-hidden flex items-center justify-center bg-riff-header">
-                    <img
-                      src={pub.image}
-                      alt="Publicación"
-                      className="w-full h-auto max-h-[400px] object-contain"
-                    />
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex items-center justify-end gap-4 pt-3">
-                  <div className="flex items-center gap-1.5 text-white/50">
-                    <AiOutlineHeart className="w-5 h-5" />
-                    <span className="text-sm">{pub.likes}</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-1.5 text-white/50">
-                    <BsBookmark className="w-5 h-5" />
-                    <span className="text-sm">{pub.saved}</span>
-                  </div>
-                </div>
-              </div>
+              <PublicationListCard
+                key={pub.id}
+                publication={pub}
+                isMenuOpen={openMenuId === pub.id}
+                isEditing={editingId === pub.id}
+                editText={editText}
+                onMenuToggle={() => setOpenMenuId(openMenuId === pub.id ? null : pub.id)}
+                onEdit={() => handleEdit(pub.id, pub.text || '')}
+                onDelete={() => handleDelete(pub.id)}
+                onEditTextChange={setEditText}
+                onSaveEdit={() => saveEdit(pub.id)}
+                onCancelEdit={cancelEdit}
+              />
             ))}
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={deleteConfirmId !== null}
+        title="Eliminar publicación"
+        message="¿Estás seguro de que quieres eliminar esta publicación? Esta acción no se puede deshacer."
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
     </div>
   );
 }

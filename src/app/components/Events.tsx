@@ -1,18 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { IoMdClose } from 'react-icons/io';
 import { MdEdit, MdDelete } from 'react-icons/md';
-import { FiMapPin, FiClock, FiCalendar } from 'react-icons/fi';
-import Calendar from './Calendar';
-
-interface Event {
-  id: number;
-  title: string;
-  location: string;
-  date: string;
-  time: string;
-}
+import { FiMapPin, FiCalendar } from 'react-icons/fi';
+import Calendar from './common/Calendar';
+import { Event } from '@/app/types';
+import EventForm from './events/EventForm';
+import EventCard from './events/EventCard';
+import DeleteConfirmModal from './common/DeleteConfirmModal';
 
 export default function Events() {
   const [showModal, setShowModal] = useState(false);
@@ -227,27 +222,14 @@ export default function Events() {
                 <p className="text-riff-text-secondary text-sm text-center py-8">No hay eventos próximos</p>
               ) : (
                 events.map((event) => (
-                  <div
+                  <EventCard
                     key={event.id}
-                    onClick={() => setSelectedEvent(event)}
-                    className={`p-4 border rounded-sm cursor-pointer transition-all ${
-                      selectedEvent?.id === event.id
-                        ? 'border-riff-primary bg-riff-primary/10'
-                        : 'border-white/10 hover:border-riff-primary/50 bg-riff-text-primary/30'
-                    }`}
-                  >
-                    <h4 className="text-white font-semibold text-base mb-3">{event.title}</h4>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-riff-text-secondary text-sm">
-                        <FiMapPin className="w-4 h-4" />
-                        <span>{event.location || 'Sin ubicación'}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-riff-text-secondary text-sm">
-                        <FiCalendar className="w-4 h-4" />
-                        <span>{formatEventDate(event.date, event.time)}</span>
-                      </div>
-                    </div>
-                  </div>
+                    event={event}
+                    formatDate={formatEventDate}
+                    onClick={setSelectedEvent}
+                    isSelected={selectedEvent?.id === event.id}
+                    showAttendButton={false}
+                  />
                 ))
               )}
             </div>
@@ -256,138 +238,29 @@ export default function Events() {
       </div>
 
       {/* Create Event Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm p-4">
-          <div className="bg-riff-header border border-white/20 rounded-lg w-full max-w-2xl shadow-2xl">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-white/10">
-              <h3 className="text-white text-lg sm:text-xl font-semibold">
-                {editingEventId ? 'Editar evento' : 'Subir evento'}
-              </h3>
-              <button
-                onClick={handleCloseModal}
-                className="text-riff-primary hover:text-riff-primary/80 transition-colors"
-              >
-                <IoMdClose className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-4 sm:p-6 space-y-4">
-              {/* Title */}
-              <div>
-                <label className="block text-white text-sm mb-2">Título</label>
-                <input
-                  type="text"
-                  value={newEvent.title}
-                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                  className="w-full px-3 py-2 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary
-                           focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
-                           transition-all duration-200"
-                />
-              </div>
-
-              {/* Date */}
-              <div>
-                <label className="block text-white text-sm mb-2">Fecha</label>
-                <div className="relative">
-                  <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 w-4 h-4" />
-                  <input
-                    type="date"
-                    value={newEvent.date}
-                    onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                    className="w-full pl-10 pr-3 py-2 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm
-                             focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
-                             transition-all duration-200"
-                  />
-                </div>
-              </div>
-
-              {/* Location */}
-              <div>
-                <label className="block text-white text-sm mb-2">Lugar</label>
-                <div className="relative">
-                  <FiMapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 w-4 h-4" />
-                  <input
-                    type="text"
-                    value={newEvent.location}
-                    onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
-                    className="w-full pl-10 pr-3 py-2 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary
-                             focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
-                             transition-all duration-200"
-                  />
-                </div>
-              </div>
-
-              {/* Time */}
-              <div>
-                <label className="block text-white text-sm mb-2">Hora</label>
-                <div className="relative">
-                  <FiClock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 w-4 h-4" />
-                  <input
-                    type="time"
-                    value={newEvent.time}
-                    onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
-                    className="w-full pl-10 pr-3 py-2 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm
-                             focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
-                             transition-all duration-200"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex gap-3 p-4 sm:p-6 border-t border-white/10">
-              <button
-                onClick={handleCloseModal}
-                className="flex-1 px-4 py-2.5 bg-riff-text-secondary/30 hover:bg-riff-text-secondary/40 text-white text-sm font-medium rounded-sm border border-white/20 transition-colors duration-200"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleCreateEvent}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-riff-save to-riff-save-2 hover:from-riff-save-2 hover:to-riff-save text-white text-sm font-medium rounded-sm transition-all duration-200"
-                disabled={!newEvent.title || !newEvent.date}
-              >
-                {editingEventId ? 'Guardar' : 'Subir'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <EventForm
+        isOpen={showModal}
+        isEditing={!!editingEventId}
+        title={newEvent.title}
+        location={newEvent.location}
+        date={newEvent.date}
+        time={newEvent.time}
+        onTitleChange={(value) => setNewEvent({ ...newEvent, title: value })}
+        onLocationChange={(value) => setNewEvent({ ...newEvent, location: value })}
+        onDateChange={(value) => setNewEvent({ ...newEvent, date: value })}
+        onTimeChange={(value) => setNewEvent({ ...newEvent, time: value })}
+        onSubmit={handleCreateEvent}
+        onClose={handleCloseModal}
+      />
 
       {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm p-4">
-          <div className="bg-riff-card border border-white/20 rounded-lg w-full max-w-md shadow-2xl">
-            <div className="p-6">
-              <div className="flex flex-col items-center text-center">
-                <div className="w-12 h-12 rounded-full bg-red-400/20 flex items-center justify-center mb-4">
-                  <MdDelete className="w-6 h-6 text-red-400" />
-                </div>
-                <h3 className="text-white text-xl font-semibold mb-2">¿Eliminar evento?</h3>
-                <p className="text-riff-text-secondary text-sm mb-6">
-                  Esta acción no se puede deshacer. El evento será eliminado permanentemente.
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={cancelDelete}
-                  className="flex-1 px-4 py-2.5 bg-riff-text-secondary/30 hover:bg-riff-text-secondary/40 text-white text-sm font-medium rounded-sm border border-white/20 transition-colors duration-200"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-600 text-white text-sm font-medium rounded-sm transition-all duration-200"
-                >
-                  Eliminar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        title="¿Eliminar evento?"
+        message="Esta acción no se puede deshacer. El evento será eliminado permanentemente."
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
     </div>
   );
 }

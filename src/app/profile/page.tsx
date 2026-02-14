@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import Sidebar from '../components/Sidebar';
-import MobileNav from '../components/MobileNav';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
+import Sidebar from '../components/layout/Sidebar';
+import MobileNav from '../components/layout/MobileNav';
+import Header from '../components/layout/Header';
+import Footer from '../components/layout/Footer';
 import ProfileEdit from '../components/ProfileEdit';
 import Publications from '../components/Publications';
 import Events from '../components/Events';

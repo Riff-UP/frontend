@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { MdBookmark } from 'react-icons/md';
+import { MdBookmark, MdBookmarkBorder } from 'react-icons/md';
 import { LiaUserCheckSolid } from "react-icons/lia";
 import { FaMusic } from "react-icons/fa";
 import { BsCalendarEventFill } from "react-icons/bs";
+import TabNavigation from './common/TabNavigation';
+import EventCard from './events/EventCard';
 
 interface SavedPublication {
   id: number;
@@ -118,27 +120,11 @@ export default function Saved() {
 
       {/* Tabs */}
       <div className="mb-6">
-        <div className="flex border-b border-white/10">
-          {tabs.map((tab) => {
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 px-6 py-3 font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 relative ${
-                  activeTab === tab.id
-                    ? 'text-riff-primary'
-                    : 'text-riff-text-secondary hover:text-white'
-                }`}
-              >
-                
-                <span>{tab.label}</span>
-                {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-riff-primary"></div>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <TabNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={(tabId) => setActiveTab(tabId as 'publicaciones' | 'canciones' | 'eventos')}
+        />
       </div>
 
       {/* Content */}
@@ -178,11 +164,11 @@ export default function Saved() {
                             : 'text-yellow-400 hover:text-yellow-300'
                         }`}
                       >
-                        <MdBookmark className={`w-5 h-5 ${
-                          undoMessage?.type === 'publication' && undoMessage?.id === publication.id
-                            ? 'fill-transparent stroke-current stroke-2'
-                            : 'fill-current'
-                        }`} />
+                        {undoMessage?.type === 'publication' && undoMessage?.id === publication.id ? (
+                          <MdBookmarkBorder className="w-5 h-5" />
+                        ) : (
+                          <MdBookmark className="w-5 h-5" />
+                        )}
                       </button>
                     </div>
                     {publication.image && (
