@@ -10,6 +10,7 @@ import Publications from '../components/Publications';
 import Events from '../components/Events';
 import Saved from '../components/Saved';
 import Analytics from '../components/Analytics';
+import Music from '../components/Music';
 
 export default function ProfilePage() {
   const [activeSection, setActiveSection] = useState('perfil');
@@ -23,7 +24,7 @@ export default function ProfilePage() {
       case 'eventos':
         return <Events />;
       case 'musica':
-        return <div className="text-white text-center py-20">Sección de Música - Próximamente</div>;
+        return <Music />;
       case 'guardados':
         return <Saved />;
       case 'estadisticas':
