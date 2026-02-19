@@ -49,3 +49,31 @@ export interface ProfileData {
   whatsapp: string;
   email: string;
 }
+
+// Analytics types
+export interface FollowerGrowthData {
+  week: string;
+  followers: number;
+  date: string;
+}
+
+export interface InteractionData {
+  week: string;
+  interactions: number;
+  date: string;
+}
+
+export interface EventAttendanceData {
+  id: number;
+  eventName: string;
+  attendees: number;
+}
+
+export interface EventRatingData {
+  id: number;
+  eventName: string;
+  averageRating: number;
+  totalRatings: number;
+}
+
+export type TimeFilter = '7d' | '30d' | '90d' | '1y';

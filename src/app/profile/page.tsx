@@ -9,6 +9,7 @@ import ProfileEdit from '../components/ProfileEdit';
 import Publications from '../components/Publications';
 import Events from '../components/Events';
 import Saved from '../components/Saved';
+import Analytics from '../components/Analytics';
 
 export default function ProfilePage() {
   const [activeSection, setActiveSection] = useState('perfil');
@@ -26,7 +27,7 @@ export default function ProfilePage() {
       case 'guardados':
         return <Saved />;
       case 'estadisticas':
-        return <div className="text-white text-center py-20">Sección de Estadísticas - Próximamente</div>;
+        return <Analytics />;
       default:
         return <ProfileEdit />;
     }
