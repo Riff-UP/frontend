@@ -8,9 +8,10 @@ import { FiSearch, FiUser } from 'react-icons/fi';
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
+  isAuthenticated?: boolean;
 }
 
-export default function Header({ onSearch }: HeaderProps) {
+export default function Header({ onSearch, isAuthenticated = false }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const pathname = usePathname();
 
@@ -65,16 +66,29 @@ export default function Header({ onSearch }: HeaderProps) {
               Inicio
             </Link>
 
-            <Link 
-              href="/profile" 
-              className={`flex items-center gap-2 text-sm sm:text-base font-semibold transition-colors ${
-                pathname === '/profile' 
-                  ? 'text-riff-primary' 
-                  : 'text-riff-background hover:text-riff-primary'
-              }`}
-            >
-              <span>Perfil</span>
-            </Link>
+            {isAuthenticated ? (
+              <Link 
+                href="/profile" 
+                className={`flex items-center gap-2 text-sm sm:text-base font-semibold transition-colors ${
+                  pathname === '/profile' 
+                    ? 'text-riff-primary' 
+                    : 'text-riff-background hover:text-riff-primary'
+                }`}
+              >
+                <span>Perfil</span>
+              </Link>
+            ) : (
+              <Link 
+                href="/login" 
+                className={`flex items-center gap-2 text-sm sm:text-base font-semibold transition-colors ${
+                  pathname === '/login' 
+                    ? 'text-riff-primary' 
+                    : 'text-riff-background hover:text-riff-primary'
+                }`}
+              >
+                <span>Iniciar sesión</span>
+              </Link>
+            )}
           </nav>
         </div>
       </div>

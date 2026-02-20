@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Header from "@/app/components/layout/Header";
 import Footer from "@/app/components/layout/Footer";
 import ArtistCard from "@/app/components/cards/ArtistCard";
@@ -10,22 +11,25 @@ import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { FaCircleChevronLeft, FaCircleChevronRight } from "react-icons/fa6";
 
 export default function Home() {
+  // Estado de autenticación - en producción vendría de un contexto o sesión
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
   // Datos de ejemplo - en produccion vendrian de una API
-  const featuredArtists = [
+  const featuredArtists: any[] = [
     // Aqui se agregarian los artistas destacados
   ];
 
-  const userArtists = [
+  const userArtists: any[] = [
     // Aqui se agregarian los artistas del usuario
   ];
 
-  const userSongs = [
+  const userSongs: any[] = [
     // Aqui se agregarian las canciones del usuario
   ];
 
   // Eventos a los que el usuario ha asistido (ejemplo)
   // En producción, esto vendría de una API
-  const attendedEvents = [
+  const attendedEvents: any[] = [
     // Agrega eventos aquí para probar el modal de valoración
   ];
 
@@ -34,7 +38,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-riff-background-b">
-      <Header />
+      <Header isAuthenticated={isAuthenticated} />
       <main className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
         {/* Hero Section */}
         <section 
