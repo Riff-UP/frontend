@@ -1,47 +1,50 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Header from "@/app/components/layout/Header";
 import Footer from "@/app/components/layout/Footer";
 import ArtistCard from "@/app/components/cards/ArtistCard";
 import SongCard from "@/app/components/cards/SongCard";
 import EventRatingModal from "@/app/components/common/EventRatingModal";
 import { useEventRating } from "@/app/hooks/useEventRating";
-import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { FaCircleChevronLeft, FaCircleChevronRight } from "react-icons/fa6";
 
 export default function Home() {
-  // Estado de autenticación - en producción vendría de un contexto o sesión
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const router = useRouter();
 
-  // Datos de ejemplo - en produccion vendrian de una API
-  const featuredArtists: any[] = [
-    // Aqui se agregarian los artistas destacados
-  ];
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const isExpired = payload.exp * 1000 < Date.now();
+      if (isExpired) {
+        localStorage.removeItem('token');
+        setIsAuthenticated(false);
+        router.push('/login');
+      } else {
+        setIsAuthenticated(true);
+      }
+    } else {
+      router.push('/login');
+    }
+  }, []);
 
-  const userArtists: any[] = [
-    // Aqui se agregarian los artistas del usuario
-  ];
+  const featuredArtists: any[] = [];
+  const userArtists: any[] = [];
+  const userSongs: any[] = [];
+  const attendedEvents: any[] = [];
 
-  const userSongs: any[] = [
-    // Aqui se agregarian las canciones del usuario
-  ];
-
-  // Eventos a los que el usuario ha asistido (ejemplo)
-  // En producción, esto vendría de una API
-  const attendedEvents: any[] = [
-    // Agrega eventos aquí para probar el modal de valoración
-  ];
-
-  // Hook para manejar la valoración de eventos
   const { eventToRate, handleRatingSubmit, handleRatingClose } = useEventRating(attendedEvents);
 
   return (
     <div className="min-h-screen bg-riff-background-b">
       <Header isAuthenticated={isAuthenticated} />
       <main className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
+
         {/* Hero Section */}
-        <section 
+        <section
           className="relative h-[300px] sm:h-[400px] lg:h-[450px] w-full max-w-8xl mx-auto overflow-hidden rounded-lg"
           style={{
             backgroundImage: "url(/images/portada.jpg)",
@@ -52,15 +55,17 @@ export default function Home() {
           <div className="absolute inset-0 bg-black/50" />
           <div className="relative z-10 h-full flex items-start pt-4 sm:pt-8 lg:pt-2 px-4 sm:px-8 md:px-12 lg:px-6">
             <div className="max-w-xl">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight" 
-                  style={{ textShadow: "2px 2px 8px rgba(0,0,0,0.7)" }}>
+              <h1
+                className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight"
+                style={{ textShadow: "2px 2px 8px rgba(0,0,0,0.7)" }}
+              >
                 Con Riff, impulsa tu musica al siguiente nivel
               </h1>
             </div>
           </div>
         </section>
 
-        {/* Artistas Destacados Section */}
+        {/* Artistas Destacados */}
         {featuredArtists.length > 0 && (
           <section className="max-w-8xl mx-auto px-0 sm:px-4 lg:px-0 py-6 sm:py-8">
             <div className="flex items-center justify-between mb-6 sm:mb-8 px-4 sm:px-0">
@@ -74,8 +79,6 @@ export default function Home() {
                 </button>
               </div>
             </div>
-            
-            {/* Grid de artistas */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 px-4 sm:px-0">
               {featuredArtists.map((artist) => (
                 <ArtistCard key={artist.id} {...artist} />
@@ -84,7 +87,7 @@ export default function Home() {
           </section>
         )}
 
-        {/* Tus Artistas Section */}
+        {/* Tus Artistas */}
         {userArtists.length > 0 && (
           <section className="max-w-8xl mx-auto px-0 sm:px-4 lg:px-0 py-6 sm:py-12">
             <div className="flex items-center justify-between mb-6 sm:mb-8 px-4 sm:px-0">
@@ -98,8 +101,6 @@ export default function Home() {
                 </button>
               </div>
             </div>
-            
-            {/* Grid de artistas */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 px-4 sm:px-0">
               {userArtists.map((artist) => (
                 <ArtistCard key={artist.id} {...artist} />
@@ -108,7 +109,7 @@ export default function Home() {
           </section>
         )}
 
-        {/* Tus Canciones Section */}
+        {/* Tus Canciones */}
         {userSongs.length > 0 && (
           <section className="max-w-8xl mx-auto px-0 sm:px-4 lg:px-0 py-6 sm:py-12">
             <div className="flex items-center justify-between mb-6 sm:mb-8 px-4 sm:px-0">
@@ -122,8 +123,6 @@ export default function Home() {
                 </button>
               </div>
             </div>
-            
-            {/* Grid de canciones */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 px-4 sm:px-0">
               {userSongs.map((song) => (
                 <SongCard key={song.id} {...song} />
@@ -132,10 +131,9 @@ export default function Home() {
           </section>
         )}
       </main>
-      
+
       <Footer />
 
-      {/* Event Rating Modal */}
       {eventToRate && (
         <EventRatingModal
           isOpen={!!eventToRate}

@@ -6,6 +6,7 @@ import { CgProfile } from "react-icons/cg";
 import { BiImages } from "react-icons/bi";
 import { MdOutlineLibraryMusic, MdOutlineQueryStats } from "react-icons/md";
 import { IoIosLogOut, IoIosCalendar } from "react-icons/io";
+import { useLogout } from '@/app/hooks/useLogout';
 
 interface SidebarProps {
   activeSection?: string;
@@ -14,6 +15,7 @@ interface SidebarProps {
 
 export default function Sidebar({ activeSection = 'perfil', onSectionChange }: SidebarProps) {
   const [active, setActive] = useState(activeSection);
+  const { handleLogout } = useLogout()
 
   const handleSectionChange = (section: string) => {
     setActive(section);
@@ -28,10 +30,6 @@ export default function Sidebar({ activeSection = 'perfil', onSectionChange }: S
     { id: 'guardados', label: 'Guardados', icon: FiBookmark },
     { id: 'estadisticas', label: 'Estadísticas', icon: MdOutlineQueryStats },
   ];
-
-  const handleLogout = () => {
-    // Lógica de cierre de sesión
-  };
 
   return (
     <aside className="hidden md:flex group w-16 hover:w-64 bg-gradient-to-b from-riff-card to-riff-header border border-white/10 rounded-2xl flex-col transition-all duration-300 ease-in-out shadow-lg sticky top-24 self-start">

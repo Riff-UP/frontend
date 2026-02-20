@@ -12,14 +12,8 @@ export default function HomePage() {
     if (tokenFromUrl) {
       localStorage.setItem('token', tokenFromUrl);
       setToken(tokenFromUrl);
-      router.replace('/home');
+      router.replace('/');
     }
   }, []);
 
-  return (
-    <div>
-      <h1>Bienvenido a Riff</h1>
-      {token && <p>Sesión iniciada correctamente</p>}
-    </div>
-  );
 }
