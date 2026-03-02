@@ -6,6 +6,8 @@ import { CgProfile } from "react-icons/cg";
 import { BiImages } from "react-icons/bi";
 import { MdOutlineLibraryMusic, MdOutlineQueryStats } from "react-icons/md";
 import { IoIosLogOut, IoIosCalendar } from "react-icons/io";
+import { useLogout } from '@/app/hooks/useLogout';
+import { useUser } from '@/app/hooks/useUser';
 
 interface SidebarProps {
   activeSection?: string;
@@ -14,6 +16,8 @@ interface SidebarProps {
 
 export default function Sidebar({ activeSection = 'perfil', onSectionChange }: SidebarProps) {
   const [active, setActive] = useState(activeSection);
+  const { handleLogout } = useLogout();
+  const { user } = useUser();
 
   const handleSectionChange = (section: string) => {
     setActive(section);
@@ -29,10 +33,6 @@ export default function Sidebar({ activeSection = 'perfil', onSectionChange }: S
     { id: 'estadisticas', label: 'Estadísticas', icon: MdOutlineQueryStats },
   ];
 
-  const handleLogout = () => {
-    // Lógica de cierre de sesión
-  };
-
   return (
     <aside className="hidden md:flex group w-16 hover:w-64 bg-gradient-to-b from-riff-card to-riff-header border border-white/10 rounded-2xl flex-col transition-all duration-300 ease-in-out shadow-lg sticky top-24 self-start">
       {/* User Info */}
@@ -40,11 +40,18 @@ export default function Sidebar({ activeSection = 'perfil', onSectionChange }: S
         {/* Top line */}
         <div className="w-10 h-[2px] bg-gradient-to-r from-riff-primary-dark to-riff-primary mx-auto mb-4 rounded-full"></div>
         <div className="flex items-center gap-3 mb-4">
-          <div className="relative w-10 h-10 rounded-full overflow-hidden bg-riff-text-secondary/30 flex-shrink-0 mx-auto group-hover:mx-0">
+          <div className="relative w-10 h-10 rounded-full overflow-hidden bg-riff-text-secondary/30 flex-shrink-0 mx-auto group-hover:mx-0 flex items-center justify-center">
+            <span className="text-white font-semibold text-sm">
+              {user?.name?.charAt(0)?.toUpperCase() || '?'}
+            </span>
           </div>
           <div className="flex-2 min-w-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <h3 className="text-white font-semibold text-sm truncate whitespace-nowrap"></h3>
-            <p className="text-riff-text-secondary text-xs truncate whitespace-nowrap"></p>
+            <h3 className="text-white font-semibold text-sm truncate whitespace-nowrap">
+              {user?.name || 'Cargando...'}
+            </h3>
+            <p className="text-riff-text-secondary text-xs truncate whitespace-nowrap">
+              {user?.role === 'ARTIST' ? 'Artista' : 'Usuario'}
+            </p>
           </div>
         </div>
         

@@ -1,5 +1,34 @@
 // Shared types for the application
 
+// Auth types
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  googleId?: string;
+  biography?: string;
+  role: 'USER' | 'ARTIST' | 'ADMIN';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: User;
+}
+
+export interface RegisterData {
+  name: string;
+  email: string;
+  password: string;
+  role?: 'USER' | 'ARTIST';
+}
+
+export interface LoginData {
+  email: string;
+  password: string;
+}
+
 export interface ArtistData {
   id: number;
   name: string;
@@ -49,3 +78,43 @@ export interface ProfileData {
   whatsapp: string;
   email: string;
 }
+
+// User from backend
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  googleId?: string | null;
+  biography?: string | null;
+  role: 'USER' | 'ARTIST';
+  status: boolean;
+  createdAt: string;
+}
+
+// Analytics types
+export interface FollowerGrowthData {
+  week: string;
+  followers: number;
+  date: string;
+}
+
+export interface InteractionData {
+  week: string;
+  interactions: number;
+  date: string;
+}
+
+export interface EventAttendanceData {
+  id: number;
+  eventName: string;
+  attendees: number;
+}
+
+export interface EventRatingData {
+  id: number;
+  eventName: string;
+  averageRating: number;
+  totalRatings: number;
+}
+
+export type TimeFilter = '7d' | '30d' | '90d' | '1y';

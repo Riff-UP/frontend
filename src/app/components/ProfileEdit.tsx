@@ -1,11 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { ProfileData } from '@/app/types';
 import SocialMediaInput from './profile/SocialMediaInput';
+import { useUser } from '../hooks/useUser';
 
 export default function ProfileEdit() {
+  const { user, loading, error, updateUser, deleteAccount } = useUser();
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  
   const [profileData, setProfileData] = useState<ProfileData>({
     name: '',
     description: '',
@@ -17,6 +22,18 @@ export default function ProfileEdit() {
   });
 
   const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  // Sincronizar datos del usuario cuando se carguen
+  useEffect(() => {
+    if (user) {
+      setProfileData(prev => ({
+        ...prev,
+        name: user.name || '',
+        description: user.biography || '',
+        email: user.email || '',
+      }));
+    }
+  }, [user]);
 
   const handleChange = (field: keyof ProfileData, value: string | number) => {
     setProfileData(prev => ({ ...prev, [field]: value }));
@@ -40,17 +57,68 @@ export default function ProfileEdit() {
     fileInput?.click();
   };
 
-  const handleSave = () => {
-    // Lógica para guardar
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveMessage(null);
+    
+    const success = await updateUser({
+      name: profileData.name,
+      biography: profileData.description,
+    });
+    
+    if (success) {
+      setSaveMessage({ type: 'success', text: 'Perfil actualizado correctamente' });
+    } else {
+      setSaveMessage({ type: 'error', text: error || 'Error al guardar cambios' });
+    }
+    
+    setSaving(false);
+    
+    // Limpiar mensaje después de 3 segundos
+    setTimeout(() => setSaveMessage(null), 3000);
   };
 
   const handleCancel = () => {
-    // Lógica para cancelar
+    // Restaurar datos originales del usuario
+    if (user) {
+      setProfileData(prev => ({
+        ...prev,
+        name: user.name || '',
+        description: user.biography || '',
+        email: user.email || '',
+      }));
+    }
+    setSaveMessage(null);
   };
 
-  const handleDeleteAccount = () => {
-    // Lógica para eliminar cuenta
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      '¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer.'
+    );
+    
+    if (confirmed) {
+      await deleteAccount();
+    }
   };
+
+  // Estado de carga
+  if (loading) {
+    return (
+      <div className="w-full flex justify-center">
+        <div className="w-full max-w-4xl">
+          <div className="bg-riff-header border border-white/0 rounded-sm p-6 flex items-center justify-center min-h-[400px]">
+            <div className="flex flex-col items-center gap-3">
+              <svg className="animate-spin h-8 w-8 text-riff-primary" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span className="text-riff-text-secondary">Cargando perfil...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full flex justify-center">
@@ -164,32 +232,58 @@ export default function ProfileEdit() {
         {/* Divider line */}
         <div className="border-t-2 border-riff-primary my-3 sm:my-4"></div>
 
+        {/* Mensaje de éxito/error */}
+        {saveMessage && (
+          <div className={`mb-3 p-3 rounded-sm text-sm ${
+            saveMessage.type === 'success' 
+              ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+              : 'bg-red-500/20 text-red-400 border border-red-500/30'
+          }`}>
+            {saveMessage.text}
+          </div>
+        )}
+
         {/* Botones de acción */}
         <div className="flex flex-col sm:flex-row flex-wrap gap-2">
           <button
             onClick={handleSave}
+            disabled={saving}
             className="px-5 py-2 
             bg-gradient-to-r from-riff-save to-riff-save-2 
             text-white text-sm font-medium rounded-sm
             hover:from-riff-save-2 hover:to-riff-save
-             transition-colors duration-200"
+             transition-colors duration-200
+             disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Guardar
+            {saving ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Guardando...
+              </span>
+            ) : (
+              'Guardar'
+            )}
           </button>
           
           <button
             onClick={handleCancel}
-            className="px-5 py-2 bg-riff-text-secondary/30 hover:bg-riff-text-secondary/40 text-white text-sm font-medium rounded-sm border border-white/20 transition-colors duration-200"
+            disabled={saving}
+            className="px-5 py-2 bg-riff-text-secondary/30 hover:bg-riff-text-secondary/40 text-white text-sm font-medium rounded-sm border border-white/20 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancelar
           </button>
           
           <button
             onClick={handleDeleteAccount}
+            disabled={saving}
             className="px-5 py-2
             bg-gradient-to-r from-riff-delete to-riff-delete-2
             hover:from-riff-delete-2 hover:to-riff-delete
-             text-white text-sm font-medium rounded-sm transition-colors duration-200 sm:ml-auto"
+             text-white text-sm font-medium rounded-sm transition-colors duration-200 sm:ml-auto
+             disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Eliminar cuenta
           </button>
