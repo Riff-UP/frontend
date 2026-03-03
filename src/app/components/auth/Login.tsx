@@ -4,29 +4,19 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { FiEye, FiEyeOff } from "react-icons/fi";
+import { useLogin } from "../../hooks/useLogin";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Login:", formData);
-  };
-
-  const handleGoogleLogin = () => {
-    console.log("Google login");
-  };
+  
+  const {
+    formData,
+    error,
+    loading,
+    handleChange,
+    handleSubmit,
+    handleGoogleLogin,
+  } = useLogin();
 
   return (
     <div className="space-y-6">
@@ -38,6 +28,13 @@ export default function Login() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Mensaje de error */}
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+            {error}
+          </div>
+        )}
+
         <div className="group">
           <input
             type="email"
@@ -88,14 +85,26 @@ export default function Login() {
 
         <button
           type="submit"
+          disabled={loading}
           className="w-full py-2.5
                     bg-gradient-to-r from-riff-primary-dark to-riff-primary
                     text-white font-semibold rounded-lg 
                     hover:from-riff-primary hover:to-riff-primary-dark transform hover:scale-[1.02]
                      transition-all duration-300 shadow-lg shadow-riff-primary/25
-                     focus:outline-none focus:ring-4 focus:ring-riff-primary/30"
+                     focus:outline-none focus:ring-4 focus:ring-riff-primary/30
+                     disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
         >
-          Iniciar sesión
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Iniciando...
+            </span>
+          ) : (
+            'Iniciar sesión'
+          )}
         </button>
       </form>
 
@@ -107,11 +116,13 @@ export default function Login() {
 
       <button
         onClick={handleGoogleLogin}
+        disabled={loading}
         className="w-full py-2.5 bg-white border-1 rounded-lg 
                    flex items-center justify-center gap-3 
                    hover:border-riff-primary 
                     hover:shadow-md
-                   transition-all duration-300 group"
+                   transition-all duration-300 group
+                   disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Image
           src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"

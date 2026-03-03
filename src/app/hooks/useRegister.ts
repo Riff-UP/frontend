@@ -106,6 +106,8 @@ export function useRegister() {
 
       if (loginData.token) {
         localStorage.setItem('token', loginData.token);
+        // Disparar evento para actualizar Header
+        window.dispatchEvent(new Event('authChange'));
         router.push('/');
       } else {
         // Usuario creado pero error en login, redirigir a login

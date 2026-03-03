@@ -3,15 +3,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
+export interface SocialMedia {
+  id: string;
+  url: string;
+}
+
 export interface UserData {
   id: string;
   name: string;
   email: string;
   googleId?: string | null;
+  hasPassword?: boolean;
   biography?: string | null;
   role: 'USER' | 'ARTIST';
   status: boolean;
   createdAt: string;
+  socialMedia?: SocialMedia[];
 }
 
 interface UseUserReturn {
@@ -21,6 +28,10 @@ interface UseUserReturn {
   updateUser: (data: Partial<UserData>) => Promise<boolean>;
   refreshUser: () => Promise<void>;
   deleteAccount: () => Promise<boolean>;
+  setPassword: (password: string) => Promise<boolean>;
+  addSocialMedia: (url: string) => Promise<SocialMedia | null>;
+  updateSocialMedia: (id: string, url: string) => Promise<boolean>;
+  removeSocialMedia: (id: string) => Promise<boolean>;
 }
 
 const API_URL = 'http://localhost:4000/api';
@@ -151,6 +162,158 @@ export function useUser(): UseUserReturn {
     }
   };
 
+  const setPassword = async (password: string): Promise<boolean> => {
+    const token = getToken();
+    
+    if (!token || !user) {
+      setError('No hay sesión activa');
+      return false;
+    }
+
+    try {
+      setError(null);
+
+      const res = await fetch(`${API_URL}/users/${user.id}/password`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ newPassword: password }),
+      });
+
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        router.push('/login');
+        return false;
+      }
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Error al establecer contraseña');
+      }
+
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al establecer contraseña');
+      return false;
+    }
+  };
+
+  const addSocialMedia = async (url: string): Promise<SocialMedia | null> => {
+    const token = getToken();
+    
+    if (!token || !user) {
+      setError('No hay sesión activa');
+      return null;
+    }
+
+    try {
+      setError(null);
+
+      const res = await fetch(`${API_URL}/social-media`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: user.id, url }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Error al agregar red social');
+      }
+
+      const newSocialMedia = await res.json();
+      
+      // Actualizar usuario local
+      setUser(prev => prev ? {
+        ...prev,
+        socialMedia: [...(prev.socialMedia || []), newSocialMedia]
+      } : null);
+
+      return newSocialMedia;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al agregar red social');
+      return null;
+    }
+  };
+
+  const updateSocialMedia = async (id: string, url: string): Promise<boolean> => {
+    const token = getToken();
+    
+    if (!token || !user) {
+      setError('No hay sesión activa');
+      return false;
+    }
+
+    try {
+      setError(null);
+
+      const res = await fetch(`${API_URL}/social-media/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Error al actualizar red social');
+      }
+
+      // Actualizar usuario local
+      setUser(prev => prev ? {
+        ...prev,
+        socialMedia: prev.socialMedia?.map(sm => sm.id === id ? { ...sm, url } : sm)
+      } : null);
+
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al actualizar red social');
+      return false;
+    }
+  };
+
+  const removeSocialMedia = async (id: string): Promise<boolean> => {
+    const token = getToken();
+    
+    if (!token || !user) {
+      setError('No hay sesión activa');
+      return false;
+    }
+
+    try {
+      setError(null);
+
+      const res = await fetch(`${API_URL}/social-media/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Error al eliminar red social');
+      }
+
+      // Actualizar usuario local
+      setUser(prev => prev ? {
+        ...prev,
+        socialMedia: prev.socialMedia?.filter(sm => sm.id !== id)
+      } : null);
+
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al eliminar red social');
+      return false;
+    }
+  };
+
   useEffect(() => {
     fetchUser();
   }, [fetchUser]);
@@ -162,5 +325,9 @@ export function useUser(): UseUserReturn {
     updateUser,
     refreshUser: fetchUser,
     deleteAccount,
+    setPassword,
+    addSocialMedia,
+    updateSocialMedia,
+    removeSocialMedia,
   };
 }

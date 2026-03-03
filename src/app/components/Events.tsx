@@ -4,20 +4,27 @@ import { useState } from 'react';
 import { MdEdit, MdDelete } from 'react-icons/md';
 import { FiMapPin, FiCalendar } from 'react-icons/fi';
 import Calendar from './common/Calendar';
-import { Event } from '@/app/types';
 import EventForm from './events/EventForm';
 import EventCard from './events/EventCard';
 import DeleteConfirmModal from './common/DeleteConfirmModal';
+import { useEvents } from '../hooks/useEvents';
+import { useUser } from '../hooks/useUser';
+import { Event } from '@/app/types';
 
 export default function Events() {
+  const { user, refreshUser } = useUser();
+  // 👇 1. Le pasamos el ID del usuario al hook. 
+  // Si user es null al principio, pasará undefined, y cuando cargue hará el re-fetch automático
+  const { events: backendEvents, loading, createEvent, updateEvent, deleteEvent } = useEvents(user?.id);
+  
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const [eventToDelete, setEventToDelete] = useState<number | null>(null);
-  const [events, setEvents] = useState<Event[]>([]);
+  const [eventToDelete, setEventToDelete] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   
   // Form state
   const [newEvent, setNewEvent] = useState({
@@ -25,9 +32,23 @@ export default function Events() {
     location: '',
     date: '',
     time: '',
+    description: '',
   });
 
-
+  // 👇 2. Convertimos el formato. Ya NO necesitamos el .filter() porque el backend ya lo filtró
+  const events: Event[] = backendEvents.map(e => {
+    const date = e.event_date.split('T')[0];
+    const dateTime = new Date(e.event_date);
+    const time = dateTime.toTimeString().slice(0, 5);
+    return {
+      id: e._id,
+      title: e.title,
+      location: e.location,
+      date,
+      time,
+      description: e.description,
+    };
+  });
 
   const handlePrevMonth = () => {
     if (currentMonth === 0) {
@@ -47,32 +68,45 @@ export default function Events() {
     }
   };
 
-  const handleCreateEvent = () => {
-    if (!newEvent.title || !newEvent.date) return;
+  const handleCreateEvent = async () => {
+    if (!newEvent.title || !newEvent.date || !user) return;
+
+    setSaving(true);
+
+    const eventDateTime = newEvent.time 
+      ? `${newEvent.date}T${newEvent.time}:00`
+      : `${newEvent.date}T00:00:00`;
 
     if (editingEventId) {
-      // Update existing event
-      setEvents(events.map(e => 
-        e.id === editingEventId 
-          ? { ...e, ...newEvent }
-          : e
-      ));
-      if (selectedEvent?.id === editingEventId) {
-        setSelectedEvent({ id: editingEventId, ...newEvent });
-      }
-    } else {
-      // Create new event
-      const event: Event = {
-        id: Date.now(),
+      const success = await updateEvent(editingEventId, {
         title: newEvent.title,
         location: newEvent.location,
-        date: newEvent.date,
-        time: newEvent.time,
-      };
-      setEvents([...events, event]);
+        event_date: eventDateTime,
+        description: newEvent.description
+      });
+      if (success && selectedEvent?.id === editingEventId) {
+        setSelectedEvent({ 
+          id: editingEventId, 
+          title: newEvent.title,
+          location: newEvent.location,
+          date: newEvent.date,
+          time: newEvent.time,
+          description: newEvent.description,
+        });
+      }
+    } else {
+      await createEvent({
+        title: newEvent.title,
+        location: newEvent.location,
+        event_date: eventDateTime,
+        description: newEvent.description,
+      });
     }
 
-    setNewEvent({ title: '', location: '', date: '', time: '' });
+    await refreshUser();
+
+    setSaving(false);
+    setNewEvent({ title: '', location: '', date: '', time: '', description: '' });
     setEditingEventId(null);
     setShowModal(false);
   };
@@ -83,19 +117,20 @@ export default function Events() {
       location: event.location,
       date: event.date,
       time: event.time,
+      description: event.description || '',
     });
     setEditingEventId(event.id);
     setShowModal(true);
   };
 
-  const handleDeleteClick = (id: number) => {
+  const handleDeleteClick = (id: string) => {
     setEventToDelete(id);
     setShowDeleteModal(true);
   };
 
-  const confirmDelete = () => {
-    if (eventToDelete) {
-      setEvents(events.filter(e => e.id !== eventToDelete));
+  const confirmDelete = async () => {
+    if (eventToDelete && user) {
+      await deleteEvent(eventToDelete);
       if (selectedEvent?.id === eventToDelete) {
         setSelectedEvent(null);
       }
@@ -111,7 +146,7 @@ export default function Events() {
 
   const handleCloseModal = () => {
     setShowModal(false);
-    setNewEvent({ title: '', location: '', date: '', time: '' });
+    setNewEvent({ title: '', location: '', date: '', time: '', description: '' });
     setEditingEventId(null);
   };
 
@@ -126,7 +161,6 @@ export default function Events() {
 
   const hasEventOnDate = (day: number) => {
     return events.some(event => {
-      // Parse date in local timezone to avoid off-by-one errors
       const [year, month, dayOfMonth] = event.date.split('-').map(Number);
       return dayOfMonth === day && 
              (month - 1) === currentMonth && 
@@ -218,7 +252,14 @@ export default function Events() {
           <div className="rounded-sm p-4 sm:p-0">
             <h3 className="text-white text-base sm:text-lg font-semibold mb-4">Próximos eventos</h3>
             <div className="space-y-3">
-              {events.length === 0 ? (
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <svg className="animate-spin h-6 w-6 text-riff-primary" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                </div>
+              ) : events.length === 0 ? (
                 <p className="text-riff-text-secondary text-sm text-center py-8">No hay eventos próximos</p>
               ) : (
                 events.map((event) => (
@@ -245,10 +286,13 @@ export default function Events() {
         location={newEvent.location}
         date={newEvent.date}
         time={newEvent.time}
+        description={newEvent.description}
+        saving={saving}
         onTitleChange={(value) => setNewEvent({ ...newEvent, title: value })}
         onLocationChange={(value) => setNewEvent({ ...newEvent, location: value })}
         onDateChange={(value) => setNewEvent({ ...newEvent, date: value })}
         onTimeChange={(value) => setNewEvent({ ...newEvent, time: value })}
+        onDescriptionChange={(value) => setNewEvent({ ...newEvent, description: value })}
         onSubmit={handleCreateEvent}
         onClose={handleCloseModal}
       />

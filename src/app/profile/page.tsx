@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Sidebar from '../components/layout/Sidebar';
 import MobileNav from '../components/layout/MobileNav';
 import Header from '../components/layout/Header';
@@ -12,6 +13,15 @@ import Saved from '../components/Saved';
 
 export default function ProfilePage() {
   const [activeSection, setActiveSection] = useState('perfil');
+  const router = useRouter();
+
+  // Proteger ruta - redirigir si no hay token
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.replace('/login');
+    }
+  }, [router]);
 
   const renderContent = () => {
     switch (activeSection) {

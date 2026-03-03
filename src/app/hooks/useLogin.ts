@@ -29,6 +29,8 @@ export function useLogin() {
 
       if (data.token) {
         localStorage.setItem('token', data.token);
+        // Disparar evento para actualizar Header
+        window.dispatchEvent(new Event('authChange'));
         router.push('/');
       } else {
         setError('Correo o contraseña incorrectos');

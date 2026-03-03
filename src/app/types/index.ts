@@ -7,7 +7,7 @@ export interface User {
   email: string;
   googleId?: string;
   biography?: string;
-  role: 'USER' | 'ARTIST' | 'ADMIN';
+  role: 'USER' | 'ARTIST';
   createdAt?: string;
   updatedAt?: string;
 }
@@ -30,16 +30,17 @@ export interface LoginData {
 }
 
 export interface ArtistData {
-  id: number;
+  id: string;
   name: string;
-  followers: number;
-  description: string;
-  instagram: string;
-  facebook: string;
-  whatsapp: string;
-  email: string;
-  coverImage: string;
+  biography?: string | null;
+  role: 'USER' | 'ARTIST';
+  status: boolean;
+  createdAt: string;
+  socialMedia?: { id: string; url: string }[];
+  // campos opcionales para display
+  coverImage?: string;
   profileImage?: string;
+  followers?: number;
 }
 
 export interface Publication {
@@ -60,11 +61,12 @@ export interface Publication {
 }
 
 export interface Event {
-  id: number;
+  id: string;
   title: string;
   location: string;
   date: string;
   time: string;
+  description?: string;
   isAttending?: boolean;
   attending?: boolean;
 }

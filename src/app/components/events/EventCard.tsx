@@ -7,7 +7,7 @@ import { Event } from '@/app/types';
 interface EventCardProps {
   event: Event;
   formatDate: (date: string, time?: string) => string;
-  onAttend?: (id: number) => void;
+  onAttend?: (id: string) => void;
   onClick?: (event: Event) => void;
   showAttendButton?: boolean;
   isSelected?: boolean;

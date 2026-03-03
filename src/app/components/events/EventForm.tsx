@@ -1,5 +1,5 @@
 import { IoMdClose } from 'react-icons/io';
-import { FiMapPin, FiClock, FiCalendar } from 'react-icons/fi';
+import { FiMapPin, FiClock, FiCalendar, FiFileText } from 'react-icons/fi';
 
 interface EventFormProps {
   isOpen: boolean;
@@ -8,10 +8,13 @@ interface EventFormProps {
   location: string;
   date: string;
   time: string;
+  description: string;
+  saving?: boolean;
   onTitleChange: (value: string) => void;
   onLocationChange: (value: string) => void;
   onDateChange: (value: string) => void;
   onTimeChange: (value: string) => void;
+  onDescriptionChange: (value: string) => void;
   onSubmit: () => void;
   onClose: () => void;
 }
@@ -23,14 +26,23 @@ export default function EventForm({
   location,
   date,
   time,
+  description,
+  saving = false,
   onTitleChange,
   onLocationChange,
   onDateChange,
   onTimeChange,
+  onDescriptionChange,
   onSubmit,
   onClose,
 }: EventFormProps) {
   if (!isOpen) return null;
+
+  // Fecha mínima: hoy en formato YYYY-MM-DD
+  const today = new Date().toISOString().split('T')[0];
+  // Limitar año a 2026
+  const minDate = today > '2026-12-31' ? '2026-12-31' : (today < '2026-01-01' ? '2026-01-01' : today);
+  const maxDate = '2026-12-31';
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm p-4">
@@ -71,6 +83,8 @@ export default function EventForm({
               <input
                 type="date"
                 value={date}
+                min={minDate}
+                max={maxDate}
                 onChange={(e) => onDateChange(e.target.value)}
                 className="w-full pl-10 pr-3 py-2 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm
                          focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
@@ -110,6 +124,23 @@ export default function EventForm({
               />
             </div>
           </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-white text-sm mb-2">Descripción *</label>
+            <div className="relative">
+              <FiFileText className="absolute left-3 top-3 text-white/50 w-4 h-4" />
+              <textarea
+                value={description}
+                onChange={(e) => onDescriptionChange(e.target.value)}
+                placeholder="Describe tu evento..."
+                rows={3}
+                className="w-full pl-10 pr-3 py-2 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary
+                         focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
+                         transition-all duration-200 resize-none"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Modal Footer */}
@@ -122,10 +153,10 @@ export default function EventForm({
           </button>
           <button
             onClick={onSubmit}
-            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-riff-save to-riff-save-2 hover:from-riff-save-2 hover:to-riff-save text-white text-sm font-medium rounded-sm transition-all duration-200"
-            disabled={!title || !date}
+            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-riff-save to-riff-save-2 hover:from-riff-save-2 hover:to-riff-save text-white text-sm font-medium rounded-sm transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!title || !date || !description || saving}
           >
-            {isEditing ? 'Guardar' : 'Subir'}
+            {saving ? (isEditing ? 'Guardando...' : 'Subiendo...') : (isEditing ? 'Guardar' : 'Subir')}
           </button>
         </div>
       </div>
