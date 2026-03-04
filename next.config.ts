@@ -8,6 +8,16 @@ const nextConfig: NextConfig = {
         hostname: "www.gstatic.com",
         pathname: "/firebasejs/**",
       },
+      {
+        protocol: "https",
+        hostname: "*.r2.dev",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "pub-*.r2.dev",
+        pathname: "/**",
+      },
     ],
   },
 };

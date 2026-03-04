@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getValidToken, getUserFromToken } from '../utils/jwt';
+import { API_BASE_URL } from '../config/api';
+
+const API_URL = API_BASE_URL;
 
 export interface SocialMedia {
   id: string;
@@ -35,7 +38,6 @@ interface UseUserReturn {
   removeSocialMedia: (id: string) => Promise<boolean>;
 }
 
-const API_URL = 'http://localhost:4000/api';
 
 export function useUser(): UseUserReturn {
   const [user, setUser] = useState<UserData | null>(null);

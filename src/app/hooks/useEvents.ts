@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { API_BASE_URL } from '../config/api';
+
+const API_URL = API_BASE_URL;
 
 export interface EventData {
   _id: string;
@@ -35,7 +38,6 @@ interface UseEventsReturn {
   refreshEvents: () => Promise<void>;
 }
 
-const API_URL = 'http://localhost:4000/api';
 
 // 👇 1. Mantenemos el parámetro opcional userId
 export function useEvents(userId?: string): UseEventsReturn {

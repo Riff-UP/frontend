@@ -6,8 +6,8 @@ interface PublicationCardProps {
   publication: Publication;
   authorName: string;
   savedCount?: number;
-  onLike: (id: number) => void;
-  onSave: (id: number) => void;
+  onLike: (id: string | number) => void;
+  onSave: (id: string | number) => void;
   onClick?: (publication: Publication) => void;
   formatDate: (date: string) => string;
 }

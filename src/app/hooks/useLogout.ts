@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { API_BASE_URL } from '../config/api';
 
 export function useLogout() {
   const router = useRouter();
@@ -8,7 +9,7 @@ export function useLogout() {
   const handleLogout = async () => {
     try {
       // Llamar al endpoint de logout del gateway
-      await fetch('http://localhost:4000/api/auth/logout', {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
         method: 'GET',
         credentials: 'include',
       });

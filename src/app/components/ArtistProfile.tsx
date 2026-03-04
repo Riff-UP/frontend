@@ -19,7 +19,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [selectedPublication, setSelectedPublication] = useState<Publication | null>(null);
-  const [savedCounts, setSavedCounts] = useState<{[key: number]: number}>({});
+  const [savedCounts, setSavedCounts] = useState<{[key: string | number]: number}>({});
   const [publications, setPublications] = useState<Publication[]>([]);
 
   const artistData = artist;
@@ -34,7 +34,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
     );
   }
 
-  const handleLike = (publicationId: number) => {
+  const handleLike = (publicationId: string | number) => {
     setPublications(pubs =>
       pubs.map(pub =>
         pub.id === publicationId
@@ -48,7 +48,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
     );
   };
 
-  const handleSave = (publicationId: number) => {
+  const handleSave = (publicationId: string | number) => {
     setPublications(pubs =>
       pubs.map(pub =>
         pub.id === publicationId ? { ...pub, isSaved: !pub.isSaved } : pub

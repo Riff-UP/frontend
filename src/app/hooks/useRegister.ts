@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { API_BASE_URL } from '../config/api';
 
 interface RegisterFormData {
   name: string;
@@ -72,7 +73,7 @@ export function useRegister() {
 
     try {
       // Crear usuario
-      const registerRes = await fetch('http://localhost:4000/api/users', {
+      const registerRes = await fetch(`${API_BASE_URL}/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -93,7 +94,7 @@ export function useRegister() {
       }
 
       // Usuario creado, ahora hacer login automático
-      const loginRes = await fetch('http://localhost:4000/api/auth/login', {
+      const loginRes = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -121,8 +122,7 @@ export function useRegister() {
   };
 
   const handleGoogleRegister = () => {
-    // Usa el mismo endpoint que login con Google
-    window.location.href = 'http://localhost:4000/api/auth/google';
+    window.location.href = `${API_BASE_URL}/auth/google`;
   };
 
   return {

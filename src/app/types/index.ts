@@ -44,7 +44,7 @@ export interface ArtistData {
 }
 
 export interface Publication {
-  id: number;
+  id: string | number; // Permitir ambos tipos para compatibilidad
   content: string;
   image?: string;
   date: string;
