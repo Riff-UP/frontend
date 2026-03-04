@@ -5,6 +5,9 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Header from "@/app/components/layout/Header";
 import Footer from "@/app/components/layout/Footer";
 import ArtistCard from "@/app/components/cards/ArtistCard";
+import SongCard from "@/app/components/cards/SongCard";
+import EventRatingModal from "@/app/components/common/EventRatingModal";
+import { useEventRating } from "@/app/hooks/useEventRating";
 import { FaCircleChevronLeft, FaCircleChevronRight } from "react-icons/fa6";
 import { useArtists, ArtistData } from "@/app/hooks/useArtists";
 
@@ -30,6 +33,15 @@ export default function Home() {
   useEffect(() => {
     setSearch(searchQuery);
   }, [searchQuery, setSearch]);
+
+  // Eventos a los que el usuario ha asistido (ejemplo)
+  // En producción, esto vendría de una API
+  const attendedEvents = [
+    // Agrega eventos aquí para probar el modal de valoración
+  ];
+
+  // Hook para manejar la valoración de eventos
+  const { eventToRate, handleRatingSubmit, handleRatingClose } = useEventRating(attendedEvents);
 
   return (
     <div className="min-h-screen bg-riff-background-b">
@@ -102,6 +114,17 @@ export default function Home() {
 
       </main>
       <Footer />
+
+      {/* Event Rating Modal */}
+      {eventToRate && (
+        <EventRatingModal
+          isOpen={!!eventToRate}
+          eventTitle={eventToRate.title}
+          eventDate={eventToRate.date}
+          onSubmit={(rating, comment) => handleRatingSubmit(eventToRate.id, rating, comment)}
+          onClose={handleRatingClose}
+        />
+      )}
     </div>
   );
 }
