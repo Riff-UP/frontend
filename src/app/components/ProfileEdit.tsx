@@ -231,6 +231,17 @@ export default function ProfileEdit() {
     );
   }
 
+  // Si hay error (probablemente CORS), mostrar datos del token
+  if (error && !user) {
+    return (
+      <div className="w-full flex justify-center">
+        <div className="w-full max-w-4xl">
+          <ProfileFromToken />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full flex justify-center">
       <div className="w-full max-w-4xl">

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { getValidToken, getUserFromToken } from '../utils/jwt';
 
 export interface SocialMedia {
   id: string;
@@ -43,10 +44,7 @@ export function useUser(): UseUserReturn {
   const router = useRouter();
 
   const getToken = (): string | null => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('token');
-    }
-    return null;
+    return getValidToken(); // Usa la utilidad que valida expiración
   };
 
   const fetchUser = useCallback(async () => {
@@ -58,11 +56,19 @@ export function useUser(): UseUserReturn {
       return;
     }
 
+    // Obtener el ID del usuario desde el token
+    const tokenData = getUserFromToken(token);
+    if (!tokenData || !tokenData.id) {
+      setLoading(false);
+      setError('Token inválido');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
-      const res = await fetch(`${API_URL}/users/me`, {
+      const res = await fetch(`${API_URL}/users/${tokenData.id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',

@@ -34,18 +34,31 @@ export function useArtists(): UseArtistsReturn {
       setLoading(true);
       setError(null);
 
-      const params = search ? `?search=${encodeURIComponent(search)}` : '';
-      const res = await fetch(`${API_URL}/users/artists${params}`, {
+      // Llamar al endpoint /users y filtrar artistas en el frontend
+      const res = await fetch(`${API_URL}/users`, {
         headers: { 'Content-Type': 'application/json' },
       });
 
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al obtener artistas');
+        throw new Error(errorData.message || 'Error al obtener usuarios');
       }
 
       const data = await res.json();
-      setArtists(data);
+
+      // Filtrar solo usuarios con role === 'ARTIST'
+      let artistsList = data.filter((user: any) => user.role === 'ARTIST');
+
+      // Aplicar búsqueda local si existe
+      if (search) {
+        const searchLower = search.toLowerCase();
+        artistsList = artistsList.filter((artist: ArtistData) =>
+          artist.name?.toLowerCase().includes(searchLower) ||
+          artist.biography?.toLowerCase().includes(searchLower)
+        );
+      }
+
+      setArtists(artistsList);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
