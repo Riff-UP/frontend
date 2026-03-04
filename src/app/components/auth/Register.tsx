@@ -19,6 +19,16 @@ export default function Register() {
     handleGoogleRegister,
   } = useRegister();
 
+  const passwordStrength = (pwd: string) => {
+    if (pwd.length === 0) return null;
+    if (pwd.length < 6) return { label: "Débil", color: "bg-red-400", width: "w-1/4" };
+    if (pwd.length < 8) return { label: "Regular", color: "bg-yellow-400", width: "w-2/4" };
+    if (pwd.length < 12 || !/[A-Z]/.test(pwd) || !/[0-9]/.test(pwd)) return { label: "Buena", color: "bg-blue-400", width: "w-3/4" };
+    return { label: "Muy fuerte", color: "bg-green-400", width: "w-full" };
+  };
+
+  const strength = passwordStrength(formData.password);
+
   return (
     <div className="space-y-6">
       {/* Título */}
@@ -69,25 +79,37 @@ export default function Register() {
         </div>
 
         {/* Campo Contraseña */}
-        <div className="relative">
-          <input
-            type={showPassword ? "text" : "password"}
-            name="password"
-            placeholder="Contraseña"
-            value={formData.password}
-            onChange={handleChange}
-            className="w-full px-5 py-2.5 border-1 border-riff-login rounded-lg 
-                       focus:outline-none focus:border-riff-primary
-                       transition-all duration-300 text-riff-text-primary placeholder-riff-login/80 pr-14"
-            required
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-5 top-1/2 -translate-y-1/2 p-1 text-riff-login hover:text-riff-login/60 transition-colors"
-          >
-            {showPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
-          </button>
+        <div>
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              name="password"
+              placeholder="Contraseña"
+              value={formData.password}
+              onChange={handleChange}
+              className="w-full px-5 py-2.5 border-1 border-riff-login rounded-lg 
+                         focus:outline-none focus:border-riff-primary
+                         transition-all duration-300 text-riff-text-primary placeholder-riff-login/80 pr-14"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-5 top-1/2 -translate-y-1/2 p-1 text-riff-login hover:text-riff-login/60 transition-colors"
+            >
+              {showPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
+            </button>
+          </div>
+
+          {/* Indicador de fortaleza */}
+          {strength && (
+            <div className="mt-2 space-y-1">
+              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-300 ${strength.color} ${strength.width}`} />
+              </div>
+              <p className="text-xs text-riff-text-secondary text-right">{strength.label}</p>
+            </div>
+          )}
         </div>
 
         {/* Campo Confirmar Contraseña */}
