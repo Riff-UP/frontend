@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import { BsThreeDots } from 'react-icons/bs';
 import { AiOutlineHeart } from 'react-icons/ai';
-import { BsBookmark } from 'react-icons/bs';
+import { BsBookmark, BsBookmarkFill } from 'react-icons/bs';
 import { MdEdit, MdDelete } from 'react-icons/md';
 import { Publication } from '@/app/types';
 
@@ -10,9 +10,11 @@ interface PublicationListCardProps {
   isMenuOpen: boolean;
   isEditing: boolean;
   editText: string;
+  isSaving?: boolean;
   onMenuToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onSave?: (id: string | number) => void;
   onEditTextChange: (value: string) => void;
   onSaveEdit: () => void;
   onCancelEdit: () => void;
@@ -23,9 +25,11 @@ export default function PublicationListCard({
   isMenuOpen,
   isEditing,
   editText,
+  isSaving = false,
   onMenuToggle,
   onEdit,
   onDelete,
+  onSave,
   onEditTextChange,
   onSaveEdit,
   onCancelEdit,
@@ -118,10 +122,12 @@ export default function PublicationListCard({
 
       {/* Image */}
       {publication.image && (
-        <div className="mb-3 overflow-hidden flex items-center justify-center bg-riff-header">
-          <img
+        <div className="mb-3 overflow-hidden flex items-center justify-center bg-riff-header relative w-full" style={{ minHeight: '200px' }}>
+          <Image
             src={publication.image}
             alt="Publicación"
+            width={800}
+            height={400}
             className="w-full h-auto max-h-[400px] object-contain"
           />
         </div>
@@ -134,10 +140,24 @@ export default function PublicationListCard({
           <span className="text-sm">{publication.likes}</span>
         </div>
 
-        <div className="flex items-center gap-1.5 text-white/50">
-          <BsBookmark className="w-5 h-5" />
-          <span className="text-sm">{publication.saved || 0}</span>
-        </div>
+        <button
+          onClick={() => onSave?.(publication.id)}
+          disabled={isSaving}
+          className={`flex items-center gap-1.5 transition-all duration-200 ${
+            isSaving 
+              ? 'opacity-50 cursor-wait' 
+              : publication.isSaved 
+                ? 'text-yellow-400 hover:text-yellow-300' 
+                : 'text-white/50 hover:text-yellow-400'
+          }`}
+          title={publication.isSaved ? 'Quitar de guardados' : 'Guardar publicación'}
+        >
+          {publication.isSaved ? (
+            <BsBookmarkFill className="w-5 h-5" />
+          ) : (
+            <BsBookmark className="w-5 h-5" />
+          )}
+        </button>
       </div>
     </div>
   );

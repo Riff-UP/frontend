@@ -1,11 +1,11 @@
 import { FiHeart } from 'react-icons/fi';
-import { MdBookmark, MdBookmarkBorder } from 'react-icons/md';
+import { BsBookmark, BsBookmarkFill } from 'react-icons/bs';
 import { Publication } from '@/app/types';
 
 interface PublicationCardProps {
   publication: Publication;
   authorName: string;
-  savedCount?: number;
+  isSaving?: boolean;
   onLike: (id: string | number) => void;
   onSave: (id: string | number) => void;
   onClick?: (publication: Publication) => void;
@@ -15,7 +15,7 @@ interface PublicationCardProps {
 export default function PublicationCard({
   publication,
   authorName,
-  savedCount = 0,
+  isSaving = false,
   onLike,
   onSave,
   onClick,
@@ -74,16 +74,21 @@ export default function PublicationCard({
               e.stopPropagation();
               onSave(publication.id);
             }}
-            className={`flex items-center gap-2 transition-colors ${
-              publication.isSaved ? 'text-yellow-400' : 'text-riff-text-secondary hover:text-yellow-400'
+            disabled={isSaving}
+            className={`flex items-center gap-2 transition-all duration-200 ${
+              isSaving 
+                ? 'opacity-50 cursor-wait' 
+                : publication.isSaved 
+                  ? 'text-yellow-400 hover:text-yellow-300' 
+                  : 'text-riff-text-secondary hover:text-yellow-400'
             }`}
+            title={publication.isSaved ? 'Quitar de guardados' : 'Guardar publicación'}
           >
             {publication.isSaved ? (
-              <MdBookmark className="w-6 h-6" />
+              <BsBookmarkFill className="w-6 h-6" />
             ) : (
-              <MdBookmarkBorder className="w-6 h-6" />
+              <BsBookmark className="w-6 h-6" />
             )}
-            <span className="text-xs">{savedCount}</span>
           </button>
         </div>
       </div>

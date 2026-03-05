@@ -26,7 +26,10 @@ export function useArtistEvents(artistId: string) {
       setLoading(true);
       setError(null);
 
-      const res = await fetch(`${API_URL}/events?userId=${artistId}`, {
+      // El backend no acepta userId como query param según el gateway
+      // TODO: Verificar si existe endpoint /events/:userId o similar
+      // Por ahora, obtendremos todos los eventos (el backend filtra por JWT)
+      const res = await fetch(`${API_URL}/events`, {
         headers: { 'Content-Type': 'application/json' },
       });
 

@@ -1,16 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Publication } from '@/app/types';
 import PublicationForm from './publications/PublicationForm';
 import PublicationListCard from './publications/PublicationListCard';
 import DeleteConfirmModal from './common/DeleteConfirmModal';
 import { usePosts } from '../hooks/usePosts';
 import { useUser } from '../hooks/useUser';
+import { useSavedPosts } from '../hooks/useSavedPosts';
 
 export default function Publications() {
   const { user } = useUser();
   const { posts, uploading, error: postsError, createPost, updatePost, deletePost, fetchPosts } = usePosts(user?.id);
+  const { savedPosts, savePost, unsavePost, isPostSaved } = useSavedPosts(user?.id);
 
   const [newPost, setNewPost] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -20,16 +22,20 @@ export default function Publications() {
   const [editText, setEditText] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [savingPostId, setSavingPostId] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false); // Lock para evitar múltiples requests
 
   // Cargar posts al montar el componente
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchPosts(); }, []);
+
   useEffect(() => {
     if (!postsError) return;
     const timer = setTimeout(() => setErrorMessage(null), 5000);
     setErrorMessage(postsError);
     return () => clearTimeout(timer);
   }, [postsError]);
+
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -104,39 +110,93 @@ export default function Publications() {
     setEditText('');
   };
 
+  const handleSave = async (postId: string | number) => {
+    // Evitar múltiples requests simultáneos
+    if (isProcessing) {
+      console.log('⏸️ Ya hay una operación en proceso, ignorando click');
+      return;
+    }
+
+    if (!user) {
+      setErrorMessage('Debes iniciar sesión para guardar publicaciones');
+      return;
+    }
+
+    const postIdStr = String(postId);
+
+    // Validar que el ID no sea vacío, 'undefined' o 'null'
+    if (!postIdStr || postIdStr === 'undefined' || postIdStr === 'null' || postIdStr === '') {
+      console.error('ID de post inválido:', postId);
+      setErrorMessage('Error: ID de publicación inválido');
+      return;
+    }
+
+    // Activar lock
+    setIsProcessing(true);
+    setSavingPostId(postIdStr);
+
+    try {
+      const savedPost = savedPosts.find(sp => sp.postId === postIdStr);
+
+      if (savedPost) {
+        // Si ya está guardado, eliminarlo
+        // Pequeño delay para asegurar que el backend haya procesado el POST anterior
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await unsavePost(savedPost.id);
+      } else {
+        // Si no está guardado, guardarlo
+        await savePost(postIdStr, user.id);
+      }
+    } catch (error) {
+      console.error('Error al guardar/quitar guardado:', error);
+      setErrorMessage('Error al procesar la acción');
+    } finally {
+      // Limpiar lock y estado de loading
+      setIsProcessing(false);
+      setSavingPostId(null);
+    }
+  };
+
   // Convertir posts del backend al formato de Publication para el componente
-  // El backend devuelve: description=texto, content=URL imagen (o mediaUrl)
-  const publications: Publication[] = Array.isArray(posts) ? posts.map(post => {
-    // Detectar la URL de imagen: mediaUrl tiene prioridad, luego content si parece una URL
-    const imageUrl = post.mediaUrl
-      || (post.content && (post.content.startsWith('http') || post.content.startsWith('/'))
-          ? post.content
-          : undefined);
+  // Usar useMemo para que se recalcule cuando savedPosts cambia
+  const publications: Publication[] = useMemo(() => {
+    if (!Array.isArray(posts)) return [];
 
-    // El texto real es description, o content si no parece una URL
-    const textContent = post.description
-      || (post.content && !post.content.startsWith('http') ? post.content : '')
-      || post.title
-      || '';
+    return posts.map(post => {
+      // Obtener el ID del post - puede venir como id o _id
+      const postId = post.id || (post as any)._id || '';
 
-    const rawDate = post.createdAt || (post as any).created_at;
-    return {
-      id: post.id,
-      content: textContent,
-      image: imageUrl,
-      date: rawDate ? new Date(rawDate).toLocaleDateString() : 'Sin fecha',
-      time: rawDate && typeof window !== 'undefined' ? formatTimeAgo(new Date(rawDate)) : '',
-      text: textContent,
-      likes: post.likesCount ?? 0,
-      saved: 0,
-      isLiked: false,
-      isSaved: false,
-      author: {
-        name: user?.name || 'Usuario',
-        avatar: '',
-      },
-    };
-  }) : [];
+      // Detectar la URL de imagen: mediaUrl tiene prioridad, luego content si parece una URL
+      const imageUrl = post.mediaUrl
+        || (post.content && (post.content.startsWith('http') || post.content.startsWith('/'))
+            ? post.content
+            : undefined);
+
+      // El texto real es description, o content si no parece una URL
+      const textContent = post.description
+        || (post.content && !post.content.startsWith('http') ? post.content : '')
+        || post.title
+        || '';
+
+      const rawDate = post.createdAt || (post as { created_at?: string }).created_at;
+      return {
+        id: postId,
+        content: textContent,
+        image: imageUrl,
+        date: rawDate ? new Date(rawDate).toLocaleDateString() : 'Sin fecha',
+        time: rawDate && typeof window !== 'undefined' ? formatTimeAgo(new Date(rawDate)) : '',
+        text: textContent,
+        likes: post.likesCount ?? 0,
+        saved: 0,
+        isLiked: false,
+        isSaved: postId ? isPostSaved(postId) : false, // ✅ Se recalcula cuando savedPosts cambia
+        author: {
+          name: user?.name || 'Usuario',
+          avatar: '',
+        },
+      };
+    });
+  }, [posts, savedPosts, isPostSaved, user?.name]); // ✅ Dependencias: recalcula cuando savedPosts cambia
 
   // Función para formatear tiempo relativo
   function formatTimeAgo(date: Date): string {
@@ -207,9 +267,11 @@ export default function Publications() {
                 isMenuOpen={openMenuId === pub.id}
                 isEditing={editingId === pub.id}
                 editText={editText}
+                isSaving={savingPostId === pub.id}
                 onMenuToggle={() => setOpenMenuId(openMenuId === pub.id ? null : pub.id)}
                 onEdit={() => handleEdit(pub.id, pub.text || '')}
                 onDelete={() => handleDelete(pub.id)}
+                onSave={handleSave}
                 onEditTextChange={setEditText}
                 onSaveEdit={() => saveEdit(pub.id)}
                 onCancelEdit={cancelEdit}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaMusic } from "react-icons/fa";
 import Calendar from './common/Calendar';
 import { ArtistData, Publication } from '@/app/types';
@@ -9,6 +9,8 @@ import PublicationCard from './publications/PublicationCard';
 import PublicationModal from './publications/PublicationModal';
 import EventCard from './events/EventCard';
 import { useArtistEvents } from '@/app/hooks/useArtistEvents';
+import { useSavedPosts } from '@/app/hooks/useSavedPosts';
+import { useUser } from '@/app/hooks/useUser';
 
 interface ArtistProfileProps {
   artist?: ArtistData;
@@ -19,12 +21,24 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [selectedPublication, setSelectedPublication] = useState<Publication | null>(null);
-  const [savedCounts, setSavedCounts] = useState<{[key: string | number]: number}>({});
   const [publications, setPublications] = useState<Publication[]>([]);
+  const [savingPostId, setSavingPostId] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false); // Lock para evitar múltiples requests
 
   const artistData = artist;
+  const { user } = useUser();
+  const { savedPosts, savePost, unsavePost, isPostSaved } = useSavedPosts(user?.id);
 
-  const { events, loading: eventsLoading } = useArtistEvents(artistData?.id?.toString() ?? '');
+  // ⚠️ DESHABILITADO: El backend no tiene endpoint para obtener eventos de otro artista
+  // const { events, loading: eventsLoading } = useArtistEvents(artistData?.id?.toString() ?? '');
+  const events: any[] = []; // Lista vacía por ahora
+  const eventsLoading = false;
+
+  // Forzar re-render cuando savedPosts cambia
+  const [, forceUpdate] = useState({});
+  useEffect(() => {
+    forceUpdate({});
+  }, [savedPosts]);
 
   if (!artistData) {
     return (
@@ -48,18 +62,56 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
     );
   };
 
-  const handleSave = (publicationId: string | number) => {
-    setPublications(pubs =>
-      pubs.map(pub =>
-        pub.id === publicationId ? { ...pub, isSaved: !pub.isSaved } : pub
-      )
-    );
-    setSavedCounts(counts => ({
-      ...counts,
-      [publicationId]:
-        (counts[publicationId] || 0) +
-        (publications.find(p => p.id === publicationId)?.isSaved ? -1 : 1),
-    }));
+  const handleSave = async (publicationId: string | number) => {
+    // Evitar múltiples requests simultáneos
+    if (isProcessing) {
+      console.log('⏸️ Ya hay una operación en proceso, ignorando click');
+      return;
+    }
+
+    if (!user) {
+      alert('Debes iniciar sesión para guardar publicaciones');
+      return;
+    }
+
+    const postIdStr = String(publicationId);
+
+    if (!postIdStr || postIdStr === 'undefined' || postIdStr === 'null') {
+      console.error('ID de post inválido:', publicationId);
+      return;
+    }
+
+    console.log('🔖 Intentando guardar/quitar post:', postIdStr);
+    console.log('📋 Posts guardados actuales:', savedPosts);
+
+    // Activar lock
+    setIsProcessing(true);
+    setSavingPostId(postIdStr);
+
+    try {
+      const savedPost = savedPosts.find(sp => sp.postId === postIdStr);
+      console.log('🔍 Post ya guardado?:', savedPost ? 'SÍ' : 'NO');
+
+      if (savedPost) {
+        console.log('❌ Quitando de guardados, ID:', savedPost.id);
+        // Pequeño delay para asegurar consistencia con el backend
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const success = await unsavePost(savedPost.id);
+        console.log('✅ Resultado unsave:', success);
+      } else {
+        console.log('➕ Guardando nuevo post');
+        const result = await savePost(postIdStr, user.id);
+        console.log('✅ Resultado save:', result);
+      }
+    } catch (error) {
+      console.error('💥 Error al guardar/quitar guardado:', error);
+    } finally {
+      // Limpiar lock
+      setIsProcessing(false);
+      setSavingPostId(null);
+      // Forzar actualización
+      forceUpdate({});
+    }
   };
 
   const handlePrevMonth = () => {
@@ -170,18 +222,27 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
               </p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-7xl mx-auto">
-                {publications.map(publication => (
-                  <PublicationCard
-                    key={publication.id}
-                    publication={publication}
-                    authorName={artistData.name}
-                    savedCount={savedCounts[publication.id] || 0}
-                    onLike={handleLike}
-                    onSave={handleSave}
-                    onClick={setSelectedPublication}
-                    formatDate={formatDate}
-                  />
-                ))}
+                {publications.map(publication => {
+                  const postId = String(publication.id);
+                  const isSaved = isPostSaved(postId);
+                  console.log(`📝 Post ${postId}:`, { isSaved, savedPosts: savedPosts.length });
+
+                  return (
+                    <PublicationCard
+                      key={publication.id}
+                      publication={{
+                        ...publication,
+                        isSaved: isSaved
+                      }}
+                      authorName={artistData.name}
+                      isSaving={savingPostId === postId}
+                      onLike={handleLike}
+                      onSave={handleSave}
+                      onClick={setSelectedPublication}
+                      formatDate={formatDate}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
@@ -234,9 +295,12 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
       </div>
 
       <PublicationModal
-        publication={selectedPublication}
+        publication={selectedPublication ? {
+          ...selectedPublication,
+          isSaved: isPostSaved(String(selectedPublication.id))
+        } : null}
         authorName={artistData.name}
-        savedCount={selectedPublication ? savedCounts[selectedPublication.id] || 0 : 0}
+        isSaving={selectedPublication ? savingPostId === String(selectedPublication.id) : false}
         onClose={() => setSelectedPublication(null)}
         onLike={handleLike}
         onSave={handleSave}

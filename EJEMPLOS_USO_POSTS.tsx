@@ -208,7 +208,7 @@ function PostsFeed() {
             {post.mediaUrl && (
               <img src={post.mediaUrl} alt="Post media" />
             )}
-            <small>{new Date(post.createdAt).toLocaleDateString()}</small>
+            <small>{post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Fecha desconocida'}</small>
             <p>❤️ {post.likesCount} | 💬 {post.commentsCount}</p>
           </div>
         ))

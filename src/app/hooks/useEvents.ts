@@ -19,6 +19,7 @@ export interface CreateEventData {
   description?: string;
   event_date: string;
   location: string;
+  userId: string;
 }
 
 export interface UpdateEventData {
@@ -59,17 +60,15 @@ export function useEvents(userId?: string): UseEventsReturn {
       setLoading(true);
       setError(null);
 
-      // 👇 2. Construimos la URL dependiendo de si recibimos un userId
-      const url = userId 
-        ? `${API_URL}/events?userId=${userId}` 
-        : `${API_URL}/events`;
+      // El backend obtiene el userId del JWT, no enviar como query param
+      const url = `${API_URL}/events`;
 
-      // 👇 3. Construimos los headers dinámicamente para no enviar "Bearer null"
+      // Construir headers con el token
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
 
-      // Solo inyectamos el Authorization si realmente hay un token
+      // Solo inyectar Authorization si hay token
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
@@ -101,6 +100,8 @@ export function useEvents(userId?: string): UseEventsReturn {
     try {
       setError(null);
 
+      console.log('POST /events - Payload:', data);
+
       const res = await fetch(`${API_URL}/events`, {
         method: 'POST',
         headers: {
@@ -111,15 +112,23 @@ export function useEvents(userId?: string): UseEventsReturn {
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al crear evento');
+        const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
+        console.error('Error del backend:', {
+          status: res.status,
+          statusText: res.statusText,
+          error: errorData
+        });
+        throw new Error(errorData.message || `Error ${res.status}: ${res.statusText}`);
       }
 
       const newEvent = await res.json();
+      console.log('Evento creado exitosamente:', newEvent);
       setEvents(prev => [...prev, newEvent]);
       return newEvent;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al crear evento');
+      const errorMessage = err instanceof Error ? err.message : 'Error al crear evento';
+      console.error('Error en createEvent:', err);
+      setError(errorMessage);
       return null;
     }
   };

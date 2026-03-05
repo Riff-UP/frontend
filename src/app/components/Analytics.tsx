@@ -5,13 +5,14 @@ import FollowerGrowthChart from './analytics/FollowerGrowthChart';
 import InteractionsChart from './analytics/InteractionsChart';
 import EventAttendanceChart from './analytics/EventAttendanceChart';
 import EventRatingChart from './analytics/EventRatingChart';
+import type { FollowerGrowthData, InteractionData, EventAttendanceData, EventRatingData } from '@/app/types';
 
 export default function Analytics() {
   // TODO: Obtener datos de la API
-  const followerGrowthData = [];
-  const interactionData = [];
-  const eventAttendanceData = [];
-  const eventRatingData = [];
+  const followerGrowthData: FollowerGrowthData[] = [];
+  const interactionData: InteractionData[] = [];
+  const eventAttendanceData: EventAttendanceData[] = [];
+  const eventRatingData: EventRatingData[] = [];
 
   const totalInteractions = interactionData.reduce((sum, week) => sum + week.interactions, 0);
   const totalFollowerGrowth = followerGrowthData.length > 0 
