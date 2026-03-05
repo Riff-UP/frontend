@@ -9,7 +9,7 @@ import PublicationCard from './publications/PublicationCard';
 import PublicationModal from './publications/PublicationModal';
 import EventCard from './events/EventCard';
 import { useArtistEvents } from '@/app/hooks/useArtistEvents';
-import { useSavedPosts } from '@/app/hooks/useSavedPosts';
+import { useSavedPostsContext } from '@/app/context/SavedPostsContext';
 import { useUser } from '@/app/hooks/useUser';
 
 interface ArtistProfileProps {
@@ -27,7 +27,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
 
   const artistData = artist;
   const { user } = useUser();
-  const { savedPosts, savePost, unsavePost, isPostSaved } = useSavedPosts(user?.id);
+  const { savedPosts, savePost, unsavePost, isPostSaved } = useSavedPostsContext();
 
   // ⚠️ DESHABILITADO: El backend no tiene endpoint para obtener eventos de otro artista
   // const { events, loading: eventsLoading } = useArtistEvents(artistData?.id?.toString() ?? '');
@@ -94,7 +94,6 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
 
       if (savedPost) {
         console.log('❌ Quitando de guardados, ID:', savedPost.id);
-        // Pequeño delay para asegurar consistencia con el backend
         await new Promise(resolve => setTimeout(resolve, 100));
         const success = await unsavePost(savedPost.id);
         console.log('✅ Resultado unsave:', success);

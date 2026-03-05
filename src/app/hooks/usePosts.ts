@@ -66,13 +66,23 @@ export function usePosts(userId?: string) {
 
       const data = await response.json();
       // Normalizar respuesta: el backend puede devolver array directo o { data: [...] } / { posts: [...] }
-      const postsArray = Array.isArray(data)
+      const rawArray = Array.isArray(data)
         ? data
         : Array.isArray(data?.data)
         ? data.data
         : Array.isArray(data?.posts)
         ? data.posts
         : [];
+
+      // Normalizar cada post: asegurar que id sea siempre un string limpio
+      const postsArray = rawArray.map((p: Record<string, unknown>) => {
+        const rawId = p._id ?? p.id;
+        const id = typeof rawId === 'object' && rawId !== null && '$oid' in rawId
+          ? String((rawId as { $oid: string }).$oid)
+          : String(rawId ?? '');
+        return { ...p, id };
+      });
+
       setPosts(postsArray);
 
     } catch (err) {
@@ -157,7 +167,7 @@ export function usePosts(userId?: string) {
       console.log('  - hasImage:', !!postData.imageFile);
 
       // Mostrar todos los campos del FormData
-      for (let pair of formData.entries()) {
+      for (const pair of formData.entries()) {
         console.log(`  FormData[${pair[0]}]:`, typeof pair[1] === 'string' ? pair[1] : 'File');
       }
 

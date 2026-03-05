@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import { BsThreeDots } from 'react-icons/bs';
-import { AiOutlineHeart } from 'react-icons/ai';
+import { AiOutlineHeart, AiFillHeart } from 'react-icons/ai';
 import { BsBookmark, BsBookmarkFill } from 'react-icons/bs';
 import { MdEdit, MdDelete } from 'react-icons/md';
 import { Publication } from '@/app/types';
@@ -11,10 +11,12 @@ interface PublicationListCardProps {
   isEditing: boolean;
   editText: string;
   isSaving?: boolean;
+  isLiking?: boolean;
   onMenuToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onSave?: (id: string | number) => void;
+  onLike?: (id: string | number) => void;
   onEditTextChange: (value: string) => void;
   onSaveEdit: () => void;
   onCancelEdit: () => void;
@@ -26,14 +28,20 @@ export default function PublicationListCard({
   isEditing,
   editText,
   isSaving = false,
+  isLiking = false,
   onMenuToggle,
   onEdit,
   onDelete,
   onSave,
+  onLike,
   onEditTextChange,
   onSaveEdit,
   onCancelEdit,
 }: PublicationListCardProps) {
+  const handleLikeClick = () => {
+    if (!isLiking && onLike) onLike(publication.id);
+  };
+
   return (
     <div className="bg-riff-header rounded-sm p-4 sm:p-5">
       {/* Header */}
@@ -134,20 +142,37 @@ export default function PublicationListCard({
       )}
 
       {/* Actions */}
-      <div className="flex items-center justify-end gap-4 pt-3">
-        <div className="flex items-center gap-1.5 text-white/50">
-          <AiOutlineHeart className="w-5 h-5" />
+      <div className="flex items-center justify-end gap-4 pt-3 border-t border-white/5">
+        {/* Like button */}
+        <button
+          onClick={handleLikeClick}
+          disabled={isLiking}
+          className={`flex items-center gap-1.5 transition-all duration-200 group ${
+            isLiking
+              ? 'opacity-50 cursor-wait'
+              : publication.isLiked
+                ? 'text-red-400 hover:text-red-300'
+                : 'text-white/50 hover:text-red-400'
+          }`}
+          title={publication.isLiked ? 'Quitar me gusta' : 'Me gusta'}
+        >
+          {publication.isLiked ? (
+            <AiFillHeart className="w-5 h-5 transition-transform duration-150 group-hover:scale-110" />
+          ) : (
+            <AiOutlineHeart className="w-5 h-5 transition-transform duration-150 group-hover:scale-110" />
+          )}
           <span className="text-sm">{publication.likes}</span>
-        </div>
+        </button>
 
+        {/* Save button */}
         <button
           onClick={() => onSave?.(publication.id)}
           disabled={isSaving}
           className={`flex items-center gap-1.5 transition-all duration-200 ${
-            isSaving 
-              ? 'opacity-50 cursor-wait' 
-              : publication.isSaved 
-                ? 'text-yellow-400 hover:text-yellow-300' 
+            isSaving
+              ? 'opacity-50 cursor-wait'
+              : publication.isSaved
+                ? 'text-yellow-400 hover:text-yellow-300'
                 : 'text-white/50 hover:text-yellow-400'
           }`}
           title={publication.isSaved ? 'Quitar de guardados' : 'Guardar publicación'}

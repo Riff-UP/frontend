@@ -5,6 +5,17 @@ import { API_BASE_URL } from '../config/api';
 
 const API_URL = API_BASE_URL;
 
+// Helper para decodificar JWT y extraer userId
+function getUserIdFromToken(token: string): string | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.id || payload.userId || payload.sub || null;
+  } catch (e) {
+    console.error('Error al decodificar JWT:', e);
+    return null;
+  }
+}
+
 export interface EventData {
   _id: string;
   sql_user_id: string;
@@ -19,7 +30,7 @@ export interface CreateEventData {
   description?: string;
   event_date: string;
   location: string;
-  userId: string;
+  // NO incluir userId - el backend lo obtiene del JWT en Authorization header
 }
 
 export interface UpdateEventData {
@@ -101,6 +112,22 @@ export function useEvents(userId?: string): UseEventsReturn {
       setError(null);
 
       console.log('POST /events - Payload:', data);
+      console.log('🔑 Token completo:', token);
+      console.log('🔑 Header Authorization:', `Bearer ${token}`);
+
+      // Decodificar y verificar el token
+      try {
+        const parts = token.split('.');
+        console.log('🔓 Token parts:', parts.length);
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          console.log('🔓 JWT Payload:', payload);
+          console.log('👤 User ID en token:', payload.id || payload.userId || payload.sub);
+          console.log('⏰ Token expira:', payload.exp ? new Date(payload.exp * 1000).toLocaleString() : 'N/A');
+        }
+      } catch (e) {
+        console.error('❌ Error decodificando token:', e);
+      }
 
       const res = await fetch(`${API_URL}/events`, {
         method: 'POST',

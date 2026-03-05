@@ -5,6 +5,25 @@ import { API_BASE_URL } from '../config/api';
 
 const API_URL = API_BASE_URL;
 
+// Helper para extraer el ID de MongoDB (puede venir como string o como {$oid: "..."})
+function extractId(id: any): string {
+  if (!id) return '';
+  if (typeof id === 'string') return id;
+  if (typeof id === 'object' && id.$oid) return id.$oid;
+  return String(id);
+}
+
+// Helper para normalizar un SavedPost del backend
+function normalizeSavedPost(post: any): SavedPost {
+  return {
+    id: extractId(post._id || post.id),
+    postId: extractId(post.post_id || post.postId),
+    userId: post.sql_user_id || post.userId || '',
+    createdAt: post.saved_at || post.createdAt,
+    post: post.post,
+  };
+}
+
 export interface SavedPost {
   id: string;
   postId: string;
@@ -70,43 +89,33 @@ export function useSavedPosts(userId?: string): UseSavedPostsReturn {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      // El backend obtiene el userId del JWT, no enviar como query param
-      const url = `${API_URL}/posts/saved`;
+      // Enviar userId como query param para que el backend filtre correctamente
+      const url = `${API_URL}/posts/saved?userId=${userId}`;
+      console.log('🔍 Fetching saved posts from:', url);
 
       const res = await fetch(url, { headers });
+      console.log('📡 Response status:', res.status, res.statusText);
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
-
-        // Si es error 500, no fallar completamente - solo log y continuar
-        if (res.status === 500) {
-          console.warn('⚠️ Backend con problemas (500), continuando con lista vacía');
-          setSavedPosts([]); // Lista vacía en lugar de fallar
-          setError(null); // No mostrar error al usuario
-          return;
-        }
-
-        throw new Error(errorData.message || 'Error al obtener posts guardados');
+        console.warn(`⚠️ GET /posts/saved falló (${res.status}), continuando con lista vacía`);
+        setSavedPosts([]);
+        setError(null);
+        return;
       }
 
       const data = await res.json();
+      console.log('📦 Data recibida (RAW):', data);
 
-      // Normalizar respuesta del backend
       const postsArray = Array.isArray(data)
         ? data
         : Array.isArray(data?.data)
         ? data.data
         : [];
 
-      // Normalizar cada post: convertir _id a id, post_id a postId, etc.
-      const normalizedPosts = postsArray.map((post: any) => ({
-        id: post._id || post.id,
-        postId: post.post_id || post.postId,
-        userId: post.sql_user_id || post.userId,
-        createdAt: post.saved_at || post.createdAt,
-        post: post.post
-      }));
+      console.log('📋 Posts array length:', postsArray.length);
 
+      const normalizedPosts = postsArray.map(normalizeSavedPost);
+      console.log('✅ Posts normalizados:', normalizedPosts);
       setSavedPosts(normalizedPosts);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
@@ -149,62 +158,37 @@ export function useSavedPosts(userId?: string): UseSavedPostsReturn {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
-        console.error('Error del backend:', {
-          status: res.status,
-          statusText: res.statusText,
-          error: errorData
-        });
 
         // Si el error es 409 (Conflict), el post ya está guardado
-        // Hacer GET para obtener todos los guardados y encontrar el ID real
         if (res.status === 409) {
-          console.warn('⚠️ Post ya guardado (409 Conflict), obteniendo ID real...');
+          console.warn('⚠️ Post ya guardado (409), buscando en lista actual...');
 
+          // Buscar en la lista actual del estado
+          const existing = savedPosts.find(sp => sp.postId === postId);
+          if (existing) return existing;
+
+          // Si no está en el estado, hacer GET para sincronizar
           try {
-            // Hacer GET para obtener todos los posts guardados
-            // El backend obtiene el userId del JWT
-            const getRes = await fetch(`${API_URL}/posts/saved`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
+            const getRes = await fetch(`${API_URL}/posts/saved?userId=${userId}`, {
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             });
-
             if (getRes.ok) {
               const allSaved = await getRes.json();
               const savedArray = Array.isArray(allSaved) ? allSaved : (allSaved?.data || []);
-
-              // Encontrar el post específico
-              const existing = savedArray.find((sp: any) =>
-                (sp.post_id || sp.postId) === postId
+              const found = savedArray.find((sp: any) =>
+                extractId(sp.post_id || sp.postId) === postId
               );
-
-              if (existing) {
-                // Normalizar y retornar el objeto real
-                const normalizedPost: SavedPost = {
-                  id: existing._id || existing.id,
-                  postId: existing.post_id || existing.postId,
-                  userId: existing.sql_user_id || existing.userId,
-                  createdAt: existing.saved_at || existing.createdAt
-                };
-
-                // Actualizar el estado con el objeto real
-                setSavedPosts(prev => {
-                  // Verificar si ya existe para evitar duplicados
-                  if (prev.some(p => p.id === normalizedPost.id)) {
-                    return prev;
-                  }
-                  return [...prev, normalizedPost];
-                });
-
-                return normalizedPost;
+              if (found) {
+                const normalized = normalizeSavedPost(found);
+                setSavedPosts(prev =>
+                  prev.some(p => p.id === normalized.id) ? prev : [...prev, normalized]
+                );
+                return normalized;
               }
             }
           } catch (getErr) {
             console.error('Error al obtener posts guardados:', getErr);
           }
-
-          // Si no se pudo obtener, retornar null
           return null;
         }
 
@@ -214,15 +198,7 @@ export function useSavedPosts(userId?: string): UseSavedPostsReturn {
       const savedPost = await res.json();
       console.log('Post guardado exitosamente:', savedPost);
 
-      // Normalizar: El backend devuelve _id, pero necesitamos id
-      const normalizedPost: SavedPost = {
-        id: savedPost._id || savedPost.id,
-        postId: savedPost.post_id || savedPost.postId,
-        userId: savedPost.sql_user_id || savedPost.userId,
-        createdAt: savedPost.saved_at || savedPost.createdAt
-      };
-
-      // Agregar al estado local con el objeto normalizado
+      const normalizedPost = normalizeSavedPost(savedPost);
       setSavedPosts(prev => [...prev, normalizedPost]);
 
       return normalizedPost;

@@ -7,12 +7,14 @@ import PublicationListCard from './publications/PublicationListCard';
 import DeleteConfirmModal from './common/DeleteConfirmModal';
 import { usePosts } from '../hooks/usePosts';
 import { useUser } from '../hooks/useUser';
-import { useSavedPosts } from '../hooks/useSavedPosts';
+import { useSavedPostsContext } from '../context/SavedPostsContext';
+import { usePostReactions } from '../hooks/usePostReactions';
 
 export default function Publications() {
   const { user } = useUser();
   const { posts, uploading, error: postsError, createPost, updatePost, deletePost, fetchPosts } = usePosts(user?.id);
-  const { savedPosts, savePost, unsavePost, isPostSaved } = useSavedPosts(user?.id);
+  const { savedPosts, savePost, unsavePost, isPostSaved } = useSavedPostsContext();
+  const { isLiked, toggleLike, processingPostId: likingPostId, reactedPosts } = usePostReactions(user?.id);
 
   const [newPost, setNewPost] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -23,7 +25,9 @@ export default function Publications() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [savingPostId, setSavingPostId] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false); // Lock para evitar múltiples requests
+  const [isProcessing, setIsProcessing] = useState(false);
+  // Override local de contadores de likes (postId -> delta) para reflejo inmediato
+  const [likesOverride, setLikesOverride] = useState<Map<string, number>>(new Map());
 
   // Cargar posts al montar el componente
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -139,12 +143,9 @@ export default function Publications() {
       const savedPost = savedPosts.find(sp => sp.postId === postIdStr);
 
       if (savedPost) {
-        // Si ya está guardado, eliminarlo
-        // Pequeño delay para asegurar que el backend haya procesado el POST anterior
         await new Promise(resolve => setTimeout(resolve, 100));
         await unsavePost(savedPost.id);
       } else {
-        // Si no está guardado, guardarlo
         await savePost(postIdStr, user.id);
       }
     } catch (error) {
@@ -157,14 +158,46 @@ export default function Publications() {
     }
   };
 
+  const handleLike = async (postId: string | number) => {
+    if (!user) {
+      setErrorMessage('Debes iniciar sesión para reaccionar');
+      return;
+    }
+    const postIdStr = String(postId);
+    if (!postIdStr || postIdStr === 'undefined') return;
+
+    const wasLiked = isLiked(postIdStr);
+
+    // Optimistic update del contador
+    setLikesOverride(prev => {
+      const next = new Map(prev);
+      const currentDelta = next.get(postIdStr) ?? 0;
+      next.set(postIdStr, wasLiked ? currentDelta - 1 : currentDelta + 1);
+      return next;
+    });
+
+    const result = await toggleLike(postIdStr);
+
+    // Si el resultado no coincide con lo esperado, corregir el contador
+    if (result.liked === wasLiked) {
+      // Algo salió mal (el toggle no cambió el estado), revertir delta
+      setLikesOverride(prev => {
+        const next = new Map(prev);
+        const currentDelta = next.get(postIdStr) ?? 0;
+        next.set(postIdStr, wasLiked ? currentDelta + 1 : currentDelta - 1);
+        return next;
+      });
+    }
+  };
+
   // Convertir posts del backend al formato de Publication para el componente
   // Usar useMemo para que se recalcule cuando savedPosts cambia
   const publications: Publication[] = useMemo(() => {
     if (!Array.isArray(posts)) return [];
 
     return posts.map(post => {
-      // Obtener el ID del post - puede venir como id o _id
-      const postId = post.id || (post as any)._id || '';
+      // Obtener el ID del post - ya normalizado a id por usePosts
+      const postId = post.id || '';
 
       // Detectar la URL de imagen: mediaUrl tiene prioridad, luego content si parece una URL
       const imageUrl = post.mediaUrl
@@ -179,6 +212,8 @@ export default function Publications() {
         || '';
 
       const rawDate = post.createdAt || (post as { created_at?: string }).created_at;
+      const baseLikes = post.likesCount ?? 0;
+      const likesDelta = postId ? (likesOverride.get(postId) ?? 0) : 0;
       return {
         id: postId,
         content: textContent,
@@ -186,17 +221,19 @@ export default function Publications() {
         date: rawDate ? new Date(rawDate).toLocaleDateString() : 'Sin fecha',
         time: rawDate && typeof window !== 'undefined' ? formatTimeAgo(new Date(rawDate)) : '',
         text: textContent,
-        likes: post.likesCount ?? 0,
+        likes: Math.max(0, baseLikes + likesDelta),
         saved: 0,
-        isLiked: false,
-        isSaved: postId ? isPostSaved(postId) : false, // ✅ Se recalcula cuando savedPosts cambia
+        isLiked: postId ? isLiked(postId) : false,
+        reactionId: postId ? reactedPosts.get(postId) : undefined,
+        isSaved: postId ? isPostSaved(postId) : false,
         author: {
           name: user?.name || 'Usuario',
           avatar: '',
         },
       };
     });
-  }, [posts, savedPosts, isPostSaved, user?.name]); // ✅ Dependencias: recalcula cuando savedPosts cambia
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posts, savedPosts, reactedPosts, likesOverride, user?.name]);
 
   // Función para formatear tiempo relativo
   function formatTimeAgo(date: Date): string {
@@ -268,10 +305,12 @@ export default function Publications() {
                 isEditing={editingId === pub.id}
                 editText={editText}
                 isSaving={savingPostId === pub.id}
+                isLiking={likingPostId === String(pub.id)}
                 onMenuToggle={() => setOpenMenuId(openMenuId === pub.id ? null : pub.id)}
                 onEdit={() => handleEdit(pub.id, pub.text || '')}
                 onDelete={() => handleDelete(pub.id)}
                 onSave={handleSave}
+                onLike={handleLike}
                 onEditTextChange={setEditText}
                 onSaveEdit={() => saveEdit(pub.id)}
                 onCancelEdit={cancelEdit}
