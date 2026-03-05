@@ -14,7 +14,7 @@ export default function Publications() {
   const { user } = useUser();
   const { posts, uploading, error: postsError, createPost, updatePost, deletePost, fetchPosts } = usePosts(user?.id);
   const { savedPosts, savePost, unsavePost, isPostSaved } = useSavedPostsContext();
-  const { isLiked, toggleLike, processingPostId: likingPostId, reactedPosts } = usePostReactions(user?.id);
+  const { isLiked, toggleLike, processingPostId: likingPostId, reactedPosts, postReactionCounts, fetchPostReactionCounts, getReactionCount } = usePostReactions(user?.id);
 
   const [newPost, setNewPost] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -32,6 +32,14 @@ export default function Publications() {
   // Cargar posts al montar el componente
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchPosts(); }, []);
+
+  // Cuando los posts cambien, cargar el conteo real de reacciones de cada post
+  useEffect(() => {
+    if (!Array.isArray(posts) || posts.length === 0) return;
+    const ids = posts.map(p => p.id).filter(Boolean);
+    if (ids.length > 0) fetchPostReactionCounts(ids);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posts]);
 
   useEffect(() => {
     if (!postsError) return;
@@ -212,8 +220,12 @@ export default function Publications() {
         || '';
 
       const rawDate = post.createdAt || (post as { created_at?: string }).created_at;
-      const baseLikes = post.likesCount ?? 0;
-      const likesDelta = postId ? (likesOverride.get(postId) ?? 0) : 0;
+      // Si el servidor ya devolvió el conteo real para este post, usarlo directo (sin delta).
+      // Solo aplicar el delta optimista mientras el servidor aún no ha respondido.
+      const hasServerCount = postId ? postReactionCounts.has(postId) : false;
+      const serverCount = postId ? getReactionCount(postId) : 0;
+      const likesDelta = (!hasServerCount && postId) ? (likesOverride.get(postId) ?? 0) : 0;
+      const baseLikes = hasServerCount ? serverCount : (post.likesCount ?? 0);
       return {
         id: postId,
         content: textContent,
@@ -233,7 +245,7 @@ export default function Publications() {
       };
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posts, savedPosts, reactedPosts, likesOverride, user?.name]);
+  }, [posts, savedPosts, reactedPosts, postReactionCounts, likesOverride, user?.name, getReactionCount]);
 
   // Función para formatear tiempo relativo
   function formatTimeAgo(date: Date): string {

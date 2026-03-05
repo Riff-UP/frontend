@@ -38,6 +38,8 @@ function normalizeReaction(raw: Record<string, unknown>): Reaction {
 export function usePostReactions(userId?: string) {
   const [reactedPosts, setReactedPosts] = useState<Map<string, string>>(new Map());
   const [processingPostId, setProcessingPostId] = useState<string | null>(null);
+  // Conteo total de reacciones por post (postId -> count)
+  const [postReactionCounts, setPostReactionCounts] = useState<Map<string, number>>(new Map());
 
   const getToken = useCallback((): string | null => {
     if (typeof window !== 'undefined') return localStorage.getItem('token');
@@ -45,19 +47,17 @@ export function usePostReactions(userId?: string) {
   }, []);
 
   // Cargar reacciones previas del usuario al inicializar
-  // Nota: GET /posts/reactions puede no soportar filtro por userId — si falla, se ignora silenciosamente
+  // FIX: el gateway espera ?userId= (no ?sql_user_id=)
   const fetchUserReactions = useCallback(async () => {
     if (!userId) return;
     const token = getToken();
     if (!token) return;
 
     try {
-      // Intentar con sql_user_id como query param (patrón del backend)
-      const res = await fetch(`${API_URL}/posts/reactions?sql_user_id=${userId}`, {
+      const res = await fetch(`${API_URL}/posts/reactions?userId=${userId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
-        // El endpoint puede no existir o no soportar filtrado — continuar sin reacciones previas
         console.warn('⚠️ GET /posts/reactions no disponible, iniciando sin estado previo');
         return;
       }
@@ -85,6 +85,48 @@ export function usePostReactions(userId?: string) {
     fetchUserReactions();
   }, [fetchUserReactions]);
 
+  /**
+   * Obtiene el conteo total de reacciones de uno o varios posts.
+   * Llama a GET /posts/reactions/post/:postId por cada postId.
+   */
+  const fetchPostReactionCounts = useCallback(async (postIds: string[]) => {
+    if (!postIds.length) return;
+    const token = getToken();
+    if (!token) return;
+
+    const results = await Promise.allSettled(
+      postIds.map(postId =>
+        fetch(`${API_URL}/posts/reactions/post/${postId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).then(r => (r.ok ? r.json() : Promise.reject(r.status)))
+      )
+    );
+
+    setPostReactionCounts(prev => {
+      const next = new Map(prev);
+      results.forEach((result, i) => {
+        if (result.status === 'fulfilled') {
+          const data = result.value;
+          // El backend puede devolver un array de reacciones o { count: N }
+          const count = typeof data?.count === 'number'
+            ? data.count
+            : Array.isArray(data)
+            ? data.length
+            : Array.isArray(data?.data)
+            ? data.data.length
+            : 0;
+          next.set(postIds[i], count);
+        }
+      });
+      return next;
+    });
+    console.log('✅ Conteo de reacciones cargado para', postIds.length, 'posts');
+  }, [getToken]);
+
+  const getReactionCount = useCallback((postId: string): number => {
+    return postReactionCounts.get(postId) ?? 0;
+  }, [postReactionCounts]);
+
   const isLiked = useCallback((postId: string): boolean => {
     return reactedPosts.has(postId);
   }, [reactedPosts]);
@@ -111,10 +153,17 @@ export function usePostReactions(userId?: string) {
       return next;
     });
 
+    // Optimistic update del conteo total
+    setPostReactionCounts(prev => {
+      const next = new Map(prev);
+      const current = next.get(postId) ?? 0;
+      next.set(postId, alreadyLiked ? Math.max(0, current - 1) : current + 1);
+      return next;
+    });
+
     setProcessingPostId(postId);
 
     try {
-      // El backend usa siempre POST con toggle: devuelve { reaction: {...}, action: 'created' | 'removed' }
       const payload = { post_id: postId, sql_user_id: userId, type: 'like' };
       console.log('❤️ POST /posts/reactions - Payload:', payload);
 
@@ -130,7 +179,7 @@ export function usePostReactions(userId?: string) {
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         console.error('❌ Error en POST /posts/reactions:', res.status, errBody);
-        // Revertir optimistic update
+        // Revertir optimistic updates
         setReactedPosts(prev => {
           const next = new Map(prev);
           if (alreadyLiked && existingReactionId) {
@@ -140,32 +189,39 @@ export function usePostReactions(userId?: string) {
           }
           return next;
         });
+        setPostReactionCounts(prev => {
+          const next = new Map(prev);
+          const current = next.get(postId) ?? 0;
+          next.set(postId, alreadyLiked ? current + 1 : Math.max(0, current - 1));
+          return next;
+        });
         return { liked: alreadyLiked };
       }
 
       const raw = await res.json() as Record<string, unknown>;
       console.log('✅ Toggle reaction:', raw);
 
-      // El backend responde: { reaction: {...}, action: 'created' | 'removed' }
       const action = String(raw.action ?? '');
       const reactionData = (raw.reaction ?? raw) as Record<string, unknown>;
       const reactionId = extractId(reactionData._id ?? reactionData.id);
 
       if (action === 'removed') {
-        // El backend quitó la reacción
         setReactedPosts(prev => {
           const next = new Map(prev);
           next.delete(postId);
           return next;
         });
+        // Refrescar conteo real desde el servidor
+        fetchPostReactionCounts([postId]);
         return { liked: false };
       } else {
-        // action === 'created' o cualquier otro caso: se creó la reacción
         setReactedPosts(prev => {
           const next = new Map(prev);
           next.set(postId, reactionId || 'saved');
           return next;
         });
+        // Refrescar conteo real desde el servidor
+        fetchPostReactionCounts([postId]);
         return { liked: true };
       }
 
@@ -181,16 +237,25 @@ export function usePostReactions(userId?: string) {
         }
         return next;
       });
+      setPostReactionCounts(prev => {
+        const next = new Map(prev);
+        const current = next.get(postId) ?? 0;
+        next.set(postId, alreadyLiked ? current + 1 : Math.max(0, current - 1));
+        return next;
+      });
       return { liked: alreadyLiked };
     } finally {
       setProcessingPostId(null);
     }
-  }, [userId, getToken, reactedPosts, isLiked, processingPostId]);
+  }, [userId, getToken, reactedPosts, isLiked, processingPostId, fetchPostReactionCounts]);
 
   return {
     isLiked,
     toggleLike,
     processingPostId,
     reactedPosts,
+    postReactionCounts,
+    fetchPostReactionCounts,
+    getReactionCount,
   };
 }
