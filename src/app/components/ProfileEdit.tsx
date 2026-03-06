@@ -7,6 +7,7 @@ import SocialMediaInput from './profile/SocialMediaInput';
 import ProfileFromToken from './profile/ProfileFromToken';
 import { useUser } from '../hooks/useUser';
 import { API_BASE_URL, getAuthHeaders } from '../config/api';
+import { uploadToR2, validateImageFile } from '../utils/r2Storage';
 
 const API_URL = API_BASE_URL;
 
@@ -37,6 +38,7 @@ export default function ProfileEdit() {
   });
 
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Extraer plataforma y valor de URL guardada (formato: "platform:valor")
   const parseSocialMedia = (url: string): { platform: string; value: string } | null => {
@@ -75,10 +77,16 @@ export default function ProfileEdit() {
       }));
       
       setSocialMediaIds(idsMap);
+
+      // Cargar foto de perfil desde el backend
+      if (user.profileImage) {
+        setProfileImage(user.profileImage);
+      }
     }
   }, [user]);
 
   // Cargar conteo real de seguidores desde el backend
+
   useEffect(() => {
     if (!user?.id) return;
     const fetchFollowers = async () => {
@@ -102,16 +110,41 @@ export default function ProfileEdit() {
     setProfileData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      setSaveMessage({ type: 'error', text: validation.error || 'Archivo inválido' });
+      return;
+    }
+
+    setUploadingImage(true);
+    setSaveMessage(null);
+
+    try {
+      // Preview inmediato mientras sube
       const reader = new FileReader();
       reader.onload = (e) => {
-        if (e.target?.result) {
-          setProfileImage(e.target.result as string);
-        }
+        if (e.target?.result) setProfileImage(e.target.result as string);
       };
       reader.readAsDataURL(file);
+
+      // Subir a R2
+      const imageUrl = await uploadToR2(file);
+
+      // Guardar en backend
+      await updateUser({ profileImage: imageUrl });
+      setProfileImage(imageUrl);
+      setSaveMessage({ type: 'success', text: 'Foto de perfil actualizada' });
+      setTimeout(() => setSaveMessage(null), 3000);
+    } catch {
+      setSaveMessage({ type: 'error', text: 'Error al subir la foto de perfil' });
+    } finally {
+      setUploadingImage(false);
+      // Limpiar el input
+      event.target.value = '';
     }
   };
 
@@ -125,43 +158,52 @@ export default function ProfileEdit() {
     setSaveMessage(null);
     
     // Guardar datos del perfil
-    const success = await updateUser({
+    const profileSuccess = await updateUser({
       name: profileData.name,
       biography: profileData.description,
     });
 
     // Guardar redes sociales (con prefijo de plataforma)
     const platforms: Array<'instagram' | 'facebook' | 'whatsapp'> = ['instagram', 'facebook', 'whatsapp'];
-    
+    let socialErrors: string[] = [];
+
     for (const platform of platforms) {
       const value = profileData[platform];
       const existingId = socialMediaIds[platform];
       const urlWithPrefix = value ? `${platform}:${value}` : '';
 
-      if (value && existingId) {
-        // Actualizar existente
-        await updateSocialMedia(existingId, urlWithPrefix);
-      } else if (value && !existingId) {
-        // Crear nueva
-        const newSm = await addSocialMedia(urlWithPrefix);
-        if (newSm) {
-          setSocialMediaIds(prev => ({ ...prev, [platform]: newSm.id }));
+      try {
+        if (value && existingId) {
+          // Actualizar existente
+          await updateSocialMedia(existingId, urlWithPrefix);
+        } else if (value && !existingId) {
+          // Crear nueva
+          const newSm = await addSocialMedia(urlWithPrefix);
+          if (newSm) {
+            setSocialMediaIds(prev => ({ ...prev, [platform]: newSm.id }));
+          } else {
+            socialErrors.push(platform);
+          }
+        } else if (!value && existingId) {
+          // Eliminar
+          await removeSocialMedia(existingId);
+          setSocialMediaIds(prev => {
+            const updated = { ...prev };
+            delete updated[platform];
+            return updated;
+          });
         }
-      } else if (!value && existingId) {
-        // Eliminar
-        await removeSocialMedia(existingId);
-        setSocialMediaIds(prev => {
-          const updated = { ...prev };
-          delete updated[platform];
-          return updated;
-        });
+      } catch {
+        socialErrors.push(platform);
       }
     }
     
-    if (success) {
+    if (profileSuccess && socialErrors.length === 0) {
       setSaveMessage({ type: 'success', text: 'Perfil actualizado correctamente' });
-    } else {
+    } else if (!profileSuccess) {
       setSaveMessage({ type: 'error', text: error || 'Error al guardar cambios' });
+    } else if (socialErrors.length > 0) {
+      setSaveMessage({ type: 'error', text: `Error al guardar: ${socialErrors.join(', ')}. Revisa la consola.` });
     }
     
     setSaving(false);
@@ -272,7 +314,7 @@ export default function ProfileEdit() {
         <div className="bg-riff-header border border-white/0 rounded-sm p-3 sm:p-4 md:p-6">
         {/* Header con foto y seguidores */}
         <div className="flex items-center gap-2 sm:gap-3 pb-3 sm:pb-4">
-          <div className="relative group cursor-pointer" onClick={triggerImageUpload}>
+          <div className="relative group cursor-pointer" onClick={uploadingImage ? undefined : triggerImageUpload}>
             <div className="relative w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-riff-text-secondary/30 flex-shrink-0">
               {profileImage ? (
                 <Image
@@ -290,12 +332,21 @@ export default function ProfileEdit() {
                 </div>
               )}
             </div>
-            {/* Overlay de hover */}
-            <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M3 4V1h2v3h3v2H5v3H3V6H0V4h3zm3 6V7h3V4h7l1.83 2H21c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V10h3zm7 9c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-3.2-5c0 1.77 1.43 3.2 3.2 3.2s3.2-1.43 3.2-3.2-1.43-3.2-3.2-3.2-3.2 1.43-3.2 3.2z"/>
-              </svg>
-            </div>
+            {/* Overlay de hover o spinner mientras sube */}
+            {uploadingImage ? (
+              <div className="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center">
+                <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              </div>
+            ) : (
+              <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M3 4V1h2v3h3v2H5v3H3V6H0V4h3zm3 6V7h3V4h7l1.83 2H21c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V10h3zm7 9c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-3.2-5c0 1.77 1.43 3.2 3.2 3.2s3.2-1.43 3.2-3.2-1.43-3.2-3.2-3.2-3.2 1.43-3.2 3.2z"/>
+                </svg>
+              </div>
+            )}
           </div>
           <input
             id="profile-image-input"

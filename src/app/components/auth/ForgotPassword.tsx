@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FiArrowLeft } from "react-icons/fi";
+import { FiArrowLeft, FiCheck } from "react-icons/fi";
+import { API_BASE_URL } from "@/app/config/api";
 
 export default function ForgotPassword() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [sent, setSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,16 +17,58 @@ export default function ForgotPassword() {
     setError("");
 
     try {
-      // TODO: Implementar llamada a la API para enviar código de recuperación
-      console.log("Recuperar contraseña para:", email);
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simular petición
-      router.push(`/verify-code?email=${encodeURIComponent(email)}`);
-    } catch (err) {
-      setError("Ocurrió un error. Por favor intenta de nuevo.");
+      const res = await fetch(`${API_BASE_URL}/password-resets/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mail: email }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg = Array.isArray(data?.message)
+          ? data.message.join(", ")
+          : data?.message || "Error al enviar el correo.";
+        setError(msg);
+        return;
+      }
+
+      setSent(true);
+    } catch {
+      setError("Ocurrió un error de red. Por favor intenta de nuevo.");
     } finally {
       setLoading(false);
     }
   };
+
+  if (sent) {
+    return (
+      <div className="space-y-6 text-center">
+        <div className="flex justify-center">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-riff-primary-dark to-riff-primary flex items-center justify-center">
+            <FiCheck className="w-7 h-7 text-white" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-riff-primary-dark to-riff-primary bg-clip-text text-transparent">
+            ¡Correo enviado!
+          </h1>
+          <p className="text-riff-text-secondary text-sm">
+            Revisa tu bandeja de entrada. Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.
+          </p>
+        </div>
+        <Link
+          href="/login"
+          className="block w-full py-2.5
+                    bg-gradient-to-r from-riff-primary-dark to-riff-primary
+                    text-white font-semibold rounded-lg text-center
+                    hover:from-riff-primary hover:to-riff-primary-dark transform hover:scale-[1.02]
+                    transition-all duration-300 shadow-lg shadow-riff-primary/25"
+        >
+          Volver al inicio de sesión
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -35,7 +77,7 @@ export default function ForgotPassword() {
           ¿Olvidaste tu contraseña?
         </h1>
         <p className="text-riff-text-secondary text-sm">
-          Ingresa tu correo y te enviaremos un código para restablecerla.
+          Ingresa tu correo y te enviaremos un enlace para restablecerla.
         </p>
       </div>
 
@@ -77,7 +119,7 @@ export default function ForgotPassword() {
               Enviando...
             </span>
           ) : (
-            "Enviar Código  "
+            "Enviar enlace"
           )}
         </button>
       </form>

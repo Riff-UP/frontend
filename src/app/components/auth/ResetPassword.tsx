@@ -2,15 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FiEye, FiEyeOff, FiArrowLeft, FiCheck } from "react-icons/fi";
+import { API_BASE_URL } from "@/app/config/api";
 
 interface ResetPasswordProps {
   token?: string;
 }
 
 export default function ResetPassword({ token }: ResetPasswordProps) {
-  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -39,16 +38,33 @@ export default function ResetPassword({ token }: ResetPasswordProps) {
       return;
     }
 
+    if (!token) {
+      setError("Token inválido. Por favor solicita un nuevo enlace.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
-      // TODO: Implementar llamada a la API para restablecer contraseña
-      console.log("Restablecer contraseña con token:", token);
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simular petición
+      const res = await fetch(`${API_BASE_URL}/password-resets/reset`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, password: formData.password }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg = Array.isArray(data?.message)
+          ? data.message.join(", ")
+          : data?.message || "El enlace es inválido o ha expirado. Solicita uno nuevo.";
+        setError(msg);
+        return;
+      }
+
       setSuccess(true);
-    } catch (err) {
-      setError("El enlace es inválido o ha expirado. Solicita uno nuevo.");
+    } catch {
+      setError("Ocurrió un error de red. Por favor intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -64,6 +80,38 @@ export default function ResetPassword({ token }: ResetPasswordProps) {
 
   const strength = passwordStrength(formData.password);
 
+  if (!token) {
+    return (
+      <div className="space-y-6 text-center">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-riff-primary-dark to-riff-primary bg-clip-text text-transparent">
+            Enlace inválido
+          </h1>
+          <p className="text-riff-text-secondary text-sm">
+            El enlace de recuperación es inválido o ha expirado.
+          </p>
+        </div>
+        <Link
+          href="/forgot-password"
+          className="block w-full py-2.5
+                    bg-gradient-to-r from-riff-primary-dark to-riff-primary
+                    text-white font-semibold rounded-lg text-center
+                    hover:from-riff-primary hover:to-riff-primary-dark transform hover:scale-[1.02]
+                    transition-all duration-300 shadow-lg shadow-riff-primary/25"
+        >
+          Solicitar nuevo enlace
+        </Link>
+        <Link
+          href="/login"
+          className="flex items-center justify-center gap-1.5 text-riff-registro font-bold hover:text-riff-primary-dark transition-colors text-sm"
+        >
+          <FiArrowLeft className="w-4 h-4" />
+          Volver al inicio de sesión
+        </Link>
+      </div>
+    );
+  }
+
   if (success) {
     return (
       <div className="space-y-6 text-center">
@@ -78,7 +126,7 @@ export default function ResetPassword({ token }: ResetPasswordProps) {
             ¡Contraseña actualizada!
           </h1>
           <p className="text-riff-text-secondary text-sm">
-            Tu contraseña ha sido restablecida exitosamente.
+            Tu contraseña ha sido restablecida exitosamente. Ya puedes iniciar sesión.
           </p>
         </div>
 

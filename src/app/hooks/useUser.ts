@@ -19,6 +19,7 @@ export interface UserData {
   googleId?: string | null;
   hasPassword?: boolean;
   biography?: string | null;
+  profileImage?: string | null;
   role: 'USER' | 'ARTIST';
   status: boolean;
   createdAt: string;
@@ -58,7 +59,6 @@ export function useUser(): UseUserReturn {
       return;
     }
 
-    // Obtener el ID del usuario desde el token
     const tokenData = getUserFromToken(token);
     if (!tokenData || !tokenData.id) {
       setLoading(false);
@@ -70,7 +70,8 @@ export function useUser(): UseUserReturn {
       setLoading(true);
       setError(null);
 
-      const res = await fetch(`${API_URL}/users/${tokenData.id}`, {
+      // Usar /users/me que extrae el userId del JWT
+      const res = await fetch(`${API_URL}/users/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -84,11 +85,31 @@ export function useUser(): UseUserReturn {
       }
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || 'Error al obtener usuario');
       }
 
       const userData = await res.json();
+      const userId = userData.id || tokenData.id;
+
+      // Cargar redes sociales del usuario via /social-media/user/:userId
+      try {
+        const smRes = await fetch(`${API_URL}/social-media/user/${userId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (smRes.ok) {
+          const smData = await smRes.json();
+          userData.socialMedia = Array.isArray(smData) ? smData : (smData?.data ?? []);
+        } else {
+          userData.socialMedia = userData.socialMedia || [];
+        }
+      } catch {
+        userData.socialMedia = userData.socialMedia || [];
+      }
+
       setUser(userData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -108,7 +129,7 @@ export function useUser(): UseUserReturn {
     try {
       setError(null);
 
-      const res = await fetch(`${API_URL}/users/${user.id}`, {
+      const res = await fetch(`${API_URL}/users/me`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -124,12 +145,13 @@ export function useUser(): UseUserReturn {
       }
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || 'Error al actualizar');
       }
 
       const updatedUser = await res.json();
-      setUser(updatedUser);
+      // Preservar las redes sociales ya cargadas
+      setUser(prev => ({ ...(prev || {}), ...updatedUser, socialMedia: prev?.socialMedia } as UserData));
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al actualizar');
@@ -219,22 +241,28 @@ export function useUser(): UseUserReturn {
     try {
       setError(null);
 
+      const payload = { userId: user.id, url };
+      console.log('📱 addSocialMedia payload:', payload);
+
       const res = await fetch(`${API_URL}/social-media`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userId: user.id, url }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al agregar red social');
+        const errorData = await res.json().catch(() => ({}));
+        const msg = Array.isArray(errorData?.message) ? errorData.message.join(', ') : (errorData?.message || 'Error al agregar red social');
+        console.error('❌ addSocialMedia error:', errorData);
+        throw new Error(msg);
       }
 
       const newSocialMedia = await res.json();
-      
+      console.log('✅ addSocialMedia result:', newSocialMedia);
+
       // Actualizar usuario local
       setUser(prev => prev ? {
         ...prev,
@@ -259,6 +287,8 @@ export function useUser(): UseUserReturn {
     try {
       setError(null);
 
+      console.log('📱 updateSocialMedia:', { id, url });
+
       const res = await fetch(`${API_URL}/social-media/${id}`, {
         method: 'PATCH',
         headers: {
@@ -269,10 +299,13 @@ export function useUser(): UseUserReturn {
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al actualizar red social');
+        const errorData = await res.json().catch(() => ({}));
+        const msg = Array.isArray(errorData?.message) ? errorData.message.join(', ') : (errorData?.message || 'Error al actualizar red social');
+        console.error('❌ updateSocialMedia error:', errorData);
+        throw new Error(msg);
       }
 
+      console.log('✅ updateSocialMedia ok');
       // Actualizar usuario local
       setUser(prev => prev ? {
         ...prev,
@@ -297,6 +330,8 @@ export function useUser(): UseUserReturn {
     try {
       setError(null);
 
+      console.log('📱 removeSocialMedia:', id);
+
       const res = await fetch(`${API_URL}/social-media/${id}`, {
         method: 'DELETE',
         headers: {
@@ -305,10 +340,13 @@ export function useUser(): UseUserReturn {
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al eliminar red social');
+        const errorData = await res.json().catch(() => ({}));
+        const msg = Array.isArray(errorData?.message) ? errorData.message.join(', ') : (errorData?.message || 'Error al eliminar red social');
+        console.error('❌ removeSocialMedia error:', errorData);
+        throw new Error(msg);
       }
 
+      console.log('✅ removeSocialMedia ok');
       // Actualizar usuario local
       setUser(prev => prev ? {
         ...prev,
