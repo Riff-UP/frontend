@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Header from "@/app/components/layout/Header";
 import Footer from "@/app/components/layout/Footer";
@@ -55,7 +55,7 @@ function getPostImageUrl(post: RawPost): string | undefined {
   return undefined;
 }
 
-export default function Home() {
+function HomeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
@@ -134,7 +134,7 @@ export default function Home() {
 
   // Eventos a los que el usuario ha asistido (ejemplo)
   // En producción, esto vendría de una API
-  const attendedEvents = [
+  const attendedEvents: Array<{ id: number; title: string; date: string; time: string }> = [
     // Agrega eventos aquí para probar el modal de valoración
   ];
 
@@ -261,5 +261,13 @@ export default function Home() {
         />
       )}
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={null}>
+      <HomeContent />
+    </Suspense>
   );
 }

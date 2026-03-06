@@ -9,20 +9,28 @@ function getEnv(name: string): string {
   return value;
 }
 
-const r2Client = new S3Client({
-  region: 'auto',
-  endpoint: getEnv('R2_ENDPOINT'),
-  credentials: {
-    accessKeyId: getEnv('R2_ACCESS_KEY_ID'),
-    secretAccessKey: getEnv('R2_SECRET_ACCESS_KEY'),
-  },
-});
+function getR2Config() {
+  const endpoint = getEnv('R2_ENDPOINT');
+  const accessKeyId = getEnv('R2_ACCESS_KEY_ID');
+  const secretAccessKey = getEnv('R2_SECRET_ACCESS_KEY');
+  const bucket = getEnv('R2_BUCKET');
+  const publicUrl = getEnv('R2_PUBLIC_URL');
 
-const BUCKET = getEnv('R2_BUCKET');
-const PUBLIC_URL = getEnv('R2_PUBLIC_URL');
+  const client = new S3Client({
+    region: 'auto',
+    endpoint,
+    credentials: {
+      accessKeyId,
+      secretAccessKey,
+    },
+  });
+
+  return { client, bucket, publicUrl };
+}
 
 export async function POST(request: Request) {
   try {
+    const { client, bucket, publicUrl } = getR2Config();
     const formData = await request.formData();
 
     // Buscar el archivo en cualquiera de las keys usadas en el cliente
@@ -41,16 +49,16 @@ export async function POST(request: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    await r2Client.send(
+    await client.send(
       new PutObjectCommand({
-        Bucket: BUCKET,
+        Bucket: bucket,
         Key: filename,
         Body: buffer,
         ContentType: file.type,
       })
     );
 
-    const url = `${PUBLIC_URL.replace(/\/$/, '')}/${filename}`;
+    const url = `${publicUrl.replace(/\/$/, '')}/${filename}`;
 
     return NextResponse.json({ url });
   } catch (err) {

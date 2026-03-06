@@ -76,6 +76,7 @@ export function getValidToken(): string | null {
 export interface JWTPayload {
   id: string;
   email: string;
+  name?: string;
   role?: string;
   iat?: number; // issued at
   exp?: number; // expiration
