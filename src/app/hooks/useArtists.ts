@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { API_BASE_URL } from '../config/api';
 
 export interface ArtistData {
   id: string;
@@ -21,7 +22,7 @@ interface UseArtistsReturn {
   refreshArtists: () => Promise<void>;
 }
 
-const API_URL = 'http://localhost:4000/api';
+const API_URL = API_BASE_URL;
 
 export function useArtists(): UseArtistsReturn {
   const [artists, setArtists] = useState<ArtistData[]>([]);
@@ -34,27 +35,26 @@ export function useArtists(): UseArtistsReturn {
       setLoading(true);
       setError(null);
 
-      // Llamar al endpoint /users y filtrar artistas en el frontend
-      const res = await fetch(`${API_URL}/users`, {
+      // Usar el endpoint correcto: GET /users/artists (devuelve solo ARTIST)
+      const res = await fetch(`${API_URL}/users/artists?limit=50&offset=0`, {
         headers: { 'Content-Type': 'application/json' },
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al obtener usuarios');
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Error al obtener artistas');
       }
 
       const data = await res.json();
+      let artistsList: ArtistData[] = Array.isArray(data) ? data : (data?.data ?? []);
 
-      // Filtrar solo usuarios con role === 'ARTIST'
-      let artistsList = data.filter((user: any) => user.role === 'ARTIST');
-
-      // Aplicar búsqueda local si existe
+      // Filtro local por búsqueda
       if (search) {
         const searchLower = search.toLowerCase();
-        artistsList = artistsList.filter((artist: ArtistData) =>
-          artist.name?.toLowerCase().includes(searchLower) ||
-          artist.biography?.toLowerCase().includes(searchLower)
+        artistsList = artistsList.filter(
+          (artist) =>
+            artist.name?.toLowerCase().includes(searchLower) ||
+            artist.biography?.toLowerCase().includes(searchLower)
         );
       }
 

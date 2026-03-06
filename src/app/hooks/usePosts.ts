@@ -42,7 +42,7 @@ export function usePosts(userId?: string) {
   };
 
   /**
-   * Obtener todas las publicaciones
+   * Obtener publicaciones del usuario actual
    */
   const fetchPosts = async () => {
     setLoading(true);
@@ -58,6 +58,7 @@ export function usePosts(userId?: string) {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
+      // GET /posts trae todos; filtramos por userId en cliente
       const response = await fetch(`${API_URL}/posts`, { headers });
 
       if (!response.ok) {
@@ -65,7 +66,6 @@ export function usePosts(userId?: string) {
       }
 
       const data = await response.json();
-      // Normalizar respuesta: el backend puede devolver array directo o { data: [...] } / { posts: [...] }
       const rawArray = Array.isArray(data)
         ? data
         : Array.isArray(data?.data)
@@ -74,14 +74,22 @@ export function usePosts(userId?: string) {
         ? data.posts
         : [];
 
-      // Normalizar cada post: asegurar que id sea siempre un string limpio
-      const postsArray = rawArray.map((p: Record<string, unknown>) => {
+      // Normalizar cada post
+      const allPosts = rawArray.map((p: Record<string, unknown>) => {
         const rawId = p._id ?? p.id;
         const id = typeof rawId === 'object' && rawId !== null && '$oid' in rawId
           ? String((rawId as { $oid: string }).$oid)
           : String(rawId ?? '');
         return { ...p, id };
       });
+
+      // Filtrar por userId si está disponible (solo mostrar posts del usuario actual)
+      const postsArray = userId
+        ? allPosts.filter((p: Record<string, unknown>) => {
+            const postAuthor = String(p.sql_user_id ?? p.authorId ?? '');
+            return postAuthor === userId;
+          })
+        : allPosts;
 
       setPosts(postsArray);
 

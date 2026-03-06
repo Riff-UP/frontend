@@ -19,10 +19,8 @@ export default function Saved() {
     unsavePost,
   } = useSavedPostsContext();
 
-  const postsError = null;
-
   const handleUnsavePost = async (savedPostId: string) => {
-    if (removingId) return; // Evitar doble click
+    if (removingId || !savedPostId) return;
     setRemovingId(savedPostId);
     try {
       await unsavePost(savedPostId);
@@ -72,93 +70,87 @@ export default function Saved() {
               <div className="text-center py-12">
                 <p className="text-riff-text-secondary text-sm">Cargando publicaciones...</p>
               </div>
-            ) : postsError ? (
+            ) : savedPosts.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-red-400 text-sm">{postsError}</p>
+                <MdBookmark className="w-12 h-12 text-riff-text-secondary mx-auto mb-4" />
+                <p className="text-riff-text-secondary text-sm">No tienes publicaciones guardadas</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {savedPosts.length === 0 ? (
-                  <div className="text-center py-12">
-                    <MdBookmark className="w-12 h-12 text-riff-text-secondary mx-auto mb-4" />
-                    <p className="text-riff-text-secondary text-sm">No tienes publicaciones guardadas</p>
-                  </div>
-                ) : (
-                  savedPosts.map((savedPost, index) => {
-                    // Usar id limpio o fallback
-                    const key = savedPost.id || savedPost.postId || `saved-${index}`;
-                    const post = savedPost.post;
-                    const isRemoving = removingId === savedPost.id;
+                {savedPosts.map((savedPost, index) => {
+                  const key = savedPost.id || savedPost.postId || `saved-${index}`;
+                  const post = savedPost.post;
+                  const isRemoving = removingId === savedPost.id;
 
-                    // El backend puede devolver content como URL de imagen
-                    const isContentUrl = post?.content && (
-                      post.content.startsWith('http') || post.content.startsWith('/')
-                    );
-                    const imageUrl = post?.mediaUrl || (isContentUrl ? post?.content : undefined);
-                    const textContent = post?.title
-                      || (post?.content && !isContentUrl ? post.content : '')
-                      || '';
+                  // Detectar si el content es una URL de imagen
+                  const isContentUrl = post?.content && (
+                    post.content.startsWith('http') || post.content.startsWith('/')
+                  );
+                  const imageUrl = post?.mediaUrl || (isContentUrl ? post?.content : undefined);
+                  const textContent = post?.description
+                    || post?.title
+                    || (post?.content && !isContentUrl ? post.content : '')
+                    || '';
 
-                    return (
-                      <div
-                        key={key}
-                        className={`bg-riff-header rounded-sm p-4 transition-opacity duration-200 ${isRemoving ? 'opacity-50' : ''}`}
-                      >
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div className="flex items-start gap-3 flex-1">
-                            <div className="w-8 h-8 bg-gradient-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center flex-shrink-0">
-                              <span className="text-white text-xs font-medium">
-                                {(user?.name || 'U').charAt(0).toUpperCase()}
+                  return (
+                    <div
+                      key={key}
+                      className={`bg-riff-header rounded-sm p-4 transition-opacity duration-200 ${isRemoving ? 'opacity-50' : ''}`}
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-start gap-3 flex-1">
+                          <div className="w-8 h-8 bg-gradient-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center flex-shrink-0">
+                            <span className="text-white text-xs font-medium">
+                              {(user?.name || 'U').charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-white font-semibold text-sm">
+                                {user?.name || 'Usuario'}
+                              </span>
+                              <span className="text-riff-text-secondary text-xs">
+                                {formatDate(post?.createdAt || savedPost.createdAt)}
                               </span>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-white font-semibold text-sm">
-                                  {user?.name || 'Usuario'}
-                                </span>
-                                <span className="text-riff-text-secondary text-xs">
-                                  {formatDate(post?.createdAt || savedPost.createdAt)}
-                                </span>
-                              </div>
-                              {textContent && (
-                                <p className="text-white text-sm leading-relaxed">{textContent}</p>
-                              )}
-                              {/* Mostrar postId si no hay post populado */}
-                              {!post && (
-                                <p className="text-riff-text-secondary text-xs mt-1">
-                                  ID: {savedPost.postId || 'N/A'}
-                                </p>
-                              )}
-                            </div>
+                            {textContent && (
+                              <p className="text-white text-sm leading-relaxed">{textContent}</p>
+                            )}
+                            {/* Si no hay post populado, mostrar mensaje */}
+                            {!post && (
+                              <p className="text-riff-text-secondary text-xs mt-1 italic">
+                                Publicación guardada
+                              </p>
+                            )}
                           </div>
-
-                          {/* Botón quitar de guardados */}
-                          <button
-                            onClick={() => handleUnsavePost(savedPost.id)}
-                            disabled={isRemoving}
-                            className="text-yellow-400 hover:text-white transition-colors flex-shrink-0 disabled:opacity-50"
-                            title="Quitar de guardados"
-                          >
-                            <MdBookmark className="w-5 h-5" />
-                          </button>
                         </div>
 
-                        {/* Imagen */}
-                        {imageUrl && (
-                          <div className="mt-3 overflow-hidden rounded-sm">
-                            <Image
-                              src={imageUrl}
-                              alt="Post media"
-                              width={800}
-                              height={400}
-                              className="w-full h-auto max-h-[400px] object-contain"
-                            />
-                          </div>
-                        )}
+                        {/* Botón quitar de guardados */}
+                        <button
+                          onClick={() => handleUnsavePost(savedPost.id)}
+                          disabled={isRemoving || !savedPost.id}
+                          className="text-yellow-400 hover:text-white transition-colors flex-shrink-0 disabled:opacity-50"
+                          title="Quitar de guardados"
+                        >
+                          <MdBookmark className="w-5 h-5" />
+                        </button>
                       </div>
-                    );
-                  })
-                )}
+
+                      {/* Imagen */}
+                      {imageUrl && (
+                        <div className="mt-3 overflow-hidden rounded-sm">
+                          <Image
+                            src={imageUrl}
+                            alt="Post media"
+                            width={800}
+                            height={400}
+                            style={{ width: '100%', height: 'auto', maxHeight: '400px', objectFit: 'contain' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

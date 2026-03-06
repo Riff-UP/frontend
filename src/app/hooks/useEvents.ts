@@ -5,17 +5,6 @@ import { API_BASE_URL } from '../config/api';
 
 const API_URL = API_BASE_URL;
 
-// Helper para decodificar JWT y extraer userId
-function getUserIdFromToken(token: string): string | null {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.id || payload.userId || payload.sub || null;
-  } catch (e) {
-    console.error('Error al decodificar JWT:', e);
-    return null;
-  }
-}
-
 export interface EventData {
   _id: string;
   sql_user_id: string;
@@ -30,7 +19,7 @@ export interface CreateEventData {
   description?: string;
   event_date: string;
   location: string;
-  // NO incluir userId - el backend lo obtiene del JWT en Authorization header
+  sql_user_id?: string; // El backend lo requiere en el DTO (aunque el controller lo inyecta del JWT)
 }
 
 export interface UpdateEventData {
@@ -111,23 +100,21 @@ export function useEvents(userId?: string): UseEventsReturn {
     try {
       setError(null);
 
-      console.log('POST /events - Payload:', data);
-      console.log('🔑 Token completo:', token);
-      console.log('🔑 Header Authorization:', `Bearer ${token}`);
-
-      // Decodificar y verificar el token
+      // Extraer userId del JWT para enviarlo como sql_user_id
+      let sql_user_id: string | undefined;
       try {
         const parts = token.split('.');
-        console.log('🔓 Token parts:', parts.length);
         if (parts.length === 3) {
           const payload = JSON.parse(atob(parts[1]));
-          console.log('🔓 JWT Payload:', payload);
-          console.log('👤 User ID en token:', payload.id || payload.userId || payload.sub);
-          console.log('⏰ Token expira:', payload.exp ? new Date(payload.exp * 1000).toLocaleString() : 'N/A');
+          sql_user_id = payload.id || payload.userId || payload.sub || undefined;
+          console.log('🔑 userId extraído del JWT:', sql_user_id);
         }
       } catch (e) {
-        console.error('❌ Error decodificando token:', e);
+        console.warn('⚠️ No se pudo decodificar el JWT:', e);
       }
+
+      const payload = { ...data, ...(sql_user_id ? { sql_user_id } : {}) };
+      console.log('POST /events - Payload:', payload);
 
       const res = await fetch(`${API_URL}/events`, {
         method: 'POST',
@@ -135,7 +122,7 @@ export function useEvents(userId?: string): UseEventsReturn {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {

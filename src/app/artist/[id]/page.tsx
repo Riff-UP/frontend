@@ -7,8 +7,9 @@ import ArtistProfile from '@/app/components/ArtistProfile';
 import { ArtistData } from '@/app/types';
 import { SavedPostsProvider } from '@/app/context/SavedPostsContext';
 import { useUser } from '@/app/hooks/useUser';
+import { API_BASE_URL } from '@/app/config/api';
 
-const API_URL = 'http://localhost:4000/api';
+const API_URL = API_BASE_URL;
 
 export default function ArtistPage() {
   const { id } = useParams<{ id: string }>();

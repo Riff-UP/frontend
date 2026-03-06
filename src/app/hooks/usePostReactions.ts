@@ -36,18 +36,31 @@ function normalizeReaction(raw: Record<string, unknown>): Reaction {
 }
 
 export function usePostReactions(userId?: string) {
+  // Empezar con mapa vacío (seguro para SSR)
   const [reactedPosts, setReactedPosts] = useState<Map<string, string>>(new Map());
   const [processingPostId, setProcessingPostId] = useState<string | null>(null);
   // Conteo total de reacciones por post (postId -> count)
   const [postReactionCounts, setPostReactionCounts] = useState<Map<string, number>>(new Map());
+  // Flag para saber si ya cargamos la caché local
+  const [cacheLoaded, setCacheLoaded] = useState(false);
 
   const getToken = useCallback((): string | null => {
     if (typeof window !== 'undefined') return localStorage.getItem('token');
     return null;
   }, []);
 
-  // Cargar reacciones previas del usuario al inicializar
-  // FIX: el gateway espera ?userId= (no ?sql_user_id=)
+  // Persistir reacciones en localStorage cuando cambia el mapa
+  const persistReactions = useCallback((map: Map<string, string>) => {
+    if (typeof window === 'undefined' || !userId) return;
+    try {
+      const obj: Record<string, string> = {};
+      map.forEach((v, k) => { obj[k] = v; });
+      localStorage.setItem(`reactions_${userId}`, JSON.stringify(obj));
+    } catch { /* ignorar */ }
+  }, [userId]);
+
+  // Cargar reacciones previas del usuario al inicializar (desde el backend)
+  // El backend acepta ?userId= como query param (ver ENDPOINTS_FALTANTES_HOME_PERFILES.md)
   const fetchUserReactions = useCallback(async () => {
     if (!userId) return;
     const token = getToken();
@@ -58,7 +71,7 @@ export function usePostReactions(userId?: string) {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
-        console.warn('⚠️ GET /posts/reactions no disponible, iniciando sin estado previo');
+        console.warn(`⚠️ GET /posts/reactions falló (${res.status}), usando caché local`);
         return;
       }
 
@@ -75,15 +88,40 @@ export function usePostReactions(userId?: string) {
         if (r.postId && r.id) map.set(r.postId, r.id);
       });
       setReactedPosts(map);
-      console.log('✅ Reacciones previas cargadas:', map.size);
+      persistReactions(map);
+      console.log('✅ Reacciones previas cargadas desde backend:', map.size);
     } catch {
-      // Silencioso — no bloquear la UI si el endpoint no existe
+      // Silencioso — usar caché local
     }
-  }, [userId, getToken]);
+  }, [userId, getToken, persistReactions]);
 
   useEffect(() => {
     fetchUserReactions();
   }, [fetchUserReactions]);
+
+  // Cargar caché local de reacciones al montar (antes del fetch al backend)
+  useEffect(() => {
+    if (!userId || cacheLoaded) return;
+    try {
+      const cached = localStorage.getItem(`reactions_${userId}`);
+      if (cached) {
+        const obj = JSON.parse(cached) as Record<string, string>;
+        const map = new Map(Object.entries(obj));
+        if (map.size > 0) {
+          setReactedPosts(map);
+          console.log('💾 Reacciones cargadas desde caché local:', map.size);
+        }
+      }
+    } catch { /* ignorar */ }
+    setCacheLoaded(true);
+  }, [userId, cacheLoaded]);
+
+  // Persistir reacciones automáticamente cuando cambia el mapa
+  useEffect(() => {
+    if (reactedPosts.size > 0) {
+      persistReactions(reactedPosts);
+    }
+  }, [reactedPosts, persistReactions]);
 
   /**
    * Obtiene el conteo total de reacciones de uno o varios posts.

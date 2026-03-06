@@ -5,7 +5,6 @@ import { API_BASE_URL } from '../config/api';
 
 const API_URL = API_BASE_URL;
 
-// Estructura del post populado que devuelve el backend en el GET
 export interface SavedPostContent {
   id?: string;
   _id?: string;
@@ -19,15 +18,15 @@ export interface SavedPostContent {
   createdAt?: string;
   title?: string;
   type?: string;
+  description?: string;
 }
 
-// Estructura que maneja el frontend
 export interface SavedPost {
-  id: string;       // _id del documento savedPost (string limpio, sin $oid)
-  postId: string;   // post_id (el ID del post)
+  id: string;       // savedPostId del backend (el _id del documento savedPost)
+  postId: string;   // el _id del post
   userId: string;
   createdAt?: string;
-  post?: SavedPostContent;  // El post populado (viene del GET /posts/saved)
+  post?: SavedPostContent;
 }
 
 type MongoId = string | { $oid: string } | unknown;
@@ -42,24 +41,26 @@ function extractId(id: MongoId): string {
 }
 
 // Normaliza la respuesta del GET /posts/saved
-// El backend puede devolver múltiples formatos:
-// { _id, post_id, sql_user_id, saved_at, post: {...} }
-// { id, postId, userId, createdAt, post: {...} }
-// { savedPostId, post: {...} }
+// El backend devuelve: { savedPostId, post: { _id, content, mediaUrl, ... } }
+// O también puede devolver: { _id, post_id, sql_user_id, saved_at, post: {...} }
 function normalizeSavedPost(raw: Record<string, unknown>): SavedPost {
   const rawPost = (raw.post ?? raw.postData ?? raw.publication) as Record<string, unknown> | undefined;
 
-  const rawId = raw._id ?? raw.id ?? raw.savedPostId ?? raw.savedId;
-  const rawPostId = raw.post_id ?? raw.postId ?? raw.postID ?? (rawPost ? (rawPost._id ?? rawPost.id) : undefined);
+  // El campo "savedPostId" es el identificador del documento savedPost
+  // Puede venir como savedPostId, _id, id
+  const rawId = raw.savedPostId ?? raw._id ?? raw.id ?? raw.savedId;
+  // El campo del post puede venir como post_id, postId, o dentro del objeto post como _id
+  const rawPostId = raw.post_id ?? raw.postId ?? raw.postID
+    ?? (rawPost ? (rawPost._id ?? rawPost.id) : undefined);
 
   const resolvedId = extractId(rawId);
   const resolvedPostId = extractId(rawPostId);
 
-  console.log('🔧 normalizeSavedPost:', {
+  console.log('🔧 normalizeSavedPost input:', {
     rawKeys: Object.keys(raw),
+    savedPostId: raw.savedPostId,
     rawId, rawPostId, resolvedId, resolvedPostId,
     hasPost: !!rawPost,
-    postKeys: rawPost ? Object.keys(rawPost) : [],
   });
 
   const postContent = rawPost ? String(rawPost.content ?? rawPost.description ?? rawPost.text ?? '') : '';
@@ -87,6 +88,7 @@ function normalizeSavedPost(raw: Record<string, unknown>): SavedPost {
       createdAt: String(rawPost.createdAt ?? rawPost.created_at ?? ''),
       title: rawPost.title as string | undefined,
       type: (rawPost.type ?? rawPost.mediaType) as string | undefined,
+      description: rawPost.description as string | undefined,
     } : undefined,
   };
 }
@@ -121,7 +123,9 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
 
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/posts/saved?userId=${userId}`, {
+      // El backend tiene la ruta GET /posts/saved/user/:sqlUserId
+      // que devuelve los posts guardados del usuario populados con el post
+      const res = await fetch(`${API_URL}/posts/saved/user/${userId}`, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
 
@@ -138,16 +142,11 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
         ? data.data
         : [];
 
-      // Log RAW para diagnóstico
       if (postsArray.length > 0) {
-        console.log('🔍 RAW data completa (primer elemento):');
-        console.log('  Keys del elemento:', Object.keys(postsArray[0]));
-        console.log('  _id:', postsArray[0]._id, '(type:', typeof postsArray[0]._id, ')');
-        console.log('  id:', postsArray[0].id, '(type:', typeof postsArray[0].id, ')');
-        console.log('  post_id:', postsArray[0].post_id, '(type:', typeof postsArray[0].post_id, ')');
-        console.log('  postId:', postsArray[0].postId, '(type:', typeof postsArray[0].postId, ')');
-        console.log('  post keys:', postsArray[0].post ? Object.keys(postsArray[0].post as object) : 'NO POST');
-        console.log('  RAW completo:', postsArray[0]);
+        console.log('🔍 RAW primer elemento de /posts/saved:', postsArray[0]);
+        console.log('  Keys:', Object.keys(postsArray[0]));
+      } else {
+        console.log('📭 No hay posts guardados');
       }
 
       const normalized = postsArray.map(normalizeSavedPost);
@@ -177,30 +176,37 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
       });
 
       if (res.status === 409) {
-        // Ya guardado - buscar en estado actual
+        // Ya guardado — buscar en estado actual o refrescar
         const existing = savedPosts.find(sp => sp.postId === postId);
         if (existing) return existing;
-        // Si no está en el estado local, refrescar desde el backend
+        // Refrescar y retornar nulo (el estado se actualizará y isPostSaved devolverá true)
         await fetchSavedPosts();
         return null;
       }
 
       if (!res.ok) {
-        console.error('Error al guardar post:', res.status);
+        const errBody = await res.json().catch(() => ({}));
+        console.error('Error al guardar post:', res.status, errBody);
         return null;
       }
 
-      // El POST devuelve solo { _id, post_id, sql_user_id, saved_at }
-      // Necesitamos hacer GET para obtener el post populado
-      // Pero primero agregamos al estado con la info básica para respuesta inmediata
+      // El POST devuelve: { _id, post_id, sql_user_id, saved_at, __v }
+      // (sin el post populado)
       const rawSaved = await res.json() as Record<string, unknown>;
-      console.log('Post guardado exitosamente:', rawSaved);
+      console.log('✅ Post guardado exitosamente (raw):', rawSaved);
 
+      // Normalizar la respuesta básica
       const basicNormalized = normalizeSavedPost(rawSaved);
-      // Agregar inmediatamente al estado (sin post populado)
-      setSavedPosts(prev => [...prev, basicNormalized]);
+      console.log('✅ Post guardado normalizado:', basicNormalized);
 
-      // Luego refrescar para obtener el post populado completo
+      // Agregar al estado inmediatamente
+      setSavedPosts(prev => {
+        // Evitar duplicados
+        if (prev.some(sp => sp.postId === postId)) return prev;
+        return [...prev, basicNormalized];
+      });
+
+      // Refrescar para obtener el post populado completo
       await fetchSavedPosts();
 
       return basicNormalized;
@@ -214,15 +220,14 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
     const token = getToken();
     if (!token) return false;
 
-    // Si el savedPostId está vacío, no podemos hacer nada
-    if (!savedPostId) {
-      console.warn('⚠️ unsavePost: savedPostId vacío, no se puede eliminar');
+    if (!savedPostId || savedPostId === 'undefined' || savedPostId === '') {
+      console.warn('⚠️ unsavePost: savedPostId inválido:', savedPostId);
       return false;
     }
 
-    console.log('🗑️ Eliminando savedPost con id:', savedPostId);
+    console.log('🗑️ unsavePost con savedPostId:', savedPostId);
 
-    // Eliminar del estado local INMEDIATAMENTE (optimistic update)
+    // Optimistic update: quitar del estado local inmediatamente
     setSavedPosts(prev => prev.filter(sp => sp.id !== savedPostId));
 
     try {
@@ -232,17 +237,17 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
       });
 
       if (!res.ok && res.status !== 404) {
-        console.error('Error al eliminar post guardado:', res.status);
-        // Revertir el estado si falla
+        const errBody = await res.json().catch(() => ({}));
+        console.error('Error al eliminar post guardado:', res.status, errBody);
+        // Revertir: refrescar desde el backend
         await fetchSavedPosts();
         return false;
       }
 
-      console.log('✅ Post eliminado de guardados exitosamente');
+      console.log('✅ Post eliminado de guardados');
       return true;
     } catch (err) {
       console.error('Error en unsavePost:', err);
-      // Revertir el estado si hay error de red
       await fetchSavedPosts();
       return false;
     }
