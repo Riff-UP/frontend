@@ -1,17 +1,25 @@
 import { NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
+function getEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Falta variable de entorno: ${name}`);
+  }
+  return value;
+}
+
 const r2Client = new S3Client({
   region: 'auto',
-  endpoint: process.env.NEXT_PUBLIC_R2_ENDPOINT,
+  endpoint: getEnv('R2_ENDPOINT'),
   credentials: {
-    accessKeyId: process.env.NEXT_PUBLIC_R2_ACCESS_KEY!,
-    secretAccessKey: process.env.NEXT_PUBLIC_R2_SECRET_KEY!,
+    accessKeyId: getEnv('R2_ACCESS_KEY_ID'),
+    secretAccessKey: getEnv('R2_SECRET_ACCESS_KEY'),
   },
 });
 
-const BUCKET = process.env.NEXT_PUBLIC_R2_BUCKET!;
-const PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL!;
+const BUCKET = getEnv('R2_BUCKET');
+const PUBLIC_URL = getEnv('R2_PUBLIC_URL');
 
 export async function POST(request: Request) {
   try {
