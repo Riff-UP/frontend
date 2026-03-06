@@ -44,8 +44,7 @@ export default function SavePostButton({
       } else {
         await savePost(postId, userId);
       }
-    } catch (error) {
-      console.error('Error toggling save post:', error);
+    } catch {
     } finally {
       setIsLoading(false);
     }
@@ -73,4 +72,3 @@ export default function SavePostButton({
     </button>
   );
 }
-

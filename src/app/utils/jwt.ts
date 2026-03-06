@@ -4,13 +4,12 @@
  * @param token - Token JWT a decodificar
  * @returns El payload del JWT o null si hay error
  */
-export function decodeJWT<T = any>(token: string): T | null {
+export function decodeJWT<T = unknown>(token: string): T | null {
   try {
     // Un JWT tiene 3 partes separadas por puntos: header.payload.signature
     const parts = token.split('.');
 
     if (parts.length !== 3) {
-      console.error('JWT inválido: no tiene 3 partes');
       return null;
     }
 
@@ -27,8 +26,7 @@ export function decodeJWT<T = any>(token: string): T | null {
     );
 
     return JSON.parse(jsonPayload) as T;
-  } catch (error) {
-    console.error('Error decodificando JWT:', error);
+  } catch {
     return null;
   }
 }
@@ -97,4 +95,3 @@ export function getUserFromToken(token?: string): JWTPayload | null {
 
   return decodeJWT<JWTPayload>(jwtToken);
 }
-

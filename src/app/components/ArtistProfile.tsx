@@ -127,8 +127,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
       } else {
         await savePost(postIdStr, user.id);
       }
-    } catch (error) {
-      console.error('Error al guardar/quitar guardado:', error);
+    } catch {
     } finally {
       setIsProcessing(false);
       setSavingPostId(null);

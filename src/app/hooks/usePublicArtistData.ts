@@ -126,7 +126,6 @@ export function usePublicArtistData(artistId?: string) {
       // Si no encontramos eventos con los IDs de posts, intentamos una búsqueda
       // por follows: obtenemos los usuarios que siguen a este artista para inferir su ID real
       if (artistEvents.length === 0 && rawEvents.length > 0) {
-        console.log('🔄 No se encontraron eventos con IDs de posts, intentando inferir por follows...');
         try {
           const followsRes = await fetch(`${API_URL}/follows?followingId=${artistId}`, { headers: getAuthHeaders(false) });
           if (followsRes.ok) {
@@ -136,10 +135,9 @@ export function usePublicArtistData(artistId?: string) {
             // Pero también podemos buscar si el artista sigue a alguien
             const followsAsFollower = await fetch(`${API_URL}/follows?followerId=${artistId}`, { headers: getAuthHeaders(false) });
             if (followsAsFollower.ok) {
-              const followerData = await followsAsFollower.json();
-              console.log('🔍 Follows del artista:', followerData);
+              await followsAsFollower.json();
             }
-            console.log('🔍 Follows hacia el artista:', follows.length);
+            void follows;
           }
         } catch { /* silencioso */ }
       }

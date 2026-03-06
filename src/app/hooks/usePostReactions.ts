@@ -16,7 +16,7 @@ interface Reaction {
 function extractId(raw: unknown): string {
   if (!raw) return '';
   if (typeof raw === 'string') return raw;
-  if (typeof raw === 'object' && raw !== null) {
+  if (typeof raw === 'object') {
     if ('$oid' in raw) return String((raw as { $oid: string }).$oid);
     if ('_id' in raw) return extractId((raw as { _id: unknown })._id);
   }
@@ -71,7 +71,6 @@ export function usePostReactions(userId?: string) {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
-        console.warn(`⚠️ GET /posts/reactions falló (${res.status}), usando caché local`);
         return;
       }
 
@@ -89,7 +88,6 @@ export function usePostReactions(userId?: string) {
       });
       setReactedPosts(map);
       persistReactions(map);
-      console.log('✅ Reacciones previas cargadas desde backend:', map.size);
     } catch {
       // Silencioso — usar caché local
     }
@@ -109,7 +107,6 @@ export function usePostReactions(userId?: string) {
         const map = new Map(Object.entries(obj));
         if (map.size > 0) {
           setReactedPosts(map);
-          console.log('💾 Reacciones cargadas desde caché local:', map.size);
         }
       }
     } catch { /* ignorar */ }
@@ -158,7 +155,6 @@ export function usePostReactions(userId?: string) {
       });
       return next;
     });
-    console.log('✅ Conteo de reacciones cargado para', postIds.length, 'posts');
   }, [getToken]);
 
   const getReactionCount = useCallback((postId: string): number => {
@@ -203,7 +199,6 @@ export function usePostReactions(userId?: string) {
 
     try {
       const payload = { post_id: postId, sql_user_id: userId, type: 'like' };
-      console.log('❤️ POST /posts/reactions - Payload:', payload);
 
       const res = await fetch(`${API_URL}/posts/reactions`, {
         method: 'POST',
@@ -215,8 +210,7 @@ export function usePostReactions(userId?: string) {
       });
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        console.error('❌ Error en POST /posts/reactions:', res.status, errBody);
+        await res.json().catch(() => ({}));
         // Revertir optimistic updates
         setReactedPosts(prev => {
           const next = new Map(prev);
@@ -237,7 +231,6 @@ export function usePostReactions(userId?: string) {
       }
 
       const raw = await res.json() as Record<string, unknown>;
-      console.log('✅ Toggle reaction:', raw);
 
       const action = String(raw.action ?? '');
       const reactionData = (raw.reaction ?? raw) as Record<string, unknown>;
@@ -263,8 +256,7 @@ export function usePostReactions(userId?: string) {
         return { liked: true };
       }
 
-    } catch (err) {
-      console.error('❌ Error en toggleLike:', err);
+    } catch {
       // Revertir
       setReactedPosts(prev => {
         const next = new Map(prev);

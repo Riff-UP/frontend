@@ -74,11 +74,10 @@ export default function VerifyCode({ email }: VerifyCodeProps) {
 
     try {
       // TODO: Implementar verificación del código con la API
-      console.log("Verificar código:", fullCode, "para:", email);
       await new Promise((resolve) => setTimeout(resolve, 1000));
       // En producción, la API devuelve un token para restablecer la contraseña
       router.push(`/reset-password?token=demo-token&email=${encodeURIComponent(email)}`);
-    } catch (err) {
+    } catch {
       setError("El código es incorrecto o ha expirado. Intenta de nuevo.");
       setCode(["", "", "", "", "", ""]);
       inputs.current[0]?.focus();
@@ -94,10 +93,9 @@ export default function VerifyCode({ email }: VerifyCodeProps) {
 
     try {
       // TODO: Implementar reenvío del código con la API
-      console.log("Reenviar código a:", email);
       await new Promise((resolve) => setTimeout(resolve, 1000));
       setResendCooldown(60);
-    } catch (err) {
+    } catch {
       setError("No se pudo reenviar el código. Intenta de nuevo.");
     } finally {
       setResending(false);

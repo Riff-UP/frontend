@@ -1,36 +1,28 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { decodeJWT, getUserFromToken, isJWTExpired, getValidToken } from '../../utils/jwt';
+import { decodeJWT, getUserFromToken, isJWTExpired, getValidToken, type JWTPayload } from '../../utils/jwt';
+
+type TokenInfo = {
+  iat?: number;
+  exp?: number;
+  [key: string]: unknown;
+};
 
 /**
  * Componente de debug para visualizar información del JWT
  * Úsalo temporalmente para verificar que todo funciona
  */
 export default function JWTDebugger() {
-  const [tokenInfo, setTokenInfo] = useState<any>(null);
-  const [userInfo, setUserInfo] = useState<any>(null);
-  const [isExpired, setIsExpired] = useState<boolean | null>(null);
-  const [tokenExists, setTokenExists] = useState(false);
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-
-    if (token) {
-      setTokenExists(true);
-      setTokenInfo(decodeJWT(token));
-      setUserInfo(getUserFromToken(token));
-      setIsExpired(isJWTExpired(token));
-    } else {
-      setTokenExists(false);
-    }
-  }, []);
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const tokenExists = !!token;
+  const tokenInfo = token ? decodeJWT<TokenInfo>(token) : null;
+  const userInfo: JWTPayload | null = token ? getUserFromToken(token) : null;
+  const isExpired = token ? isJWTExpired(token) : null;
 
   const handleCheckToken = () => {
     const validToken = getValidToken();
     if (validToken) {
       alert('✅ Token válido encontrado');
-      console.log('Token válido:', getUserFromToken());
     } else {
       alert('❌ No hay token válido (no existe o está expirado)');
     }
@@ -63,7 +55,6 @@ export default function JWTDebugger() {
       </h3>
 
       <div className="space-y-3 text-sm">
-        {/* Estado del token */}
         <div>
           <p className="font-semibold text-gray-400">Estado:</p>
           <p className={isExpired ? 'text-red-400' : 'text-green-400'}>
@@ -71,7 +62,6 @@ export default function JWTDebugger() {
           </p>
         </div>
 
-        {/* Información del usuario */}
         {userInfo && (
           <div>
             <p className="font-semibold text-gray-400">Usuario:</p>
@@ -85,7 +75,6 @@ export default function JWTDebugger() {
           </div>
         )}
 
-        {/* Token completo */}
         {tokenInfo && (
           <div>
             <p className="font-semibold text-gray-400">Payload Completo:</p>
@@ -95,7 +84,6 @@ export default function JWTDebugger() {
           </div>
         )}
 
-        {/* Tiempos */}
         {tokenInfo?.iat && (
           <div>
             <p className="font-semibold text-gray-400">Creado:</p>
@@ -111,14 +99,10 @@ export default function JWTDebugger() {
             <p className="text-xs text-gray-500">
               {new Date(tokenInfo.exp * 1000).toLocaleString()}
             </p>
-            <p className="text-xs text-gray-500 mt-1">
-              {Math.floor((tokenInfo.exp * 1000 - Date.now()) / 1000 / 60)} minutos restantes
-            </p>
           </div>
         )}
       </div>
 
-      {/* Botones de acción */}
       <div className="mt-4 space-y-2">
         <button
           onClick={handleCheckToken}
@@ -140,4 +124,3 @@ export default function JWTDebugger() {
     </div>
   );
 }
-

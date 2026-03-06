@@ -5,8 +5,22 @@ import { API_BASE_URL } from '../config/api';
 
 const API_URL = API_BASE_URL;
 
+type MongoIdLike = string | { $oid?: string } | null | undefined;
+
+type SavedPostApi = {
+  _id?: MongoIdLike;
+  id?: MongoIdLike;
+  post_id?: MongoIdLike;
+  postId?: MongoIdLike;
+  sql_user_id?: string;
+  userId?: string;
+  saved_at?: string;
+  createdAt?: string;
+  post?: SavedPost['post'];
+};
+
 // Helper para extraer el ID de MongoDB (puede venir como string o como {$oid: "..."})
-function extractId(id: any): string {
+function extractId(id: MongoIdLike): string {
   if (!id) return '';
   if (typeof id === 'string') return id;
   if (typeof id === 'object' && id.$oid) return id.$oid;
@@ -14,7 +28,7 @@ function extractId(id: any): string {
 }
 
 // Helper para normalizar un SavedPost del backend
-function normalizeSavedPost(post: any): SavedPost {
+function normalizeSavedPost(post: SavedPostApi): SavedPost {
   return {
     id: extractId(post._id || post.id),
     postId: extractId(post.post_id || post.postId),
@@ -40,11 +54,6 @@ export interface SavedPost {
     commentsCount?: number;
     createdAt?: string;
   };
-}
-
-export interface CreateSavedPostData {
-  postId: string;
-  userId: string;
 }
 
 interface UseSavedPostsReturn {
@@ -91,20 +100,16 @@ export function useSavedPosts(userId?: string): UseSavedPostsReturn {
 
       // Enviar userId como query param para que el backend filtre correctamente
       const url = `${API_URL}/posts/saved?userId=${userId}`;
-      console.log('🔍 Fetching saved posts from:', url);
 
       const res = await fetch(url, { headers });
-      console.log('📡 Response status:', res.status, res.statusText);
 
       if (!res.ok) {
-        console.warn(`⚠️ GET /posts/saved falló (${res.status}), continuando con lista vacía`);
         setSavedPosts([]);
         setError(null);
         return;
       }
 
       const data = await res.json();
-      console.log('📦 Data recibida (RAW):', data);
 
       const postsArray = Array.isArray(data)
         ? data
@@ -112,15 +117,11 @@ export function useSavedPosts(userId?: string): UseSavedPostsReturn {
         ? data.data
         : [];
 
-      console.log('📋 Posts array length:', postsArray.length);
-
       const normalizedPosts = postsArray.map(normalizeSavedPost);
-      console.log('✅ Posts normalizados:', normalizedPosts);
       setSavedPosts(normalizedPosts);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
       setError(errorMessage);
-      console.error('Error al obtener posts guardados:', err);
       // No dejar que el error rompa toda la aplicación
       setSavedPosts([]);
     } finally {
@@ -145,8 +146,6 @@ export function useSavedPosts(userId?: string): UseSavedPostsReturn {
         userId: userId,
       };
 
-      console.log('POST /posts/saved - Payload:', payload);
-
       const res = await fetch(`${API_URL}/posts/saved`, {
         method: 'POST',
         headers: {
@@ -161,8 +160,6 @@ export function useSavedPosts(userId?: string): UseSavedPostsReturn {
 
         // Si el error es 409 (Conflict), el post ya está guardado
         if (res.status === 409) {
-          console.warn('⚠️ Post ya guardado (409), buscando en lista actual...');
-
           // Buscar en la lista actual del estado
           const existing = savedPosts.find(sp => sp.postId === postId);
           if (existing) return existing;
@@ -174,8 +171,8 @@ export function useSavedPosts(userId?: string): UseSavedPostsReturn {
             });
             if (getRes.ok) {
               const allSaved = await getRes.json();
-              const savedArray = Array.isArray(allSaved) ? allSaved : (allSaved?.data || []);
-              const found = savedArray.find((sp: any) =>
+              const savedArray: SavedPostApi[] = Array.isArray(allSaved) ? allSaved : (allSaved?.data || []);
+              const found = savedArray.find((sp) =>
                 extractId(sp.post_id || sp.postId) === postId
               );
               if (found) {
@@ -186,17 +183,16 @@ export function useSavedPosts(userId?: string): UseSavedPostsReturn {
                 return normalized;
               }
             }
-          } catch (getErr) {
-            console.error('Error al obtener posts guardados:', getErr);
+          } catch {
           }
           return null;
         }
 
-        throw new Error(errorData.message || `Error ${res.status}: ${res.statusText}`);
+        setError(errorData.message || `Error ${res.status}: ${res.statusText}`);
+        return null;
       }
 
       const savedPost = await res.json();
-      console.log('Post guardado exitosamente:', savedPost);
 
       const normalizedPost = normalizeSavedPost(savedPost);
       setSavedPosts(prev => [...prev, normalizedPost]);
@@ -204,7 +200,6 @@ export function useSavedPosts(userId?: string): UseSavedPostsReturn {
       return normalizedPost;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al guardar post';
-      console.error('Error en savePost:', err);
       setError(errorMessage);
       return null;
     }
@@ -221,8 +216,6 @@ export function useSavedPosts(userId?: string): UseSavedPostsReturn {
     try {
       setError(null);
 
-      console.log(`DELETE /posts/saved/${savedPostId}`);
-
       const res = await fetch(`${API_URL}/posts/saved/${savedPostId}`, {
         method: 'DELETE',
         headers: {
@@ -233,36 +226,24 @@ export function useSavedPosts(userId?: string): UseSavedPostsReturn {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
-        console.error('Error del backend:', errorData);
 
         // Si es 404, el post ya no existe en el backend (o nunca existió)
         // Eliminarlo del estado local de todas formas
         if (res.status === 404) {
-          console.warn('⚠️ Post no encontrado en backend (404), eliminando del estado local');
-          setSavedPosts(prev => {
-            const newList = prev.filter(sp => sp.id !== savedPostId);
-            console.log('📋 Nuevos posts guardados:', newList.length);
-            return newList;
-          });
+          setSavedPosts(prev => prev.filter(sp => sp.id !== savedPostId));
           return true; // Considerarlo exitoso ya que el objetivo era eliminarlo
         }
 
-        throw new Error(errorData.message || 'Error al eliminar post guardado');
+        setError(errorData.message || 'Error al eliminar post guardado');
+        return false;
       }
 
-      console.log('✅ Post eliminado de guardados exitosamente');
-
       // Eliminar del estado local
-      setSavedPosts(prev => {
-        const newList = prev.filter(sp => sp.id !== savedPostId);
-        console.log('📋 Nuevos posts guardados:', newList.length);
-        return newList;
-      });
+      setSavedPosts(prev => prev.filter(sp => sp.id !== savedPostId));
 
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al eliminar post guardado');
-      console.error('Error en unsavePost:', err);
       return false;
     }
   };
@@ -287,4 +268,3 @@ export function useSavedPosts(userId?: string): UseSavedPostsReturn {
     refreshSavedPosts: fetchSavedPosts,
   };
 }
-

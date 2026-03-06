@@ -39,9 +39,7 @@ interface UseEventsReturn {
   refreshEvents: () => Promise<void>;
 }
 
-
-// 👇 1. Mantenemos el parámetro opcional userId
-export function useEvents(userId?: string): UseEventsReturn {
+export function useEvents(): UseEventsReturn {
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +85,6 @@ export function useEvents(userId?: string): UseEventsReturn {
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const createEvent = async (data: CreateEventData): Promise<EventData | null> => {
@@ -108,14 +105,11 @@ export function useEvents(userId?: string): UseEventsReturn {
         if (parts.length === 3) {
           const payload = JSON.parse(atob(parts[1]));
           sql_user_id = payload.id || payload.userId || payload.sub || undefined;
-          console.log('🔑 userId extraído del JWT:', sql_user_id);
         }
-      } catch (e) {
-        console.warn('⚠️ No se pudo decodificar el JWT:', e);
+      } catch {
       }
 
       const payload = { ...data, ...(sql_user_id ? { sql_user_id } : {}) };
-      console.log('POST /events - Payload:', payload);
 
       const res = await fetch(`${API_URL}/events`, {
         method: 'POST',
@@ -128,21 +122,14 @@ export function useEvents(userId?: string): UseEventsReturn {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
-        console.error('Error del backend:', {
-          status: res.status,
-          statusText: res.statusText,
-          error: errorData
-        });
         throw new Error(errorData.message || `Error ${res.status}: ${res.statusText}`);
       }
 
       const newEvent = await res.json();
-      console.log('Evento creado exitosamente:', newEvent);
       setEvents(prev => [...prev, newEvent]);
       return newEvent;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al crear evento';
-      console.error('Error en createEvent:', err);
       setError(errorMessage);
       return null;
     }

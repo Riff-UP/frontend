@@ -43,11 +43,9 @@ export async function POST(request: Request) {
     );
 
     const url = `${PUBLIC_URL.replace(/\/$/, '')}/${filename}`;
-    console.log('✅ Archivo subido a R2:', url);
 
     return NextResponse.json({ url });
   } catch (err) {
-    console.error('❌ Error subiendo a R2:', err);
     return NextResponse.json({ message: 'Error al subir archivo', error: String(err) }, { status: 500 });
   }
 }

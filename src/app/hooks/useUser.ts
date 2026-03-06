@@ -276,7 +276,6 @@ export function useUser(): UseUserReturn {
       setError(null);
 
       const payload = { userId: user.id, url };
-      console.log('📱 addSocialMedia payload:', payload);
 
       const res = await fetch(`${API_URL}/social-media`, {
         method: 'POST',
@@ -290,13 +289,11 @@ export function useUser(): UseUserReturn {
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         const msg = Array.isArray(errorData?.message) ? errorData.message.join(', ') : (errorData?.message || 'Error al agregar red social');
-        console.error('❌ addSocialMedia error:', errorData);
         setError(msg);
         return null;
       }
 
       const newSocialMedia = await res.json();
-      console.log('✅ addSocialMedia result:', newSocialMedia);
 
       setUser(prev => prev ? {
         ...prev,
@@ -321,8 +318,6 @@ export function useUser(): UseUserReturn {
     try {
       setError(null);
 
-      console.log('📱 updateSocialMedia:', { id, url });
-
       const res = await fetch(`${API_URL}/social-media/${id}`, {
         method: 'PATCH',
         headers: {
@@ -335,12 +330,10 @@ export function useUser(): UseUserReturn {
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         const msg = Array.isArray(errorData?.message) ? errorData.message.join(', ') : (errorData?.message || 'Error al actualizar red social');
-        console.error('❌ updateSocialMedia error:', errorData);
         setError(msg);
         return false;
       }
 
-      console.log('✅ updateSocialMedia ok');
       setUser(prev => prev ? {
         ...prev,
         socialMedia: prev.socialMedia?.map(sm => sm.id === id ? { ...sm, url } : sm)
@@ -364,8 +357,6 @@ export function useUser(): UseUserReturn {
     try {
       setError(null);
 
-      console.log('📱 removeSocialMedia:', id);
-
       const res = await fetch(`${API_URL}/social-media/${id}`, {
         method: 'DELETE',
         headers: {
@@ -376,12 +367,10 @@ export function useUser(): UseUserReturn {
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         const msg = Array.isArray(errorData?.message) ? errorData.message.join(', ') : (errorData?.message || 'Error al eliminar red social');
-        console.error('❌ removeSocialMedia error:', errorData);
         setError(msg);
         return false;
       }
 
-      console.log('✅ removeSocialMedia ok');
       setUser(prev => prev ? {
         ...prev,
         socialMedia: prev.socialMedia?.filter(sm => sm.id !== id)

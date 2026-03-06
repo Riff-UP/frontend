@@ -13,9 +13,7 @@ import { Event } from '@/app/types';
 
 export default function Events() {
   const { user, refreshUser } = useUser();
-  // 👇 1. Le pasamos el ID del usuario al hook. 
-  // Si user es null al principio, pasará undefined, y cuando cargue hará el re-fetch automático
-  const { events: backendEvents, loading, createEvent, updateEvent, deleteEvent } = useEvents(user?.id);
+  const { events: backendEvents, loading, createEvent, updateEvent, deleteEvent } = useEvents();
 
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -77,14 +75,6 @@ export default function Events() {
     const timeStr = newEvent.time || '00:00';
     const eventDateTime = `${newEvent.date}T${timeStr}:00.000Z`;
 
-    // Log para depuración
-    console.log('Enviando evento:', {
-      title: newEvent.title,
-      location: newEvent.location,
-      event_date: eventDateTime,
-      description: newEvent.description,
-    });
-
     if (editingEventId) {
       const success = await updateEvent(editingEventId, {
         title: newEvent.title,
@@ -112,7 +102,6 @@ export default function Events() {
       });
 
       if (!result) {
-        console.error('Error al crear evento');
         setSaving(false);
         return;
       }

@@ -113,7 +113,6 @@ export function usePosts(userId?: string) {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
       setError(errorMessage);
-      console.error('Error al obtener posts:', err);
     } finally {
       setLoading(false);
     }
@@ -123,15 +122,7 @@ export function usePosts(userId?: string) {
    * Crear una nueva publicación
    */
   const createPost = async (postData: CreatePostData): Promise<Post | null> => {
-    console.log('🚀 createPost iniciado', {
-      userId,
-      hasContent: !!postData.content,
-      hasImageFile: !!postData.imageFile,
-      contentLength: postData.content?.length
-    });
-
     if (!userId) {
-      console.error('❌ Error: No hay userId');
       setError('Usuario no autenticado');
       return null;
     }
@@ -142,23 +133,11 @@ export function usePosts(userId?: string) {
     try {
       // Validar imagen si existe
       if (postData.imageFile) {
-        console.log('📸 Validando imagen...', {
-          name: postData.imageFile.name,
-          size: postData.imageFile.size,
-          type: postData.imageFile.type,
-        });
-
         const validation = validateImageFile(postData.imageFile);
         if (!validation.valid) {
-          console.error('❌ Validación falló:', validation.error);
           throw new Error(validation.error);
         }
-        console.log('✅ Imagen válida');
       }
-
-      console.log('📦 Preparando FormData para envío...');
-      console.log('🔍 userId disponible:', userId);
-      console.log('🔍 postData.content:', postData.content);
 
       // Usar FormData para enviar archivo e información juntos
       const formData = new FormData();
@@ -175,7 +154,6 @@ export function usePosts(userId?: string) {
       // Agregar imagen si existe
       if (postData.imageFile) {
         formData.append('image', postData.imageFile);
-        console.log('📎 Imagen agregada al FormData');
       }
 
       // Agregar tags como JSON string (opcional)
@@ -183,53 +161,23 @@ export function usePosts(userId?: string) {
         formData.append('tags', JSON.stringify(postData.tags));
       }
 
-      // Log detallado de todos los campos del FormData
-      console.log('📦 FormData preparado con campos:');
-      console.log('  - sql_user_id:', userId);
-      console.log('  - type:', 'image');
-      console.log('  - title:', titleValue);
-      console.log('  - description:', descriptionValue);
-      console.log('  - hasImage:', !!postData.imageFile);
-
-      // Mostrar todos los campos del FormData
-      for (const pair of formData.entries()) {
-        console.log(`  FormData[${pair[0]}]:`, typeof pair[1] === 'string' ? pair[1] : 'File');
-      }
-
-      console.log('📡 Enviando POST con FormData a:', `${API_URL}/posts`);
-
       // Obtener token JWT del localStorage
       const token = localStorage.getItem('token');
-      console.log('🔐 Token JWT:', token ? 'Presente' : '❌ NO ENCONTRADO');
 
       let response = await fetch(`${API_URL}/posts`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`, // Token JWT para autenticación
+          'Authorization': `Bearer ${token}`,
         },
-        body: formData, // FormData sin Content-Type header
-      });
-
-      console.log('📨 Respuesta recibida:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
+        body: formData,
       });
 
       // Si la respuesta indica que el endpoint no soporta multipart o retorno 404, intentamos fallback
       if (!response.ok && (response.status === 404 || response.status === 415 || response.status === 400)) {
-        console.warn('⚠️ POST /posts con FormData falló, intentando fallback con uploadToR2 y JSON');
-
         // Si hay imagen, subir a R2 primero
         let mediaUrl: string | undefined;
         if (postData.imageFile) {
-          try {
-            mediaUrl = await uploadToR2(postData.imageFile);
-            console.log('✅ Imagen subida a R2 (fallback):', mediaUrl);
-          } catch (err) {
-            console.error('❌ Falló uploadToR2 en fallback:', err);
-            throw err;
-          }
+          mediaUrl = await uploadToR2(postData.imageFile);
         }
 
         // Enviar post como JSON con la URL de la imagen
@@ -250,18 +198,14 @@ export function usePosts(userId?: string) {
           body: JSON.stringify(payload),
         });
 
-        console.log('📨 Respuesta del POST JSON (fallback):', { status: response.status, ok: response.ok });
-
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('❌ Error del backend en fallback:', errorText);
           throw new Error(errorText || `Error ${response.status}`);
         }
       }
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Error del backend:', errorText);
 
         let errorData;
         try {
@@ -274,7 +218,6 @@ export function usePosts(userId?: string) {
       }
 
       const newPost = await response.json();
-      console.log('✅ Post creado exitosamente:', newPost);
 
       // Normalizar el ID del nuevo post antes de agregarlo al estado
       const normalizedPost = {
@@ -289,12 +232,10 @@ export function usePosts(userId?: string) {
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
-      console.error('💥 Error completo en createPost:', err);
       setError(errorMessage);
       return null;
     } finally {
       setUploading(false);
-      console.log('🏁 createPost finalizado');
     }
   };
 
@@ -331,7 +272,6 @@ export function usePosts(userId?: string) {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
       setError(errorMessage);
-      console.error('Error al actualizar post:', err);
       return false;
     } finally {
       setLoading(false);
@@ -343,7 +283,6 @@ export function usePosts(userId?: string) {
    */
   const deletePost = async (postId: string): Promise<boolean> => {
     if (!postId || postId === 'undefined' || postId === 'null' || postId === '') {
-      console.error('❌ deletePost: ID inválido:', postId);
       return false;
     }
 
@@ -368,7 +307,6 @@ export function usePosts(userId?: string) {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
       setError(errorMessage);
-      console.error('Error al eliminar post:', err);
       return false;
     } finally {
       setLoading(false);

@@ -34,7 +34,7 @@ type MongoId = string | { $oid: string } | unknown;
 function extractId(id: MongoId): string {
   if (!id) return '';
   if (typeof id === 'string') return id;
-  if (typeof id === 'object' && id !== null && '$oid' in (id as object)) {
+  if (typeof id === 'object' && '$oid' in (id as object)) {
     return String((id as { $oid: string }).$oid);
   }
   return String(id);
@@ -55,13 +55,6 @@ function normalizeSavedPost(raw: Record<string, unknown>): SavedPost {
 
   const resolvedId = extractId(rawId);
   const resolvedPostId = extractId(rawPostId);
-
-  console.log('🔧 normalizeSavedPost input:', {
-    rawKeys: Object.keys(raw),
-    savedPostId: raw.savedPostId,
-    rawId, rawPostId, resolvedId, resolvedPostId,
-    hasPost: !!rawPost,
-  });
 
   const postContent = rawPost ? String(rawPost.content ?? rawPost.description ?? rawPost.text ?? '') : '';
   const isContentUrl = postContent.startsWith('http') || postContent.startsWith('/');
@@ -130,7 +123,6 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
       });
 
       if (!res.ok) {
-        console.warn(`⚠️ GET /posts/saved falló (${res.status})`);
         setSavedPosts([]);
         return;
       }
@@ -142,18 +134,9 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
         ? data.data
         : [];
 
-      if (postsArray.length > 0) {
-        console.log('🔍 RAW primer elemento de /posts/saved:', postsArray[0]);
-        console.log('  Keys:', Object.keys(postsArray[0]));
-      } else {
-        console.log('📭 No hay posts guardados');
-      }
-
       const normalized = postsArray.map(normalizeSavedPost);
-      console.log('✅ SavedPostsContext - posts cargados:', normalized.length, normalized);
       setSavedPosts(normalized);
-    } catch (err) {
-      console.error('Error al cargar posts guardados:', err);
+    } catch {
       setSavedPosts([]);
     } finally {
       setLoading(false);
@@ -185,19 +168,16 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
       }
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        console.error('Error al guardar post:', res.status, errBody);
+        await res.json().catch(() => ({}));
         return null;
       }
 
       // El POST devuelve: { _id, post_id, sql_user_id, saved_at, __v }
       // (sin el post populado)
       const rawSaved = await res.json() as Record<string, unknown>;
-      console.log('✅ Post guardado exitosamente (raw):', rawSaved);
 
       // Normalizar la respuesta básica
       const basicNormalized = normalizeSavedPost(rawSaved);
-      console.log('✅ Post guardado normalizado:', basicNormalized);
 
       // Agregar al estado inmediatamente
       setSavedPosts(prev => {
@@ -210,8 +190,7 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
       await fetchSavedPosts();
 
       return basicNormalized;
-    } catch (err) {
-      console.error('Error en savePost:', err);
+    } catch {
       return null;
     }
   };
@@ -221,11 +200,8 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
     if (!token) return false;
 
     if (!savedPostId || savedPostId === 'undefined' || savedPostId === '') {
-      console.warn('⚠️ unsavePost: savedPostId inválido:', savedPostId);
       return false;
     }
-
-    console.log('🗑️ unsavePost con savedPostId:', savedPostId);
 
     // Optimistic update: quitar del estado local inmediatamente
     setSavedPosts(prev => prev.filter(sp => sp.id !== savedPostId));
@@ -237,17 +213,14 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
       });
 
       if (!res.ok && res.status !== 404) {
-        const errBody = await res.json().catch(() => ({}));
-        console.error('Error al eliminar post guardado:', res.status, errBody);
+        await res.json().catch(() => ({}));
         // Revertir: refrescar desde el backend
         await fetchSavedPosts();
         return false;
       }
 
-      console.log('✅ Post eliminado de guardados');
       return true;
-    } catch (err) {
-      console.error('Error en unsavePost:', err);
+    } catch {
       await fetchSavedPosts();
       return false;
     }
