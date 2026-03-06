@@ -1,8 +1,8 @@
 /**
  * Configuración centralizada de la URL base de la API.
- * SIEMPRE apunta al gateway (puerto 4000), nunca directamente a los microservicios.
+ * SIEMPRE apunta al gateway público configurado para el frontend.
  */
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.riffmx.lat';
 
 /**
  * Helper para obtener los headers de autenticación JWT.
@@ -24,4 +24,3 @@ export function getAuthHeaders(includeContentType = true): Record<string, string
 
   return headers;
 }
-
