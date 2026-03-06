@@ -2,7 +2,7 @@
  * Configuración centralizada de la URL base de la API.
  * SIEMPRE apunta al gateway público configurado para el frontend.
  */
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.riffmx.lat';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.riffmx.lat/api';
 
 /**
  * Helper para obtener los headers de autenticación JWT.
