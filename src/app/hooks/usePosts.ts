@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { validateImageFile } from '../utils/r2Storage';
+import { validateImageFile, uploadToR2 } from '../utils/r2Storage';
 import { API_BASE_URL, getAuthHeaders } from '../config/api';
 
 const API_URL = API_BASE_URL;
@@ -202,7 +202,7 @@ export function usePosts(userId?: string) {
       const token = localStorage.getItem('token');
       console.log('🔐 Token JWT:', token ? 'Presente' : '❌ NO ENCONTRADO');
 
-      const response = await fetch(`${API_URL}/posts`, {
+      let response = await fetch(`${API_URL}/posts`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`, // Token JWT para autenticación
@@ -215,6 +215,49 @@ export function usePosts(userId?: string) {
         statusText: response.statusText,
         ok: response.ok,
       });
+
+      // Si la respuesta indica que el endpoint no soporta multipart o retorno 404, intentamos fallback
+      if (!response.ok && (response.status === 404 || response.status === 415 || response.status === 400)) {
+        console.warn('⚠️ POST /posts con FormData falló, intentando fallback con uploadToR2 y JSON');
+
+        // Si hay imagen, subir a R2 primero
+        let mediaUrl: string | undefined;
+        if (postData.imageFile) {
+          try {
+            mediaUrl = await uploadToR2(postData.imageFile);
+            console.log('✅ Imagen subida a R2 (fallback):', mediaUrl);
+          } catch (err) {
+            console.error('❌ Falló uploadToR2 en fallback:', err);
+            throw err;
+          }
+        }
+
+        // Enviar post como JSON con la URL de la imagen
+        const payload: Record<string, unknown> = {
+           sql_user_id: userId,
+           type: 'image',
+           title: titleValue,
+           description: descriptionValue,
+         };
+         if (mediaUrl) payload.mediaUrl = mediaUrl;
+
+        response = await fetch(`${API_URL}/posts`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(payload),
+        });
+
+        console.log('📨 Respuesta del POST JSON (fallback):', { status: response.status, ok: response.ok });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ Error del backend en fallback:', errorText);
+          throw new Error(errorText || `Error ${response.status}`);
+        }
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -343,4 +386,3 @@ export function usePosts(userId?: string) {
     deletePost,
   };
 }
-

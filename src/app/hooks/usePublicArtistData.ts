@@ -3,12 +3,14 @@
 import { useState, useCallback, useEffect } from 'react';
 import { API_BASE_URL, getAuthHeaders } from '../config/api';
 import { Publication, Event } from '../types';
+import { fetchFollowersCount } from '../utils/follows';
 
 const API_URL = API_BASE_URL;
 
 interface RawPost {
   _id?: unknown;
   id?: unknown;
+  sql_id?: unknown;
   sql_user_id?: string;
   authorId?: string;
   title?: string;
@@ -83,7 +85,10 @@ export function usePublicArtistData(artistId?: string) {
       const artistPosts = rawPosts
         .filter(p => knownIds.has(String(p.sql_user_id ?? p.authorId ?? '')))
         .map(p => {
-          const postId = extractId(p._id ?? p.id);
+          // Priorizar _id de MongoDB; si no, usar id solo si parece ObjectId (24 hex chars)
+          const mongoId = extractId(p._id);
+          const fallbackId = extractId(p.id);
+          const postId = mongoId || (fallbackId.length === 24 ? fallbackId : '');
           if (!postId) return null;
           const imageUrl = p.mediaUrl
             || (p.content && (p.content.startsWith('http') || p.content.startsWith('/')) ? p.content : undefined);
@@ -114,7 +119,7 @@ export function usePublicArtistData(artistId?: string) {
       // Si los posts no nos dieron más IDs, los eventos pueden tener el sql_user_id real
       // Buscamos eventos cuyo sql_user_id matchee con CUALQUIER id conocido
       // Si knownIds solo tiene artistId, probamos también matchear por follows
-      let artistEvents = rawEvents.filter(e =>
+      const artistEvents = rawEvents.filter(e =>
         knownIds.has(String(e.sql_user_id ?? e.organizerId ?? ''))
       );
 
@@ -165,25 +170,24 @@ export function usePublicArtistData(artistId?: string) {
     }
   }, [artistId]);
 
-  const fetchFollowersCount = useCallback(async () => {
+  const fetchFollowersCountFromApi = useCallback(async () => {
     if (!artistId) return;
     try {
-      const res = await fetch(`${API_URL}/follows?followedId=${artistId}`, { headers: getAuthHeaders(false) });
-      if (!res.ok) return;
-      const data = await res.json();
-      const arr = Array.isArray(data) ? data : (data?.data ?? []);
-      setFollowersCount(arr.length);
+      const totalFollowers = await fetchFollowersCount(artistId);
+      if (totalFollowers !== undefined) {
+        setFollowersCount(totalFollowers);
+      }
     } catch { /* silencioso */ }
   }, [artistId]);
 
   useEffect(() => {
     fetchAll();
-    fetchFollowersCount();
-  }, [fetchAll, fetchFollowersCount]);
+    fetchFollowersCountFromApi();
+  }, [fetchAll, fetchFollowersCountFromApi]);
 
   return {
     posts, events, loadingPosts, loadingEvents, followersCount,
-    refreshPosts: fetchAll, refreshEvents: fetchAll, refreshFollowers: fetchFollowersCount,
+    refreshPosts: fetchAll, refreshEvents: fetchAll, refreshFollowers: fetchFollowersCountFromApi,
   };
 }
 

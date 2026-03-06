@@ -187,7 +187,7 @@ export default function Publications() {
         isLiked: postId ? isLiked(postId) : false,
         reactionId: postId ? reactedPosts.get(postId) : undefined,
         isSaved: postId ? isPostSaved(postId) : false,
-        author: { name: user?.name || 'Usuario', avatar: '' },
+        author: { name: user?.name || 'Usuario', avatar: user?.profileImage || '' },
       };
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps

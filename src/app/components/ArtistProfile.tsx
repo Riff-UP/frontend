@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { FaMusic } from "react-icons/fa";
 import Calendar from './common/Calendar';
 import { ArtistData, Publication } from '@/app/types';
@@ -25,6 +25,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
   const [selectedPublication, setSelectedPublication] = useState<Publication | null>(null);
   const [savingPostId, setSavingPostId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [bannerIndex, setBannerIndex] = useState(0);
 
   const artistData = artist;
   const { user } = useUser();
@@ -52,6 +53,31 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawPosts]);
 
+  // Imágenes del banner: coverImage primero, luego imágenes de publicaciones
+  const bannerImages = useMemo(() => {
+    const imgs: string[] = [];
+    if (artistData?.coverImage) imgs.push(artistData.coverImage);
+    rawPosts.forEach(p => { if (p.image) imgs.push(p.image); });
+    return imgs;
+  }, [artistData?.coverImage, rawPosts]);
+
+  // Slideshow automático cada 4 segundos
+  const advanceBanner = useCallback(() => {
+    if (bannerImages.length > 1) {
+      setBannerIndex(prev => (prev + 1) % bannerImages.length);
+    }
+  }, [bannerImages.length]);
+
+  useEffect(() => {
+    setBannerIndex(0); // resetear al entrar al perfil
+  }, [artistData?.id]);
+
+  useEffect(() => {
+    if (bannerImages.length <= 1) return;
+    const timer = setInterval(advanceBanner, 4000);
+    return () => clearInterval(timer);
+  }, [advanceBanner, bannerImages.length]);
+
   if (!artistData) {
     return (
       <div className="min-h-screen bg-riff-text-primary flex items-center justify-center">
@@ -60,8 +86,8 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
     );
   }
 
-  // Enriquecer posts con estado de like/save real
-  const publications: Publication[] = rawPosts.map(p => {
+  // Enriquecer posts con estado de like/save real — useMemo para re-renderizar al cambiar likes/saves
+  const publications: Publication[] = useMemo(() => rawPosts.map(p => {
     const postId = String(p.id);
     const hasServerCount = postReactionCounts.has(postId);
     const baseLikes = hasServerCount ? getReactionCount(postId) : (p.likes ?? 0);
@@ -72,12 +98,19 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
       reactionId: reactedPosts.get(postId),
       isSaved: isPostSaved(postId),
     };
-  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [rawPosts, reactedPosts, postReactionCounts, savedPosts]);
 
   const handleLike = async (publicationId: string | number) => {
     if (!user) { alert('Debes iniciar sesión para reaccionar'); return; }
     await toggleLike(String(publicationId));
   };
+
+  // selectedPublication siempre refleja el estado actualizado de likes/saves
+  const liveSelectedPublication = useMemo(() => {
+    if (!selectedPublication) return null;
+    return publications.find(p => String(p.id) === String(selectedPublication.id)) ?? selectedPublication;
+  }, [selectedPublication, publications]);
 
   const handleSave = async (publicationId: string | number) => {
     if (isProcessing) return;
@@ -185,18 +218,48 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
     <div className="min-h-screen bg-riff-text-primary">
       {/* Cover Image Header */}
       <div className="relative h-64 sm:h-80 lg:h-96 overflow-hidden">
+
+        {/* Slideshow de fondo: imágenes de publicaciones */}
+        {bannerImages.length > 0 ? (
+          bannerImages.map((img, i) => (
+            <div
+              key={img}
+              className="absolute inset-0 w-full h-full bg-cover bg-center transition-opacity duration-1000"
+              style={{
+                backgroundImage: `url('${img}')`,
+                opacity: i === bannerIndex ? 1 : 0,
+                zIndex: 0,
+              }}
+            />
+          ))
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-riff-primary/20 to-riff-text-primary" />
+        )}
+
+        {/* Gradiente izquierda + oscurecimiento general */}
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 z-10"
           style={{
-            background: `linear-gradient(to right, #212121 0%, #212121 10%, rgba(33, 33, 33, 0.8) 20%, rgba(33, 33, 33, 0) 60%)`,
+            background: `linear-gradient(to right, #212121 0%, #212121 5%, rgba(33,33,33,0.85) 25%, rgba(33,33,33,0.5) 60%, rgba(33,33,33,0.3) 100%), linear-gradient(to top, #212121 0%, rgba(33,33,33,0.4) 40%, transparent 100%)`,
           }}
         />
-        <div
-          className="w-full h-full bg-cover bg-center bg-riff-primary/10"
-          style={{ backgroundImage: artistData.coverImage ? `url('${artistData.coverImage}')` : undefined }}
-        />
 
-        <div className="absolute top-0 left-0 right-0 p-3 sm:p-6 lg:p-8">
+        {/* Indicadores del slideshow */}
+        {bannerImages.length > 1 && (
+          <div className="absolute bottom-12 right-4 z-20 flex gap-1.5">
+            {bannerImages.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setBannerIndex(i)}
+                className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                  i === bannerIndex ? 'bg-white w-4' : 'bg-white/40'
+                }`}
+              />
+            ))}
+          </div>
+        )}
+
+        <div className="absolute top-0 left-0 right-0 p-3 sm:p-6 lg:p-8 z-20">
           <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 mb-4">
             <ArtistInfo artist={artistWithFollowers} />
           </div>
@@ -219,7 +282,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
           )}
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 px-2 sm:px-4 lg:px-8">
+        <div className="absolute bottom-0 left-0 right-0 px-2 sm:px-4 lg:px-8 z-20">
           <div className="flex justify-start space-x-2 sm:space-x-4 overflow-x-auto scrollbar-hide">
             {tabs.map(tab => (
               <button
@@ -270,6 +333,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
                       key={publication.id}
                       publication={{ ...publication, isSaved: isPostSaved(postId) }}
                       authorName={artistData.name}
+                      authorImage={artistData.profileImage}
                       isSaving={savingPostId === postId}
                       onLike={handleLike}
                       onSave={handleSave}
@@ -330,12 +394,13 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
       </div>
 
       <PublicationModal
-        publication={selectedPublication ? {
-          ...selectedPublication,
-          isSaved: isPostSaved(String(selectedPublication.id))
+        publication={liveSelectedPublication ? {
+          ...liveSelectedPublication,
+          isSaved: isPostSaved(String(liveSelectedPublication.id))
         } : null}
         authorName={artistData.name}
-        isSaving={selectedPublication ? savingPostId === String(selectedPublication.id) : false}
+        authorImage={artistData.profileImage}
+        isSaving={liveSelectedPublication ? savingPostId === String(liveSelectedPublication.id) : false}
         onClose={() => setSelectedPublication(null)}
         onLike={handleLike}
         onSave={handleSave}

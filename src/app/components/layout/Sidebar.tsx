@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { FiBookmark  } from 'react-icons/fi';
 import { CgProfile } from "react-icons/cg";
 import { BiImages } from "react-icons/bi";
@@ -41,9 +42,19 @@ export default function Sidebar({ activeSection = 'perfil', onSectionChange }: S
         <div className="w-10 h-[2px] bg-gradient-to-r from-riff-primary-dark to-riff-primary mx-auto mb-4 rounded-full"></div>
         <div className="flex items-center gap-3 mb-4">
           <div className="relative w-10 h-10 rounded-full overflow-hidden bg-riff-text-secondary/30 flex-shrink-0 mx-auto group-hover:mx-0 flex items-center justify-center">
-            <span className="text-white font-semibold text-sm">
-              {user?.name?.charAt(0)?.toUpperCase() || '?'}
-            </span>
+            {user?.profileImage ? (
+              <Image
+                src={user.profileImage}
+                alt={user.name || 'Perfil'}
+                fill
+                className="object-cover"
+                sizes="40px"
+              />
+            ) : (
+              <span className="text-white font-semibold text-sm">
+                {user?.name?.charAt(0)?.toUpperCase() || '?'}
+              </span>
+            )}
           </div>
           <div className="flex-2 min-w-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <h3 className="text-white font-semibold text-sm truncate whitespace-nowrap">

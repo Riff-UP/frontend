@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { FiSearch, FiMusic, FiCalendar, FiMapPin, FiHeart, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
@@ -11,6 +11,7 @@ import { useArtists } from '../hooks/useArtists';
 import { useUser } from '../hooks/useUser';
 import { useFollow } from '../hooks/useFollow';
 import { API_BASE_URL, getAuthHeaders } from '../config/api';
+import { fetchFollowersCount } from '../utils/follows';
 
 const API_URL = API_BASE_URL;
 
@@ -38,12 +39,21 @@ interface HomePost {
   content: string; image?: string;
   likes: number; date: string; time: string;
   isLiked: boolean; isSaved: boolean;
+  authorImage?: string;
 }
 
 interface HomeEvent {
   id: string; organizerId: string; organizerName: string;
   title: string; description?: string;
   location: string; date: string; status?: string;
+}
+
+interface BannerSlide {
+  imageUrl: string;
+  type: 'post' | 'artist';
+  label: string;       // nombre del artista
+  sublabel: string;    // contenido/descripción
+  linkHref: string;
 }
 
 function extractId(raw: unknown): string {
@@ -76,13 +86,25 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'artistas' | 'publicaciones' | 'eventos'>('artistas');
   const [likingId, setLikingId] = useState<string | null>(null);
   const [userNamesMap, setUserNamesMap] = useState<Map<string, string>>(new Map());
+  const [userImagesMap, setUserImagesMap] = useState<Map<string, string>>(new Map());
   // Mapa de seguidores: artistId -> count
   const [followersMap, setFollowersMap] = useState<Map<string, number>>(new Map());
 
-  // Mapa de artistas para lookup rápido
+  // ── Banner dinámico ──
+  const [bannerSlides, setBannerSlides] = useState<BannerSlide[]>([]);
+  const [bannerIndex, setBannerIndex] = useState(0);
+  const bannerTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Mapa de artistas para lookup rápido (nombre + imagen)
   const artistMap = useMemo(() => {
     const map = new Map<string, string>();
     artists.forEach(a => map.set(a.id, a.name));
+    return map;
+  }, [artists]);
+
+  const artistImageMap = useMemo(() => {
+    const map = new Map<string, string>();
+    artists.forEach(a => { if (a.profileImage) map.set(a.id, a.profileImage); });
     return map;
   }, [artists]);
 
@@ -155,10 +177,14 @@ export default function HomePage() {
     load();
   }, []);
 
-  // Enriquecer posts y eventos con nombre del artista
+  // Enriquecer posts y eventos con nombre e imagen del artista
   const enrichedPosts = useMemo(() =>
-    posts.map(p => ({ ...p, authorName: artistMap.get(p.authorId) || userNamesMap.get(p.authorId) || 'Usuario' })),
-    [posts, artistMap, userNamesMap]
+    posts.map(p => ({
+      ...p,
+      authorName: artistMap.get(p.authorId) || userNamesMap.get(p.authorId) || 'Usuario',
+      authorImage: artistImageMap.get(p.authorId) || userImagesMap.get(p.authorId),
+    })),
+    [posts, artistMap, artistImageMap, userNamesMap, userImagesMap]
   );
 
   const enrichedEvents = useMemo(() =>
@@ -177,7 +203,8 @@ export default function HomePage() {
     if (unknownIds.size === 0) return;
 
     const fetchNames = async () => {
-      const entries: [string, string][] = [];
+      const nameEntries: [string, string][] = [];
+      const imageEntries: [string, string][] = [];
       await Promise.allSettled(
         Array.from(unknownIds).map(async (id) => {
           try {
@@ -185,21 +212,29 @@ export default function HomePage() {
             if (!res.ok) return;
             const data = await res.json();
             const name = data.name || data.username || data.email?.split('@')[0] || 'Usuario';
-            entries.push([id, name]);
+            nameEntries.push([id, name]);
+            if (data.profileImage) imageEntries.push([id, data.profileImage]);
           } catch { /* silencioso */ }
         })
       );
-      if (entries.length > 0) {
+      if (nameEntries.length > 0) {
         setUserNamesMap(prev => {
           const next = new Map(prev);
-          entries.forEach(([id, name]) => next.set(id, name));
+          nameEntries.forEach(([id, name]) => next.set(id, name));
+          return next;
+        });
+      }
+      if (imageEntries.length > 0) {
+        setUserImagesMap(prev => {
+          const next = new Map(prev);
+          imageEntries.forEach(([id, img]) => next.set(id, img));
           return next;
         });
       }
     };
 
     fetchNames();
-  }, [posts, events, artistMap, loadingPosts, loadingEvents, loadingArtists]);
+  }, [posts, events, artistMap, artistImageMap, loadingPosts, loadingEvents, loadingArtists]);
 
   const filteredArtists = artists; // ya filtrado por useArtists
 
@@ -217,20 +252,75 @@ export default function HomePage() {
       await Promise.allSettled(
         artists.map(async (artist) => {
           try {
-            const res = await fetch(`${API_URL}/follows?followingId=${artist.id}`, { headers: getAuthHeaders(false) });
-            if (!res.ok) return;
-            const data = await res.json();
-            const arr = Array.isArray(data) ? data : (data?.data ?? []);
-            entries.push([artist.id, arr.length]);
-          } catch { /* silencioso */ }
+            const followers = await fetchFollowersCount(artist.id);
+            entries.push([artist.id, followers ?? 0]);
+          } catch {
+            entries.push([artist.id, 0]);
+          }
         })
       );
-      if (entries.length > 0) {
-        setFollowersMap(new Map(entries));
-      }
+      setFollowersMap(new Map(entries));
     };
     fetchFollowers();
   }, [artists]);
+
+  // Construir slides del banner dinámico
+  useEffect(() => {
+    if (loadingPosts && loadingArtists) return;
+
+    const slides: BannerSlide[] = [];
+
+    // Posts con imagen (los más recientes primero)
+    const postsWithImage = enrichedPosts.filter(p => p.image);
+    // Mezclar aleatoriamente y tomar hasta 6
+    const shuffledPosts = [...postsWithImage].sort(() => Math.random() - 0.5).slice(0, 6);
+    shuffledPosts.forEach(p => {
+      slides.push({
+        imageUrl: p.image!,
+        type: 'post',
+        label: p.authorName,
+        sublabel: p.content || 'Publicación',
+        linkHref: `/artist/${p.authorId}`,
+      });
+    });
+
+    // Artistas con imagen de perfil
+    const artistsWithImage = artists.filter(a => a.profileImage);
+    const shuffledArtists = [...artistsWithImage].sort(() => Math.random() - 0.5).slice(0, 4);
+    shuffledArtists.forEach(a => {
+      slides.push({
+        imageUrl: a.profileImage!,
+        type: 'artist',
+        label: a.name,
+        sublabel: a.biography ? a.biography.slice(0, 60) + (a.biography.length > 60 ? '…' : '') : 'Artista',
+        linkHref: `/artist/${a.id}`,
+      });
+    });
+
+    // Mezclar el conjunto final
+    const finalSlides = slides.sort(() => Math.random() - 0.5);
+
+    if (finalSlides.length > 0) {
+      setBannerSlides(finalSlides);
+      setBannerIndex(0);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enrichedPosts, artists, loadingPosts, loadingArtists]);
+
+  // Auto-avance del banner cada 5 segundos
+  const nextBannerSlide = useCallback(() => {
+    setBannerIndex(prev => (bannerSlides.length > 0 ? (prev + 1) % bannerSlides.length : 0));
+  }, [bannerSlides.length]);
+
+  const prevBannerSlide = useCallback(() => {
+    setBannerIndex(prev => (bannerSlides.length > 0 ? (prev - 1 + bannerSlides.length) % bannerSlides.length : 0));
+  }, [bannerSlides.length]);
+
+  useEffect(() => {
+    if (bannerSlides.length === 0) return;
+    bannerTimer.current = setInterval(nextBannerSlide, 5000);
+    return () => { if (bannerTimer.current) clearInterval(bannerTimer.current); };
+  }, [bannerSlides.length, nextBannerSlide]);
 
   const handleLike = async (postId: string) => {
     if (!user) return;
@@ -258,33 +348,121 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-riff-text-primary">
       {/* ── Hero Banner ── */}
-      <section className="relative overflow-hidden">
+      <section className="relative overflow-hidden min-h-[420px] sm:min-h-[480px]">
+        {/* Fondo dinámico: imagen actual del slide con crossfade */}
         <div className="absolute inset-0">
-          <Image src="/images/portada.jpg" alt="Banner Riff" fill className="object-cover object-top opacity-30" priority />
-          <div className="absolute inset-0 bg-gradient-to-b from-riff-text-primary/60 via-riff-text-primary/70 to-riff-text-primary" />
+          {bannerSlides.length > 0 ? (
+            bannerSlides.map((slide, i) => (
+              <div
+                key={slide.imageUrl + i}
+                className="absolute inset-0 transition-opacity duration-1000"
+                style={{ opacity: i === bannerIndex ? 1 : 0, zIndex: i === bannerIndex ? 1 : 0 }}
+              >
+                <Image
+                  src={slide.imageUrl}
+                  alt="Banner dinámico"
+                  fill
+                  className="object-cover object-center"
+                  priority={i === 0}
+                />
+              </div>
+            ))
+          ) : (
+            <Image src="/images/portada.jpg" alt="Banner Riff" fill className="object-cover object-top opacity-30" priority />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/30" style={{ zIndex: 2 }} />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-riff-text-primary" style={{ zIndex: 2 }} />
         </div>
-        <div className="relative max-w-5xl mx-auto px-4 py-20 sm:py-28 text-center">
-          <div className="flex justify-center mb-4">
-            <MdMusicNote className="w-10 h-10 text-riff-primary" />
+
+        {/* Contenido */}
+        <div className="relative z-10 max-w-6xl mx-auto px-4 py-16 sm:py-24 flex flex-col lg:flex-row items-center gap-10">
+          {/* Texto izquierdo */}
+          <div className="flex-1 text-left">
+            <h1 className="text-3xl sm:text-5xl font-extrabold text-white mb-4 leading-tight drop-shadow-lg">
+              Con Riff, impulsa tu<br />musica al siguiente nivel
+            </h1>
+            <p className="text-white/70 text-sm sm:text-base mb-8 max-w-md">
+              Descubre lo más reciente de la comunidad con publicaciones visuales de artistas destacando ahora mismo.
+            </p>
+            {/* Buscador */}
+            <div className="relative max-w-sm">
+              <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
+              <input
+                type="text"
+                placeholder="Buscar artistas…"
+                value={search}
+                onChange={e => { setSearch(e.target.value); setActiveTab('artistas'); }}
+                className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all backdrop-blur-sm"
+              />
+            </div>
+
+            {/* Controles del banner */}
+            {bannerSlides.length > 1 && (
+              <div className="flex items-center gap-3 mt-6">
+                <button
+                  onClick={prevBannerSlide}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-riff-primary/30 border border-white/20 flex items-center justify-center text-white transition-all"
+                >
+                  <FiChevronLeft className="w-4 h-4" />
+                </button>
+                <div className="flex gap-1.5">
+                  {bannerSlides.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setBannerIndex(i)}
+                      className={`h-1.5 rounded-full transition-all ${i === bannerIndex ? 'w-6 bg-riff-primary' : 'w-1.5 bg-white/30 hover:bg-white/50'}`}
+                    />
+                  ))}
+                </div>
+                <button
+                  onClick={nextBannerSlide}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-riff-primary/30 border border-white/20 flex items-center justify-center text-white transition-all"
+                >
+                  <FiChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
-          <h1 className="text-3xl sm:text-5xl font-bold text-white mb-4 leading-tight">
-            Descubre la música<br className="hidden sm:block" /> que te mueve
-          </h1>
-          <p className="text-white/70 text-base sm:text-lg mb-8 max-w-xl mx-auto">
-            Conecta con artistas, sigue sus publicaciones y no te pierdas ningún evento.
-          </p>
-          {/* Buscador */}
-          <div className="relative max-w-lg mx-auto">
-            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
-            <input
-              type="text"
-              placeholder="Buscar artistas…"
-              value={search}
-              onChange={e => { setSearch(e.target.value); setActiveTab('artistas'); }}
-              className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all"
-            />
-          </div>
+
+          {/* Grid de cards derecha — solo en pantallas grandes */}
+          {bannerSlides.length >= 4 && (
+            <div className="hidden lg:grid grid-cols-2 gap-3 flex-shrink-0 w-[420px]">
+              {bannerSlides.slice(0, 4).map((slide, i) => (
+                <Link key={i} href={slide.linkHref} className="group relative rounded-xl overflow-hidden aspect-square bg-riff-header border border-white/10 hover:border-riff-primary/50 transition-all">
+                  <Image
+                    src={slide.imageUrl}
+                    alt={slide.label}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-2.5">
+                    <p className="text-riff-primary text-[9px] font-bold uppercase tracking-widest mb-0.5">
+                      {slide.type === 'post' ? 'Publicación' : 'Artista'}
+                    </p>
+                    <p className="text-white text-xs font-semibold truncate">{slide.label}</p>
+                    <p className="text-white/60 text-[10px] truncate">{slide.sublabel}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
+
+        {/* Badge del slide actual (info del fondo) */}
+        {bannerSlides.length > 0 && (
+          <div className="absolute bottom-4 left-4 z-10 hidden sm:block">
+            <Link href={bannerSlides[bannerIndex].linkHref} className="flex items-center gap-2 bg-black/50 backdrop-blur-sm border border-white/10 rounded-lg px-3 py-2 hover:border-riff-primary/50 transition-all">
+              <MdMusicNote className="w-4 h-4 text-riff-primary flex-shrink-0" />
+              <div>
+                <p className="text-white/50 text-[9px] uppercase tracking-widest">
+                  {bannerSlides[bannerIndex].type === 'post' ? 'Publicación reciente' : 'Artista destacado'}
+                </p>
+                <p className="text-white text-xs font-semibold">{bannerSlides[bannerIndex].label}</p>
+              </div>
+            </Link>
+          </div>
+        )}
       </section>
 
       {/* ── Tabs ── */}
@@ -331,11 +509,12 @@ export default function HomePage() {
                       <ArtistCard
                         key={artist.id}
                         artist={artist}
-                        followersCount={followersMap.get(artist.id) ?? 0}
+                        followersCount={followersMap.has(artist.id) ? followersMap.get(artist.id) : artist.followersCount}
                         isFollowing={isFollowing(artist.id)}
                         isLoggedIn={!!user}
                         isSelf={user?.id === artist.id}
                         onToggleFollow={() => toggleFollow(artist.id)}
+                        fullWidth
                       />
                     ))}
                   </div>
@@ -425,7 +604,7 @@ function ArtistScrollSection({
   title, artists, followersMap, isFollowing, isLoggedIn, currentUserId, onToggleFollow, loading,
 }: {
   title: string;
-  artists: { id: string; name: string; biography?: string | null; profileImage?: string | null }[];
+  artists: { id: string; name: string; biography?: string | null; profileImage?: string | null; followersCount?: number }[];
   followersMap: Map<string, number>;
   isFollowing: (id: string) => boolean;
   isLoggedIn: boolean;
@@ -437,7 +616,7 @@ function ArtistScrollSection({
 
   const scroll = (dir: 'left' | 'right') => {
     if (!scrollRef.current) return;
-    scrollRef.current.scrollBy({ left: dir === 'left' ? -320 : 320, behavior: 'smooth' });
+    scrollRef.current.scrollBy({ left: dir === 'left' ? -900 : 900, behavior: 'smooth' });
   };
 
   return (
@@ -474,7 +653,7 @@ function ArtistScrollSection({
             <ArtistCard
               key={artist.id}
               artist={artist}
-              followersCount={followersMap.get(artist.id) ?? 0}
+              followersCount={followersMap.has(artist.id) ? followersMap.get(artist.id) : artist.followersCount}
               isFollowing={isFollowing(artist.id)}
               isLoggedIn={isLoggedIn}
               isSelf={currentUserId === artist.id}
@@ -488,35 +667,53 @@ function ArtistScrollSection({
 }
 
 function ArtistCard({
-  artist, followersCount, isFollowing, isLoggedIn, isSelf, onToggleFollow,
+  artist, followersCount, isFollowing, isLoggedIn, isSelf, onToggleFollow, fullWidth,
 }: {
-  artist: { id: string; name: string; biography?: string | null; profileImage?: string | null };
-  followersCount: number;
+  artist: { id: string; name: string; biography?: string | null; profileImage?: string | null; followersCount?: number };
+  followersCount: number | undefined;
   isFollowing: boolean;
   isLoggedIn: boolean;
   isSelf: boolean;
   onToggleFollow: () => void;
+  fullWidth?: boolean;
 }) {
   const initial = artist.name.charAt(0).toUpperCase();
+  const [imgError, setImgError] = useState(false);
+  const displayFollowers = followersCount !== undefined && followersCount !== null
+    ? `${followersCount.toLocaleString()} ${followersCount === 1 ? 'seguidor' : 'seguidores'}`
+    : null;
+
+  const showImage = artist.profileImage && !imgError;
 
   return (
-    <div className="bg-riff-header rounded-sm border border-white/5 hover:border-riff-primary/30 transition-all flex-shrink-0 w-64 p-4 flex flex-col gap-3">
-      {/* Avatar + nombre + seguidores */}
-      <Link href={`/artist/${artist.id}`} className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-riff-primary-dark to-riff-primary flex items-center justify-center">
-          {artist.profileImage ? (
-            <Image src={artist.profileImage} alt={artist.name} width={48} height={48} className="w-full h-full object-cover" />
+    <div className={`bg-riff-header rounded-lg border border-white/5 hover:border-riff-primary/30 transition-all p-5 flex flex-col gap-3 ${fullWidth ? 'w-full' : 'flex-shrink-0 w-72'}`}>
+
+      {/* Fila superior: avatar + nombre + seguidores */}
+      <Link href={`/artist/${artist.id}`} className="flex items-center gap-3 w-full min-w-0">
+        {/* Avatar */}
+        <div className="w-14 h-14 rounded-full flex-shrink-0 overflow-hidden bg-gradient-to-br from-riff-primary-dark to-riff-primary flex items-center justify-center">
+          {showImage ? (
+            <img
+              src={artist.profileImage!}
+              alt={artist.name}
+              width={56}
+              height={56}
+              onError={() => setImgError(true)}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
           ) : (
-            <span className="text-white text-lg font-bold">{initial}</span>
+            <span className="text-white text-xl font-bold select-none">{initial}</span>
           )}
         </div>
-        <div className="min-w-0">
-          <h3 className="text-white font-semibold text-sm truncate hover:text-riff-primary transition-colors">
+
+        {/* Nombre + seguidores */}
+        <div className="flex flex-col min-w-0 flex-1">
+          <span className="text-white font-bold text-sm leading-tight line-clamp-2 hover:text-riff-primary transition-colors">
             {artist.name}
-          </h3>
-          <p className="text-white/50 text-xs">
-            {followersCount.toLocaleString()} {followersCount === 1 ? 'seguidor' : 'seguidores'}
-          </p>
+          </span>
+          {displayFollowers !== null && (
+            <span className="text-white/50 text-xs mt-0.5">{displayFollowers}</span>
+          )}
         </div>
       </Link>
 
@@ -526,17 +723,17 @@ function ArtistCard({
       )}
 
       {/* Botones */}
-      <div className="flex gap-2 mt-auto">
+      <div className="flex gap-2 mt-auto pt-1">
         <Link
           href={`/artist/${artist.id}`}
-          className="flex-1 text-center py-1.5 text-xs font-medium text-white/70 border border-white/20 rounded-sm hover:border-riff-primary/50 hover:text-white transition-all"
+          className="flex-1 text-center py-2 text-xs font-medium text-white/70 border border-white/20 rounded-md hover:border-riff-primary/50 hover:text-white transition-all"
         >
           Ver perfil
         </Link>
         {isLoggedIn && !isSelf && (
           <button
             onClick={onToggleFollow}
-            className={`flex-1 py-1.5 text-xs font-medium rounded-sm transition-all ${
+            className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${
               isFollowing
                 ? 'bg-white/10 text-white/70 hover:bg-red-500/20 hover:text-red-400 border border-white/20'
                 : 'bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white hover:opacity-90'
@@ -561,8 +758,12 @@ function PostCard({
       {/* Header */}
       <div className="flex items-center gap-3 mb-3">
         <Link href={`/artist/${post.authorId}`} className="flex-shrink-0">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-riff-primary-dark to-riff-primary flex items-center justify-center">
-            <span className="text-white text-sm font-bold">{post.authorName.charAt(0).toUpperCase()}</span>
+          <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-riff-primary-dark to-riff-primary flex items-center justify-center">
+            {post.authorImage ? (
+              <Image src={post.authorImage} alt={post.authorName} width={36} height={36} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-white text-sm font-bold">{post.authorName.charAt(0).toUpperCase()}</span>
+            )}
           </div>
         </Link>
         <div>

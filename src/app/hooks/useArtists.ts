@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../config/api';
+import { fetchFollowersCount } from '../utils/follows';
 
 export interface ArtistData {
   id: string;
@@ -48,7 +49,43 @@ export function useArtists(): UseArtistsReturn {
       }
 
       const data = await res.json();
-      let artistsList: ArtistData[] = Array.isArray(data) ? data : (data?.data ?? []);
+      const rawList: Record<string, unknown>[] = Array.isArray(data) ? data : (data?.data ?? []);
+
+      // Normalizar campos que pueden venir con nombres distintos según el backend
+      let artistsList: ArtistData[] = rawList.map((a) => ({
+        ...a,
+        followersCount:
+          (a.followersCount as number | undefined) ??
+          (a.followers_count as number | undefined) ??
+          ((a._count as Record<string, number> | undefined)?.followers) ??
+          (a.followers as number | undefined) ??
+          undefined,
+      } as ArtistData));
+
+      const artistsWithoutFollowers = artistsList.filter(
+        (artist) => artist.id && (artist.followersCount === undefined || artist.followersCount === null)
+      );
+
+      if (artistsWithoutFollowers.length > 0) {
+        const followerResults = await Promise.allSettled(
+          artistsWithoutFollowers.map(async (artist) => ({
+            id: artist.id,
+            followersCount: await fetchFollowersCount(artist.id),
+          }))
+        );
+
+        const followersMap = new Map<string, number>();
+        followerResults.forEach((result) => {
+          if (result.status === 'fulfilled' && result.value.followersCount !== undefined) {
+            followersMap.set(result.value.id, result.value.followersCount);
+          }
+        });
+
+        artistsList = artistsList.map((artist) => ({
+          ...artist,
+          followersCount: followersMap.get(artist.id) ?? artist.followersCount,
+        }));
+      }
 
       // Filtro local por búsqueda
       if (search) {
@@ -61,9 +98,6 @@ export function useArtists(): UseArtistsReturn {
       }
 
       setArtists(artistsList);
-      if (artistsList.length > 0) {
-        console.log('🎨 Primer artista de la lista:', artistsList[0]);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {

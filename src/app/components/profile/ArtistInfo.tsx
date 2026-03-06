@@ -22,9 +22,12 @@ export default function ArtistInfo({ artist }: ArtistInfoProps) {
       {/* Avatar */}
       <div className="w-16 h-16 sm:w-24 sm:h-24 lg:w-28 lg:h-28 rounded-full overflow-hidden border-4 border-white/20 bg-riff-primary/20 flex-shrink-0 flex items-center justify-center">
         {artist.profileImage ? (
-          <div
-            className="w-full h-full bg-cover bg-center"
-            style={{ backgroundImage: `url('${artist.profileImage}')` }}
+          <Image
+            src={artist.profileImage}
+            alt={artist.name}
+            width={112}
+            height={112}
+            className="w-full h-full object-cover"
           />
         ) : (
           <span className="text-4xl sm:text-5xl font-bold text-riff-primary select-none">

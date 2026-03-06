@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { IoMdClose } from 'react-icons/io';
 import { FiHeart } from 'react-icons/fi';
 import { BsBookmark, BsBookmarkFill } from 'react-icons/bs';
@@ -6,16 +7,18 @@ import { Publication } from '@/app/types';
 interface PublicationModalProps {
   publication: Publication | null;
   authorName: string;
+  authorImage?: string | null;
   isSaving?: boolean;
   onClose: () => void;
-  onLike: (id: number) => void;
-  onSave: (id: number) => void;
+  onLike: (id: string | number) => void;
+  onSave: (id: string | number) => void;
   formatDate: (date: string) => string;
 }
 
 export default function PublicationModal({
   publication,
   authorName,
+  authorImage,
   isSaving = false,
   onClose,
   onLike,
@@ -36,8 +39,12 @@ export default function PublicationModal({
         {/* Modal Header */}
         <div className="flex items-center justify-between p-4 sm:p-6 sticky top-0 bg-riff-header z-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-sm font-medium">{authorName.charAt(0)}</span>
+            <div className="w-10 h-10 bg-gradient-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+              {authorImage ? (
+                <Image src={authorImage} alt={authorName} width={40} height={40} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-white text-sm font-medium">{authorName.charAt(0)}</span>
+              )}
             </div>
             <div>
               <h3 className="text-white font-semibold text-base">{authorName}</h3>
@@ -54,13 +61,17 @@ export default function PublicationModal({
 
         {/* Modal Body */}
         <div className="p-4 sm:p-6">
+          {/* Imagen real de la publicación */}
           {publication.image && (
-            <div className="mb-4">
-              <div className="w-full bg-riff-header rounded-sm overflow-hidden">
-                <div className="aspect-video flex items-center justify-center">
-                  <span className="text-riff-text-secondary">Imagen del evento</span>
-                </div>
-              </div>
+            <div className="mb-4 rounded-sm overflow-hidden">
+              <Image
+                src={publication.image}
+                alt="Imagen de publicación"
+                width={800}
+                height={450}
+                className="w-full object-cover rounded-sm"
+                unoptimized
+              />
             </div>
           )}
 
@@ -75,7 +86,7 @@ export default function PublicationModal({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onLike(typeof publication.id === 'string' ? parseInt(publication.id) : publication.id);
+                onLike(publication.id);
               }}
               className={`flex items-center gap-2 transition-colors ${
                 publication.isLiked ? 'text-red-400' : 'text-riff-text-secondary hover:text-red-400'
@@ -87,14 +98,14 @@ export default function PublicationModal({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onSave(typeof publication.id === 'string' ? parseInt(publication.id) : publication.id);
+                onSave(publication.id);
               }}
               disabled={isSaving}
               className={`flex items-center gap-2 transition-all duration-200 ${
-                isSaving 
-                  ? 'opacity-50 cursor-wait' 
-                  : publication.isSaved 
-                    ? 'text-yellow-400 hover:text-yellow-300' 
+                isSaving
+                  ? 'opacity-50 cursor-wait'
+                  : publication.isSaved
+                    ? 'text-yellow-400 hover:text-yellow-300'
                     : 'text-riff-text-secondary hover:text-yellow-400'
               }`}
               title={publication.isSaved ? 'Quitar de guardados' : 'Guardar publicación'}

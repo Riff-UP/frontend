@@ -6,6 +6,7 @@ import { Publication } from '@/app/types';
 interface PublicationCardProps {
   publication: Publication;
   authorName: string;
+  authorImage?: string | null;
   isSaving?: boolean;
   onLike: (id: string | number) => void;
   onSave: (id: string | number) => void;
@@ -28,6 +29,7 @@ function safeFormatDate(date: string): string {
 export default function PublicationCard({
   publication,
   authorName,
+  authorImage,
   isSaving = false,
   onLike,
   onSave,
@@ -46,8 +48,12 @@ export default function PublicationCard({
       <div className="p-4 flex-1 flex flex-col">
         {/* Author Header */}
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-xs font-medium">{authorName.charAt(0)}</span>
+          <div className="w-8 h-8 bg-gradient-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+            {authorImage ? (
+              <Image src={authorImage} alt={authorName} width={32} height={32} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-white text-xs font-medium">{authorName.charAt(0)}</span>
+            )}
           </div>
           <div className="flex-1">
             <div className="flex flex-col gap-1">

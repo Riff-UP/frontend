@@ -6,8 +6,9 @@ import { ProfileData } from '@/app/types';
 import SocialMediaInput from './profile/SocialMediaInput';
 import ProfileFromToken from './profile/ProfileFromToken';
 import { useUser } from '../hooks/useUser';
-import { API_BASE_URL, getAuthHeaders } from '../config/api';
+import { API_BASE_URL } from '../config/api';
 import { uploadToR2, validateImageFile } from '../utils/r2Storage';
+import { fetchFollowersCount } from '../utils/follows';
 
 const API_URL = API_BASE_URL;
 
@@ -91,13 +92,10 @@ export default function ProfileEdit() {
     if (!user?.id) return;
     const fetchFollowers = async () => {
       try {
-        const res = await fetch(`${API_URL}/follows?followedId=${user.id}`, {
-          headers: getAuthHeaders(),
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        const arr = Array.isArray(data) ? data : (data?.data ?? []);
-        setProfileData(prev => ({ ...prev, followers: arr.length }));
+        const followers = await fetchFollowersCount(user.id);
+        if (followers !== undefined) {
+          setProfileData(prev => ({ ...prev, followers }));
+        }
       } catch { /* silencioso */ }
     };
     fetchFollowers();
@@ -165,7 +163,7 @@ export default function ProfileEdit() {
 
     // Guardar redes sociales (con prefijo de plataforma)
     const platforms: Array<'instagram' | 'facebook' | 'whatsapp'> = ['instagram', 'facebook', 'whatsapp'];
-    let socialErrors: string[] = [];
+    const socialErrors: string[] = [];
 
     for (const platform of platforms) {
       const value = profileData[platform];

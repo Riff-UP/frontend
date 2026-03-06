@@ -2,13 +2,15 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { API_BASE_URL, getAuthHeaders } from '../config/api';
+import { extractFollowRecords, getFollowTargetId } from '../utils/follows';
 
 const API_URL = API_BASE_URL;
 
 interface FollowRecord {
   id?: string;
   followerId: string;
-  followedId: string;
+  followedId?: string;
+  followingId?: string;
   createdAt?: string;
 }
 
@@ -24,12 +26,13 @@ export function useFollow(currentUserId?: string) {
       });
       if (!res.ok) return;
       const data = await res.json();
-      const arr: FollowRecord[] = Array.isArray(data) ? data : (data?.data ?? []);
+      const arr: FollowRecord[] = extractFollowRecords(data) as FollowRecord[];
       console.log('📋 fetchMyFollows - total:', arr.length, '| primer item:', JSON.stringify(arr[0]));
 
       const set = new Set<string>();
-      arr.forEach(f => {
-        if (f.followedId) set.add(f.followedId);
+      arr.forEach((follow) => {
+        const targetId = getFollowTargetId(follow);
+        if (targetId) set.add(targetId);
       });
       console.log('📋 followingSet:', [...set]);
       setFollowingSet(set);

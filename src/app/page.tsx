@@ -1,23 +1,103 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Header from "@/app/components/layout/Header";
 import Footer from "@/app/components/layout/Footer";
 import ArtistCard from "@/app/components/cards/ArtistCard";
-import SongCard from "@/app/components/cards/SongCard";
 import EventRatingModal from "@/app/components/common/EventRatingModal";
 import { useEventRating } from "@/app/hooks/useEventRating";
 import { FaCircleChevronLeft, FaCircleChevronRight } from "react-icons/fa6";
 import { useArtists, ArtistData } from "@/app/hooks/useArtists";
+import { API_BASE_URL, getAuthHeaders } from "@/app/config/api";
 
-const ARTIST_FALLBACK_IMAGE = "/images/default-artist.jpg";
+const API_URL = API_BASE_URL;
+
+interface RawPost {
+  _id?: unknown;
+  id?: unknown;
+  sql_user_id?: string;
+  authorId?: string;
+  title?: string;
+  description?: string;
+  content?: string;
+  mediaUrl?: string;
+  createdAt?: string;
+  created_at?: string;
+}
+
+interface HeroPublication {
+  id: string;
+  authorId: string;
+  authorName: string;
+  imageUrl: string;
+  caption: string;
+  createdAt: string;
+}
+
+function extractId(raw: unknown): string {
+  if (!raw) return "";
+  if (typeof raw === "string") return raw;
+  if (typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    if (obj.$oid) return String(obj.$oid);
+    if (obj._id) return extractId(obj._id);
+    if (obj.id) return extractId(obj.id);
+  }
+  return String(raw);
+}
+
+function getPostImageUrl(post: RawPost): string | undefined {
+  if (post.mediaUrl) return post.mediaUrl;
+  if (post.content && (post.content.startsWith("http") || post.content.startsWith("/"))) {
+    return post.content;
+  }
+  return undefined;
+}
 
 export default function Home() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  const [heroPosts, setHeroPosts] = useState<RawPost[]>([]);
   const { artists, loading, setSearch } = useArtists();
+
+  const heroPublications = useMemo<HeroPublication[]>(() => {
+    const artistNameMap = new Map(artists.map((artist) => [artist.id, artist.name]));
+    const artistIds = new Set(artists.map((artist) => artist.id));
+
+    const normalized = heroPosts
+      .map((post) => {
+        const imageUrl = getPostImageUrl(post);
+        const authorId = String(post.sql_user_id ?? post.authorId ?? "");
+        const createdAt = post.createdAt ?? post.created_at ?? "";
+
+        if (!imageUrl) return null;
+
+        return {
+          id: extractId(post._id ?? post.id),
+          authorId,
+          authorName: artistNameMap.get(authorId) ?? "Artista Riff",
+          imageUrl,
+          caption: post.description || post.title || "Nueva publicación",
+          createdAt,
+        };
+      })
+      .filter((post): post is HeroPublication => Boolean(post?.id && post.imageUrl));
+
+    const uniqueByImage = normalized.filter(
+      (post, index, arr) => arr.findIndex((item) => item.imageUrl === post.imageUrl) === index
+    );
+
+    const sorted = [...uniqueByImage].sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    const artistPosts = sorted.filter((post) => artistIds.has(post.authorId));
+    return (artistPosts.length > 0 ? artistPosts : sorted).slice(0, 4);
+  }, [artists, heroPosts]);
 
   // Capturar token de Google OAuth
   useEffect(() => {
@@ -33,6 +113,24 @@ export default function Home() {
   useEffect(() => {
     setSearch(searchQuery);
   }, [searchQuery, setSearch]);
+
+  // Cargar publicaciones para animar visualmente el hero
+  useEffect(() => {
+    const loadHeroPosts = async () => {
+      try {
+        const response = await fetch(`${API_URL}/posts`, { headers: getAuthHeaders(false) });
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const posts = Array.isArray(data) ? data : (data?.data ?? data?.posts ?? []);
+        setHeroPosts(Array.isArray(posts) ? posts : []);
+      } catch {
+        setHeroPosts([]);
+      }
+    };
+
+    loadHeroPosts();
+  }, []);
 
   // Eventos a los que el usuario ha asistido (ejemplo)
   // En producción, esto vendría de una API
@@ -57,15 +155,51 @@ export default function Home() {
             backgroundPosition: "center",
           }}
         >
-          <div className="absolute inset-0 bg-black/50" />
+          <div className="absolute inset-0 bg-black/55" />
+
+          {heroPublications.length > 0 && (
+            <div className="absolute inset-y-0 right-0 z-0 hidden sm:flex items-center pr-4 md:pr-8 lg:pr-10 pointer-events-none">
+              <div className="grid grid-cols-2 gap-3 md:gap-4 w-[240px] md:w-[320px] lg:w-[420px] opacity-95">
+                {heroPublications.map((publication, index) => (
+                  <div
+                    key={publication.id}
+                    className={`relative overflow-hidden rounded-2xl border border-white/15 shadow-2xl ${index % 2 === 0 ? "translate-y-4" : "-translate-y-4"}`}
+                  >
+                    <div
+                      className="h-28 md:h-36 lg:h-44 bg-cover bg-center scale-105"
+                      style={{ backgroundImage: `url(${publication.imageUrl})` }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    <div className="absolute inset-x-0 bottom-0 p-3">
+                      <p className="text-[10px] md:text-xs font-semibold uppercase tracking-[0.2em] text-riff-primary/90">
+                        Publicación
+                      </p>
+                      <p className="text-white text-xs md:text-sm font-semibold line-clamp-1">
+                        {publication.authorName}
+                      </p>
+                      <p className="text-white/80 text-[11px] md:text-xs line-clamp-2">
+                        {publication.caption}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="relative z-10 h-full flex items-start pt-4 sm:pt-8 lg:pt-2 px-4 sm:px-8 md:px-12 lg:px-6">
-            <div className="max-w-xl">
+            <div className="max-w-xl lg:max-w-2xl">
               <h1
                 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight"
                 style={{ textShadow: "2px 2px 8px rgba(0,0,0,0.7)" }}
               >
                 Con Riff, impulsa tu musica al siguiente nivel
               </h1>
+              {heroPublications.length > 0 && (
+                <p className="hidden sm:block mt-4 max-w-md text-sm md:text-base text-white/85">
+                  Descubre lo más reciente de la comunidad con publicaciones visuales de artistas destacando ahora mismo.
+                </p>
+              )}
             </div>
           </div>
         </section>
@@ -104,7 +238,8 @@ export default function Home() {
                   key={artist.id}
                   id={artist.id}
                   name={artist.name}
-                  image={ARTIST_FALLBACK_IMAGE}
+                  image={artist.profileImage ?? undefined}
+                  followers={artist.followersCount ?? 0}
                   description={artist.biography ?? undefined}
                 />
               ))}

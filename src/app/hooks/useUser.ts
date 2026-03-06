@@ -12,6 +12,8 @@ export interface SocialMedia {
   url: string;
 }
 
+type SocialMediaResponse = SocialMedia[] | { data?: SocialMedia[] } | null;
+
 export interface UserData {
   id: string;
   name: string;
@@ -39,7 +41,6 @@ interface UseUserReturn {
   removeSocialMedia: (id: string) => Promise<boolean>;
 }
 
-
 export function useUser(): UseUserReturn {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +55,7 @@ export function useUser(): UseUserReturn {
     const token = getToken();
     
     if (!token) {
+      setUser(null);
       setLoading(false);
       setError('No hay sesión activa');
       return;
@@ -61,6 +63,7 @@ export function useUser(): UseUserReturn {
 
     const tokenData = getUserFromToken(token);
     if (!tokenData || !tokenData.id) {
+      setUser(null);
       setLoading(false);
       setError('Token inválido');
       return;
@@ -94,14 +97,45 @@ export function useUser(): UseUserReturn {
 
       // Cargar redes sociales del usuario via /social-media/user/:userId
       try {
-        const smRes = await fetch(`${API_URL}/social-media/user/${userId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        if (smRes.ok) {
-          const smData = await smRes.json();
+        // Primero intentar el nuevo endpoint con query param (más flexible)
+        let smData: SocialMediaResponse = null;
+        try {
+          const smQueryRes = await fetch(`${API_URL}/social-media?userId=${userId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          if (smQueryRes.ok) {
+            smData = await smQueryRes.json();
+          } else {
+            // Si el endpoint con query no está disponible, usar el path legacy
+            const smRes = await fetch(`${API_URL}/social-media/user/${userId}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            if (smRes.ok) {
+              smData = await smRes.json();
+            }
+          }
+        } catch {
+          // En caso de fallo en las peticiones, intentamos el path legacy como último recurso
+          try {
+            const smRes = await fetch(`${API_URL}/social-media/user/${userId}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            if (smRes.ok) {
+              smData = await smRes.json();
+            }
+          } catch { /* silencioso */ }
+        }
+
+        if (smData) {
           userData.socialMedia = Array.isArray(smData) ? smData : (smData?.data ?? []);
         } else {
           userData.socialMedia = userData.socialMedia || [];
@@ -152,6 +186,7 @@ export function useUser(): UseUserReturn {
       const updatedUser = await res.json();
       // Preservar las redes sociales ya cargadas
       setUser(prev => ({ ...(prev || {}), ...updatedUser, socialMedia: prev?.socialMedia } as UserData));
+      window.dispatchEvent(new Event('authChange'));
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al actualizar');
@@ -362,6 +397,12 @@ export function useUser(): UseUserReturn {
 
   useEffect(() => {
     fetchUser();
+    window.addEventListener('authChange', fetchUser);
+    window.addEventListener('storage', fetchUser);
+    return () => {
+      window.removeEventListener('authChange', fetchUser);
+      window.removeEventListener('storage', fetchUser);
+    };
   }, [fetchUser]);
 
   return {

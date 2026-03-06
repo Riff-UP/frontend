@@ -5,6 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { FiSearch } from 'react-icons/fi';
+import { API_BASE_URL } from '@/app/config/api';
+import { getValidToken, getUserFromToken } from '@/app/utils/jwt';
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
@@ -14,6 +16,8 @@ interface HeaderProps {
 export default function Header({ onSearch, searchValue }: HeaderProps) {
   const [internalQuery, setInternalQuery] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>('');
   const pathname = usePathname();
 
   // Sincronizar con valor externo si viene del padre
@@ -23,18 +27,38 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
     }
   }, [searchValue]);
 
+  // Cargar datos del usuario (foto + nombre) cuando hay token
+  const loadUserData = async () => {
+    const token = getValidToken();
+    if (!token) {
+      setIsAuthenticated(false);
+      setProfileImage(null);
+      setUserName('');
+      return;
+    }
+    setIsAuthenticated(true);
+    try {
+      const tokenData = getUserFromToken(token);
+      const res = await fetch(`${API_BASE_URL}/users/me`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProfileImage(data.profileImage ?? null);
+        setUserName(data.name ?? tokenData?.name ?? '');
+      }
+    } catch { /* silencioso */ }
+  };
+
   useEffect(() => {
-    const checkAuth = () => {
-      const token = localStorage.getItem('token');
-      setIsAuthenticated(!!token);
-    };
-    checkAuth();
-    window.addEventListener('storage', checkAuth);
-    window.addEventListener('authChange', checkAuth);
+    loadUserData();
+    window.addEventListener('storage', loadUserData);
+    window.addEventListener('authChange', loadUserData);
     return () => {
-      window.removeEventListener('storage', checkAuth);
-      window.removeEventListener('authChange', checkAuth);
+      window.removeEventListener('storage', loadUserData);
+      window.removeEventListener('authChange', loadUserData);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,6 +70,8 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault(); // evitar recarga, la búsqueda ya ocurrió en onChange
   };
+
+  const initial = userName ? userName.charAt(0).toUpperCase() : 'U';
 
   return (
     <header className="sticky top-0 z-40 w-full bg-riff-header backdrop-blur-md">
@@ -90,7 +116,21 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
                   pathname === '/profile' ? 'text-riff-primary' : 'text-riff-background hover:text-riff-primary'
                 }`}
               >
-                <span>Perfil</span>
+                {/* Avatar del usuario */}
+                <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-riff-primary-dark to-riff-primary flex items-center justify-center border border-white/20">
+                  {profileImage ? (
+                    <Image
+                      src={profileImage}
+                      alt={userName}
+                      width={32}
+                      height={32}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-white text-xs font-bold">{initial}</span>
+                  )}
+                </div>
+                <span className="hidden sm:inline truncate max-w-[120px]">{userName || 'Perfil'}</span>
               </Link>
             ) : (
               <Link

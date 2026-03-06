@@ -1,5 +1,3 @@
-import { API_BASE_URL } from '../config/api';
-
 /**
  * Utilidad para subir archivos a Cloudflare R2
  * Usa la API S3-compatible de R2 con CORS habilitado
@@ -10,12 +8,6 @@ interface R2Config {
   bucket: string;
   publicUrl: string;
 }
-
-const R2_CONFIG: R2Config = {
-  accountId: '582977cf96cf897306121149b1846ebc', // Del endpoint
-  bucket: process.env.NEXT_PUBLIC_R2_BUCKET || 'riffcontentbuck',
-  publicUrl: process.env.NEXT_PUBLIC_R2_PUBLIC_URL || 'https://pub-5a853459931144dca4331ca77afeee53.r2.dev',
-};
 
 /**
  * Genera un nombre de archivo único
@@ -28,28 +20,11 @@ function generateUniqueFilename(originalName: string): string {
 }
 
 /**
- * Convierte un archivo a Base64
- */
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const result = reader.result as string;
-      // Remover el prefijo "data:image/jpeg;base64,"
-      const base64 = result.split(',')[1];
-      resolve(base64);
-    };
-    reader.onerror = error => reject(error);
-  });
-}
-
-/**
- * Sube un archivo a R2 usando el backend como proxy
+ * Sube un archivo a R2 usando el backend como proxy (multipart/form-data)
  */
 export async function uploadToR2(file: File): Promise<string> {
   try {
-    console.log('🚀 Iniciando subida a R2...', {
+    console.log('🚀 Iniciando subida a R2 (FormData)...', {
       name: file.name,
       size: file.size,
       type: file.type,
@@ -62,41 +37,46 @@ export async function uploadToR2(file: File): Promise<string> {
     }
 
     const filename = generateUniqueFilename(file.name);
-    const base64Data = await fileToBase64(file);
 
-    console.log('📦 Archivo preparado:', { filename, size: base64Data.length });
+    // Preparar FormData (mantener compatibilidad con backend)
+    const formData = new FormData();
+    // Añadimos el archivo en dos keys comunes para mayor compatibilidad
+    formData.append('file', file, filename);
+    formData.append('image', file, filename);
+    // Incluimos filename por si el backend lo espera
+    formData.append('filename', filename);
 
-    // Enviar al backend para que lo suba a R2
-    const response = await fetch(`${API_BASE_URL}/upload/r2`, {
+    // Armar headers: no setear Content-Type para que el browser añada el boundary
+    const headers: Record<string, string> = {};
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`/api/upload/r2`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-      body: JSON.stringify({
-        filename,
-        contentType: file.type,
-        base64Data,
-      }),
+      headers,
+      body: formData,
     });
 
-    console.log('📡 Respuesta del backend:', response.status, response.statusText);
+    console.log('📡 Respuesta del backend (uploadToR2):', response.status, response.statusText);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Error del backend:', errorText);
+      console.error('❌ Error del backend (uploadToR2):', errorText);
       throw new Error(`Error al subir archivo: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
-    console.log('✅ Subida exitosa:', data);
+    console.log('✅ Subida exitosa (uploadToR2):', data);
 
-    // El backend debe retornar { url: "https://..." }
-    if (!data.url) {
+    // El backend debe retornar { url: "https://..." } o similar
+    const url = data?.url || data?.data?.url || data?.result?.url;
+    if (!url) {
       throw new Error('El backend no retornó una URL válida');
     }
 
-    return data.url;
+    return url;
   } catch (error) {
     console.error('💥 Error en uploadToR2:', error);
     throw error;
