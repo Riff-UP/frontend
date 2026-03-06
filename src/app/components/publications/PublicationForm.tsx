@@ -7,6 +7,7 @@ interface PublicationFormProps {
   onImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onPublish: () => void;
   onCancel: () => void;
+  isUploading?: boolean;
 }
 
 export default function PublicationForm({
@@ -16,6 +17,7 @@ export default function PublicationForm({
   onImageSelect,
   onPublish,
   onCancel,
+  isUploading = false,
 }: PublicationFormProps) {
   return (
     <div className="w-full lg:max-w-2xl mb-6">
@@ -56,16 +58,17 @@ export default function PublicationForm({
         <div className="flex gap-2 pt-4">
           <button
             onClick={onCancel}
-            className="flex-1 px-4 py-2 bg-riff-text-secondary/30 hover:bg-riff-text-secondary/40 text-white text-sm font-medium rounded-sm border border-white/20 transition-colors duration-200"
+            disabled={isUploading}
+            className="flex-1 px-4 py-2 bg-riff-text-secondary/30 hover:bg-riff-text-secondary/40 text-white text-sm font-medium rounded-sm border border-white/20 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancelar
           </button>
           <button
             onClick={onPublish}
-            className="flex-1 px-4 py-2 bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white text-sm font-medium rounded-sm hover:from-riff-primary hover:to-riff-primary-dark transition-all duration-200"
-            disabled={!text.trim() && !selectedImage}
+            disabled={(!text.trim() && !selectedImage) || isUploading}
+            className="flex-1 px-4 py-2 bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white text-sm font-medium rounded-sm hover:from-riff-primary hover:to-riff-primary-dark transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Publicar
+            {isUploading ? 'Subiendo...' : 'Publicar'}
           </button>
         </div>
       </div>

@@ -5,8 +5,11 @@ import { useParams, useRouter } from 'next/navigation';
 import Header from '@/app/components/layout/Header';
 import ArtistProfile from '@/app/components/ArtistProfile';
 import { ArtistData } from '@/app/types';
+import { SavedPostsProvider } from '@/app/context/SavedPostsContext';
+import { useUser } from '@/app/hooks/useUser';
+import { API_BASE_URL } from '@/app/config/api';
 
-const API_URL = 'http://localhost:4000/api';
+const API_URL = API_BASE_URL;
 
 export default function ArtistPage() {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +17,7 @@ export default function ArtistPage() {
   const [artist, setArtist] = useState<ArtistData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useUser();
 
   useEffect(() => {
     if (!id) return;
@@ -92,9 +96,11 @@ export default function ArtistPage() {
   }
 
   return (
-    <div className="min-h-screen bg-riff-background-b">
-      <Header />
-      <ArtistProfile artist={artist} />
-    </div>
+    <SavedPostsProvider userId={user?.id}>
+      <div className="min-h-screen bg-riff-background-b">
+        <Header />
+        <ArtistProfile artist={artist} />
+      </div>
+    </SavedPostsProvider>
   );
 }

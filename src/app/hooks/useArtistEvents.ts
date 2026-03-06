@@ -2,17 +2,17 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Event } from '@/app/types';
+import { API_BASE_URL, getAuthHeaders } from '../config/api';
 
 interface EventFromBackend {
   _id: string;
-  sql_user_id: string;
   title: string;
   description?: string;
   event_date: string;
   location: string;
 }
 
-const API_URL = 'http://localhost:4000/api';
+const API_URL = API_BASE_URL;
 
 export function useArtistEvents(artistId: string) {
   const [events, setEvents] = useState<Event[]>([]);
@@ -26,8 +26,9 @@ export function useArtistEvents(artistId: string) {
       setLoading(true);
       setError(null);
 
-      const res = await fetch(`${API_URL}/events?userId=${artistId}`, {
-        headers: { 'Content-Type': 'application/json' },
+      // Filtrar por organizerId directamente en el backend
+      const res = await fetch(`${API_URL}/events?organizerId=${artistId}`, {
+        headers: getAuthHeaders(false),
       });
 
       if (!res.ok) throw new Error('Error al obtener eventos');
@@ -35,7 +36,6 @@ export function useArtistEvents(artistId: string) {
       const data = await res.json();
       const rawEvents: EventFromBackend[] = data.data || data || [];
 
-      // Mapear al formato que usa EventCard
       const mapped: Event[] = rawEvents.map(e => {
         const dateTime = new Date(e.event_date);
         return {

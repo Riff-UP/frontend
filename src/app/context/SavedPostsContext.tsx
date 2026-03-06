@@ -1,0 +1,278 @@
+'use client';
+
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { API_BASE_URL } from '../config/api';
+
+const API_URL = API_BASE_URL;
+
+export interface SavedPostContent {
+  id?: string;
+  _id?: string;
+  authorId?: string;
+  sql_user_id?: string;
+  content?: string;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video' | 'audio';
+  likesCount?: number;
+  commentsCount?: number;
+  createdAt?: string;
+  title?: string;
+  type?: string;
+  description?: string;
+}
+
+export interface SavedPost {
+  id: string;       // savedPostId del backend (el _id del documento savedPost)
+  postId: string;   // el _id del post
+  userId: string;
+  createdAt?: string;
+  post?: SavedPostContent;
+}
+
+type MongoId = string | { $oid: string } | unknown;
+
+function extractId(id: MongoId): string {
+  if (!id) return '';
+  if (typeof id === 'string') return id;
+  if (typeof id === 'object' && id !== null && '$oid' in (id as object)) {
+    return String((id as { $oid: string }).$oid);
+  }
+  return String(id);
+}
+
+// Normaliza la respuesta del GET /posts/saved
+// El backend devuelve: { savedPostId, post: { _id, content, mediaUrl, ... } }
+// O también puede devolver: { _id, post_id, sql_user_id, saved_at, post: {...} }
+function normalizeSavedPost(raw: Record<string, unknown>): SavedPost {
+  const rawPost = (raw.post ?? raw.postData ?? raw.publication) as Record<string, unknown> | undefined;
+
+  // El campo "savedPostId" es el identificador del documento savedPost
+  // Puede venir como savedPostId, _id, id
+  const rawId = raw.savedPostId ?? raw._id ?? raw.id ?? raw.savedId;
+  // El campo del post puede venir como post_id, postId, o dentro del objeto post como _id
+  const rawPostId = raw.post_id ?? raw.postId ?? raw.postID
+    ?? (rawPost ? (rawPost._id ?? rawPost.id) : undefined);
+
+  const resolvedId = extractId(rawId);
+  const resolvedPostId = extractId(rawPostId);
+
+  console.log('🔧 normalizeSavedPost input:', {
+    rawKeys: Object.keys(raw),
+    savedPostId: raw.savedPostId,
+    rawId, rawPostId, resolvedId, resolvedPostId,
+    hasPost: !!rawPost,
+  });
+
+  const postContent = rawPost ? String(rawPost.content ?? rawPost.description ?? rawPost.text ?? '') : '';
+  const isContentUrl = postContent.startsWith('http') || postContent.startsWith('/');
+  const mediaUrl = rawPost
+    ? String(rawPost.mediaUrl ?? rawPost.media_url ?? rawPost.imageUrl ?? (isContentUrl ? postContent : '') ?? '')
+    : '';
+  const textContent = rawPost
+    ? String(rawPost.title ?? rawPost.description ?? (!isContentUrl ? postContent : '') ?? '')
+    : '';
+
+  return {
+    id: resolvedId,
+    postId: resolvedPostId,
+    userId: String(raw.sql_user_id ?? raw.userId ?? raw.user_id ?? ''),
+    createdAt: String(raw.saved_at ?? raw.createdAt ?? raw.created_at ?? ''),
+    post: rawPost ? {
+      id: extractId(rawPost._id ?? rawPost.id),
+      authorId: String(rawPost.sql_user_id ?? rawPost.authorId ?? rawPost.author_id ?? ''),
+      content: textContent,
+      mediaUrl: mediaUrl || undefined,
+      mediaType: (rawPost.type ?? rawPost.mediaType) as 'image' | 'video' | 'audio' | undefined,
+      likesCount: Number(rawPost.likesCount ?? rawPost.likes_count ?? 0),
+      commentsCount: Number(rawPost.commentsCount ?? rawPost.comments_count ?? 0),
+      createdAt: String(rawPost.createdAt ?? rawPost.created_at ?? ''),
+      title: rawPost.title as string | undefined,
+      type: (rawPost.type ?? rawPost.mediaType) as string | undefined,
+      description: rawPost.description as string | undefined,
+    } : undefined,
+  };
+}
+
+interface SavedPostsContextValue {
+  savedPosts: SavedPost[];
+  loading: boolean;
+  savePost: (postId: string, userId: string) => Promise<SavedPost | null>;
+  unsavePost: (savedPostId: string) => Promise<boolean>;
+  isPostSaved: (postId: string) => boolean;
+  refreshSavedPosts: () => Promise<void>;
+}
+
+const SavedPostsContext = createContext<SavedPostsContextValue | null>(null);
+
+function getToken(): string | null {
+  if (typeof window !== 'undefined') return localStorage.getItem('token');
+  return null;
+}
+
+export function SavedPostsProvider({ userId, children }: { userId?: string; children: ReactNode }) {
+  const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchSavedPosts = useCallback(async () => {
+    if (!userId) {
+      setSavedPosts([]);
+      return;
+    }
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      setLoading(true);
+      // El backend tiene la ruta GET /posts/saved/user/:sqlUserId
+      // que devuelve los posts guardados del usuario populados con el post
+      const res = await fetch(`${API_URL}/posts/saved/user/${userId}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+
+      if (!res.ok) {
+        console.warn(`⚠️ GET /posts/saved falló (${res.status})`);
+        setSavedPosts([]);
+        return;
+      }
+
+      const data = await res.json();
+      const postsArray: Record<string, unknown>[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+        ? data.data
+        : [];
+
+      if (postsArray.length > 0) {
+        console.log('🔍 RAW primer elemento de /posts/saved:', postsArray[0]);
+        console.log('  Keys:', Object.keys(postsArray[0]));
+      } else {
+        console.log('📭 No hay posts guardados');
+      }
+
+      const normalized = postsArray.map(normalizeSavedPost);
+      console.log('✅ SavedPostsContext - posts cargados:', normalized.length, normalized);
+      setSavedPosts(normalized);
+    } catch (err) {
+      console.error('Error al cargar posts guardados:', err);
+      setSavedPosts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    fetchSavedPosts();
+  }, [fetchSavedPosts]);
+
+  const savePost = async (postId: string, userId: string): Promise<SavedPost | null> => {
+    const token = getToken();
+    if (!token) return null;
+
+    try {
+      const res = await fetch(`${API_URL}/posts/saved`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId, userId }),
+      });
+
+      if (res.status === 409) {
+        // Ya guardado — buscar en estado actual o refrescar
+        const existing = savedPosts.find(sp => sp.postId === postId);
+        if (existing) return existing;
+        // Refrescar y retornar nulo (el estado se actualizará y isPostSaved devolverá true)
+        await fetchSavedPosts();
+        return null;
+      }
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        console.error('Error al guardar post:', res.status, errBody);
+        return null;
+      }
+
+      // El POST devuelve: { _id, post_id, sql_user_id, saved_at, __v }
+      // (sin el post populado)
+      const rawSaved = await res.json() as Record<string, unknown>;
+      console.log('✅ Post guardado exitosamente (raw):', rawSaved);
+
+      // Normalizar la respuesta básica
+      const basicNormalized = normalizeSavedPost(rawSaved);
+      console.log('✅ Post guardado normalizado:', basicNormalized);
+
+      // Agregar al estado inmediatamente
+      setSavedPosts(prev => {
+        // Evitar duplicados
+        if (prev.some(sp => sp.postId === postId)) return prev;
+        return [...prev, basicNormalized];
+      });
+
+      // Refrescar para obtener el post populado completo
+      await fetchSavedPosts();
+
+      return basicNormalized;
+    } catch (err) {
+      console.error('Error en savePost:', err);
+      return null;
+    }
+  };
+
+  const unsavePost = async (savedPostId: string): Promise<boolean> => {
+    const token = getToken();
+    if (!token) return false;
+
+    if (!savedPostId || savedPostId === 'undefined' || savedPostId === '') {
+      console.warn('⚠️ unsavePost: savedPostId inválido:', savedPostId);
+      return false;
+    }
+
+    console.log('🗑️ unsavePost con savedPostId:', savedPostId);
+
+    // Optimistic update: quitar del estado local inmediatamente
+    setSavedPosts(prev => prev.filter(sp => sp.id !== savedPostId));
+
+    try {
+      const res = await fetch(`${API_URL}/posts/saved/${savedPostId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+
+      if (!res.ok && res.status !== 404) {
+        const errBody = await res.json().catch(() => ({}));
+        console.error('Error al eliminar post guardado:', res.status, errBody);
+        // Revertir: refrescar desde el backend
+        await fetchSavedPosts();
+        return false;
+      }
+
+      console.log('✅ Post eliminado de guardados');
+      return true;
+    } catch (err) {
+      console.error('Error en unsavePost:', err);
+      await fetchSavedPosts();
+      return false;
+    }
+  };
+
+  const isPostSaved = (postId: string): boolean => {
+    return savedPosts.some(sp => sp.postId === postId);
+  };
+
+  return (
+    <SavedPostsContext.Provider value={{
+      savedPosts,
+      loading,
+      savePost,
+      unsavePost,
+      isPostSaved,
+      refreshSavedPosts: fetchSavedPosts,
+    }}>
+      {children}
+    </SavedPostsContext.Provider>
+  );
+}
+
+export function useSavedPostsContext(): SavedPostsContextValue {
+  const ctx = useContext(SavedPostsContext);
+  if (!ctx) throw new Error('useSavedPostsContext debe usarse dentro de SavedPostsProvider');
+  return ctx;
+}

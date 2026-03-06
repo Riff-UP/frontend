@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { API_BASE_URL } from '../config/api';
+
+const API_URL = API_BASE_URL;
 
 export interface EventData {
   _id: string;
@@ -16,6 +19,7 @@ export interface CreateEventData {
   description?: string;
   event_date: string;
   location: string;
+  sql_user_id?: string; // El backend lo requiere en el DTO (aunque el controller lo inyecta del JWT)
 }
 
 export interface UpdateEventData {
@@ -35,7 +39,6 @@ interface UseEventsReturn {
   refreshEvents: () => Promise<void>;
 }
 
-const API_URL = 'http://localhost:4000/api';
 
 // 👇 1. Mantenemos el parámetro opcional userId
 export function useEvents(userId?: string): UseEventsReturn {
@@ -57,17 +60,15 @@ export function useEvents(userId?: string): UseEventsReturn {
       setLoading(true);
       setError(null);
 
-      // 👇 2. Construimos la URL dependiendo de si recibimos un userId
-      const url = userId 
-        ? `${API_URL}/events?userId=${userId}` 
-        : `${API_URL}/events`;
+      // El backend obtiene el userId del JWT, no enviar como query param
+      const url = `${API_URL}/events`;
 
-      // 👇 3. Construimos los headers dinámicamente para no enviar "Bearer null"
+      // Construir headers con el token
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
 
-      // Solo inyectamos el Authorization si realmente hay un token
+      // Solo inyectar Authorization si hay token
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
@@ -99,25 +100,49 @@ export function useEvents(userId?: string): UseEventsReturn {
     try {
       setError(null);
 
+      // Extraer userId del JWT para enviarlo como sql_user_id
+      let sql_user_id: string | undefined;
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          sql_user_id = payload.id || payload.userId || payload.sub || undefined;
+          console.log('🔑 userId extraído del JWT:', sql_user_id);
+        }
+      } catch (e) {
+        console.warn('⚠️ No se pudo decodificar el JWT:', e);
+      }
+
+      const payload = { ...data, ...(sql_user_id ? { sql_user_id } : {}) };
+      console.log('POST /events - Payload:', payload);
+
       const res = await fetch(`${API_URL}/events`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al crear evento');
+        const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
+        console.error('Error del backend:', {
+          status: res.status,
+          statusText: res.statusText,
+          error: errorData
+        });
+        throw new Error(errorData.message || `Error ${res.status}: ${res.statusText}`);
       }
 
       const newEvent = await res.json();
+      console.log('Evento creado exitosamente:', newEvent);
       setEvents(prev => [...prev, newEvent]);
       return newEvent;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al crear evento');
+      const errorMessage = err instanceof Error ? err.message : 'Error al crear evento';
+      console.error('Error en createEvent:', err);
+      setError(errorMessage);
       return null;
     }
   };

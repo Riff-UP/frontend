@@ -16,7 +16,7 @@ export default function Events() {
   // 👇 1. Le pasamos el ID del usuario al hook. 
   // Si user es null al principio, pasará undefined, y cuando cargue hará el re-fetch automático
   const { events: backendEvents, loading, createEvent, updateEvent, deleteEvent } = useEvents(user?.id);
-  
+
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -73,9 +73,17 @@ export default function Events() {
 
     setSaving(true);
 
-    const eventDateTime = newEvent.time 
-      ? `${newEvent.date}T${newEvent.time}:00`
-      : `${newEvent.date}T00:00:00`;
+    // Construir fecha ISO completa con zona horaria
+    const timeStr = newEvent.time || '00:00';
+    const eventDateTime = `${newEvent.date}T${timeStr}:00.000Z`;
+
+    // Log para depuración
+    console.log('Enviando evento:', {
+      title: newEvent.title,
+      location: newEvent.location,
+      event_date: eventDateTime,
+      description: newEvent.description,
+    });
 
     if (editingEventId) {
       const success = await updateEvent(editingEventId, {
@@ -95,12 +103,19 @@ export default function Events() {
         });
       }
     } else {
-      await createEvent({
+      // NO enviar userId - el backend lo obtiene del JWT en Authorization header
+      const result = await createEvent({
         title: newEvent.title,
         location: newEvent.location,
         event_date: eventDateTime,
         description: newEvent.description,
       });
+
+      if (!result) {
+        console.error('Error al crear evento');
+        setSaving(false);
+        return;
+      }
     }
 
     await refreshUser();
@@ -222,18 +237,18 @@ export default function Events() {
                       <p className="text-white text-sm">
                         {formatEventDate(selectedEvent.date, selectedEvent.time)}
                       </p>
-                    </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => handleEditEvent(selectedEvent)}
-                    className="flex-1 px-3 py-2 bg-riff-primary/20 hover:bg-riff-primary/30 text-riff-primary border border-riff-primary/30 rounded-sm transition-colors flex items-center justify-center gap-2"
-                  >
-                    <MdEdit className="w-4 h-4" />
-                    <span className="text-sm">Editar</span>
-                  </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleEditEvent(selectedEvent)}
+                  className="flex-1 px-3 py-2 bg-riff-primary/20 hover:bg-riff-primary/30 text-riff-primary border border-riff-primary/30 rounded-sm transition-colors flex items-center justify-center gap-2"
+                >
+                  <MdEdit className="w-4 h-4" />
+                  <span className="text-sm">Editar</span>
+                </button>
                   <button
                     onClick={() => handleDeleteClick(selectedEvent.id)}
                     className="flex-1 px-3 py-2 bg-red-400/20 hover:bg-red-400/30 text-red-400 border border-red-400/30 rounded-sm transition-colors flex items-center justify-center gap-2"

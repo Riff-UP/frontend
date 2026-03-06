@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { API_BASE_URL } from '../config/api';
 
 export function useLogin() {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -30,7 +31,7 @@ export function useLogin() {
     setError(null);
 
     try {
-      const res = await fetch('http://localhost:4000/api/auth/login', {
+      const res = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -55,7 +56,7 @@ export function useLogin() {
 
   const handleGoogleLogin = () => {
     // El backend debe redirigir de vuelta a http://localhost:3001/?token=JWT
-    window.location.href = 'http://localhost:4000/api/auth/google';
+    window.location.href = `${API_BASE_URL}/auth/google`;
   };
 
   return {

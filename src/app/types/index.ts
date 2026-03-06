@@ -44,12 +44,13 @@ export interface ArtistData {
 }
 
 export interface Publication {
-  id: number;
+  id: string | number;
   content: string;
   image?: string;
   date: string;
   likes: number;
   isLiked: boolean;
+  reactionId?: string;   // id del documento reaction para poder hacer DELETE
   isSaved: boolean;
   author?: {
     name: string;

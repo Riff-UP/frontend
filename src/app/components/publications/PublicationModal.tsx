@@ -1,12 +1,12 @@
 import { IoMdClose } from 'react-icons/io';
 import { FiHeart } from 'react-icons/fi';
-import { MdBookmark, MdBookmarkBorder } from 'react-icons/md';
+import { BsBookmark, BsBookmarkFill } from 'react-icons/bs';
 import { Publication } from '@/app/types';
 
 interface PublicationModalProps {
   publication: Publication | null;
   authorName: string;
-  savedCount?: number;
+  isSaving?: boolean;
   onClose: () => void;
   onLike: (id: number) => void;
   onSave: (id: number) => void;
@@ -16,7 +16,7 @@ interface PublicationModalProps {
 export default function PublicationModal({
   publication,
   authorName,
-  savedCount = 0,
+  isSaving = false,
   onClose,
   onLike,
   onSave,
@@ -75,7 +75,7 @@ export default function PublicationModal({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onLike(publication.id);
+                onLike(typeof publication.id === 'string' ? parseInt(publication.id) : publication.id);
               }}
               className={`flex items-center gap-2 transition-colors ${
                 publication.isLiked ? 'text-red-400' : 'text-riff-text-secondary hover:text-red-400'
@@ -87,18 +87,23 @@ export default function PublicationModal({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onSave(publication.id);
+                onSave(typeof publication.id === 'string' ? parseInt(publication.id) : publication.id);
               }}
-              className={`flex items-center gap-2 transition-colors ${
-                publication.isSaved ? 'text-yellow-400' : 'text-riff-text-secondary hover:text-yellow-400'
+              disabled={isSaving}
+              className={`flex items-center gap-2 transition-all duration-200 ${
+                isSaving 
+                  ? 'opacity-50 cursor-wait' 
+                  : publication.isSaved 
+                    ? 'text-yellow-400 hover:text-yellow-300' 
+                    : 'text-riff-text-secondary hover:text-yellow-400'
               }`}
+              title={publication.isSaved ? 'Quitar de guardados' : 'Guardar publicación'}
             >
               {publication.isSaved ? (
-                <MdBookmark className="w-6 h-6" />
+                <BsBookmarkFill className="w-6 h-6" />
               ) : (
-                <MdBookmarkBorder className="w-6 h-6" />
+                <BsBookmark className="w-6 h-6" />
               )}
-              <span className="text-sm">{savedCount}</span>
             </button>
           </div>
         </div>

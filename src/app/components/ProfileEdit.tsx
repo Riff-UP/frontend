@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { ProfileData } from '@/app/types';
 import SocialMediaInput from './profile/SocialMediaInput';
+import ProfileFromToken from './profile/ProfileFromToken';
 import { useUser } from '../hooks/useUser';
 
 export default function ProfileEdit() {
