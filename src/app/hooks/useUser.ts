@@ -73,7 +73,6 @@ export function useUser(): UseUserReturn {
       setLoading(true);
       setError(null);
 
-      // Usar /users/me que extrae el userId del JWT
       const res = await fetch(`${API_URL}/users/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -89,15 +88,15 @@ export function useUser(): UseUserReturn {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Error al obtener usuario');
+        setError(errorData.message || 'Error al obtener usuario');
+        setUser(null);
+        return;
       }
 
       const userData = await res.json();
       const userId = userData.id || tokenData.id;
 
-      // Cargar redes sociales del usuario via /social-media/user/:userId
       try {
-        // Primero intentar el nuevo endpoint con query param (más flexible)
         let smData: SocialMediaResponse = null;
         try {
           const smQueryRes = await fetch(`${API_URL}/social-media?userId=${userId}`, {
@@ -109,7 +108,6 @@ export function useUser(): UseUserReturn {
           if (smQueryRes.ok) {
             smData = await smQueryRes.json();
           } else {
-            // Si el endpoint con query no está disponible, usar el path legacy
             const smRes = await fetch(`${API_URL}/social-media/user/${userId}`, {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -121,7 +119,6 @@ export function useUser(): UseUserReturn {
             }
           }
         } catch {
-          // En caso de fallo en las peticiones, intentamos el path legacy como último recurso
           try {
             const smRes = await fetch(`${API_URL}/social-media/user/${userId}`, {
               headers: {
@@ -180,11 +177,11 @@ export function useUser(): UseUserReturn {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Error al actualizar');
+        setError(errorData.message || 'Error al actualizar');
+        return false;
       }
 
       const updatedUser = await res.json();
-      // Preservar las redes sociales ya cargadas
       setUser(prev => ({ ...(prev || {}), ...updatedUser, socialMedia: prev?.socialMedia } as UserData));
       window.dispatchEvent(new Event('authChange'));
       return true;
@@ -214,8 +211,9 @@ export function useUser(): UseUserReturn {
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al eliminar cuenta');
+        const errorData = await res.json().catch(() => ({}));
+        setError(errorData.message || 'Error al eliminar cuenta');
+        return false;
       }
 
       localStorage.removeItem('token');
@@ -254,8 +252,9 @@ export function useUser(): UseUserReturn {
       }
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al establecer contraseña');
+        const errorData = await res.json().catch(() => ({}));
+        setError(errorData.message || 'Error al establecer contraseña');
+        return false;
       }
 
       return true;
@@ -292,13 +291,13 @@ export function useUser(): UseUserReturn {
         const errorData = await res.json().catch(() => ({}));
         const msg = Array.isArray(errorData?.message) ? errorData.message.join(', ') : (errorData?.message || 'Error al agregar red social');
         console.error('❌ addSocialMedia error:', errorData);
-        throw new Error(msg);
+        setError(msg);
+        return null;
       }
 
       const newSocialMedia = await res.json();
       console.log('✅ addSocialMedia result:', newSocialMedia);
 
-      // Actualizar usuario local
       setUser(prev => prev ? {
         ...prev,
         socialMedia: [...(prev.socialMedia || []), newSocialMedia]
@@ -337,11 +336,11 @@ export function useUser(): UseUserReturn {
         const errorData = await res.json().catch(() => ({}));
         const msg = Array.isArray(errorData?.message) ? errorData.message.join(', ') : (errorData?.message || 'Error al actualizar red social');
         console.error('❌ updateSocialMedia error:', errorData);
-        throw new Error(msg);
+        setError(msg);
+        return false;
       }
 
       console.log('✅ updateSocialMedia ok');
-      // Actualizar usuario local
       setUser(prev => prev ? {
         ...prev,
         socialMedia: prev.socialMedia?.map(sm => sm.id === id ? { ...sm, url } : sm)
@@ -378,11 +377,11 @@ export function useUser(): UseUserReturn {
         const errorData = await res.json().catch(() => ({}));
         const msg = Array.isArray(errorData?.message) ? errorData.message.join(', ') : (errorData?.message || 'Error al eliminar red social');
         console.error('❌ removeSocialMedia error:', errorData);
-        throw new Error(msg);
+        setError(msg);
+        return false;
       }
 
       console.log('✅ removeSocialMedia ok');
-      // Actualizar usuario local
       setUser(prev => prev ? {
         ...prev,
         socialMedia: prev.socialMedia?.filter(sm => sm.id !== id)
