@@ -4,6 +4,24 @@ import { API_BASE_URL, getAuthHeaders } from '../config/api';
 
 const API_URL = API_BASE_URL;
 
+// Extrae el id string de un objeto devuelto por el backend.
+// El backend puede devolver { id }, { _id } o { _id: { $oid } } (sin procesar de Mongo).
+// Esta función normaliza cualquiera de esos casos a un string limpio.
+function extractId(raw: unknown): string {
+  if (!raw) return '';
+  if (typeof raw === 'string') return raw;
+  if (typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    // Caso: { $oid: "..." } — backend no procesó el _id de Mongo
+    if (obj.$oid) return String(obj.$oid);
+    // Caso: { _id: "..." } o { _id: { $oid: "..." } }
+    if (obj._id) return extractId(obj._id);
+    // Caso: { id: "..." }
+    if (obj.id) return extractId(obj.id);
+  }
+  return String(raw);
+}
+
 export interface Post {
   id: string;
   authorId?: string;
@@ -74,14 +92,13 @@ export function usePosts(userId?: string) {
         ? data.posts
         : [];
 
-      // Normalizar cada post
-      const allPosts = rawArray.map((p: Record<string, unknown>) => {
-        const rawId = p._id ?? p.id;
-        const id = typeof rawId === 'object' && rawId !== null && '$oid' in rawId
-          ? String((rawId as { $oid: string }).$oid)
-          : String(rawId ?? '');
-        return { ...p, id };
-      });
+      // Normalizar cada post - extraer ID correctamente (puede ser string, {$oid:...}, o nested)
+      const allPosts = rawArray
+        .map((p: Record<string, unknown>) => {
+          const id = extractId(p._id ?? p.id);
+          return { ...p, id };
+        })
+        .filter((p: Record<string, unknown>) => p.id && p.id !== 'undefined' && p.id !== 'null' && p.id !== '');
 
       // Filtrar por userId si está disponible (solo mostrar posts del usuario actual)
       const postsArray = userId
@@ -216,10 +233,16 @@ export function usePosts(userId?: string) {
       const newPost = await response.json();
       console.log('✅ Post creado exitosamente:', newPost);
 
-      // Agregar el nuevo post al estado (protegido contra prevPosts no iterable)
-      setPosts(prevPosts => [newPost, ...(Array.isArray(prevPosts) ? prevPosts : [])]);
+      // Normalizar el ID del nuevo post antes de agregarlo al estado
+      const normalizedPost = {
+        ...newPost,
+        id: extractId(newPost._id ?? newPost.id),
+      };
 
-      return newPost;
+      // Agregar el nuevo post al estado (protegido contra prevPosts no iterable)
+      setPosts(prevPosts => [normalizedPost, ...(Array.isArray(prevPosts) ? prevPosts : [])]);
+
+      return normalizedPost;
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
@@ -276,6 +299,11 @@ export function usePosts(userId?: string) {
    * Eliminar una publicación
    */
   const deletePost = async (postId: string): Promise<boolean> => {
+    if (!postId || postId === 'undefined' || postId === 'null' || postId === '') {
+      console.error('❌ deletePost: ID inválido:', postId);
+      return false;
+    }
+
     setLoading(true);
     setError(null);
 

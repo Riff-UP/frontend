@@ -36,6 +36,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
     loadingPosts,
     loadingEvents,
     followersCount,
+    refreshFollowers,
   } = usePublicArtistData(artistData?.id);
   const { isLiked, toggleLike, reactedPosts, fetchPostReactionCounts, postReactionCounts, getReactionCount } =
     usePostReactions(user?.id);
@@ -118,21 +119,57 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
       return dayOfMonth === day && month - 1 === currentMonth && year === currentYear;
     });
 
+  // Contador local de seguidores para actualizar optimísticamente
+  const [localFollowersCount, setLocalFollowersCount] = useState<number | undefined>(undefined);
+
+  // Sincronizar con el valor real del backend cuando llega
+  useEffect(() => {
+    if (followersCount !== undefined) {
+      setLocalFollowersCount(followersCount);
+    }
+  }, [followersCount]);
+
+  const handleToggleFollow = async () => {
+    const alreadyFollowing = isFollowing(artistData.id);
+    // Actualización optimista del contador
+    setLocalFollowersCount(prev => {
+      const current = prev ?? 0;
+      return alreadyFollowing ? Math.max(0, current - 1) : current + 1;
+    });
+    const ok = await toggleFollow(artistData.id);
+    if (!ok) {
+      // Revertir si falló
+      setLocalFollowersCount(prev => {
+        const current = prev ?? 0;
+        return alreadyFollowing ? current + 1 : Math.max(0, current - 1);
+      });
+    } else {
+      // Refrescar el conteo real desde el backend
+      await refreshFollowers();
+    }
+  };
+
   const formatEventDate = (dateString: string, timeString?: string) => {
-    const [year, month, day] = dateString.split('-');
-    const formattedDate = `${day}/${month}/${year}`;
-    return timeString ? `${formattedDate} • ${timeString}` : formattedDate;
+    if (!dateString) return '';
+    const d = new Date(dateString);
+    if (!isNaN(d.getTime())) {
+      const formatted = d.toLocaleDateString('es-MX');
+      return timeString ? `${formatted} • ${timeString}` : formatted;
+    }
+    return dateString;
   };
 
   const formatDate = (dateString: string) => {
-    const [year, month, day] = dateString.split('-');
-    return `${day}/${month}/${year}`;
+    if (!dateString) return '';
+    const d = new Date(dateString);
+    if (!isNaN(d.getTime())) return d.toLocaleDateString('es-MX');
+    return dateString;
   };
 
   // Mostrar el contador real de seguidores si está disponible
   const artistWithFollowers: ArtistData = {
     ...artistData,
-    followers: followersCount ?? artistData.followers,
+    followers: localFollowersCount ?? followersCount ?? artistData.followers,
   };
 
   const isSelf = user?.id === artistData.id;
@@ -168,7 +205,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
           {isAuth && !isSelf && (
             <div className="mt-2">
               <button
-                onClick={() => toggleFollow(artistData.id)}
+                onClick={handleToggleFollow}
                 disabled={followLoading}
                 className={`px-6 py-2 rounded-sm text-sm font-medium transition-all duration-200 ${
                   isFollowing(artistData.id)

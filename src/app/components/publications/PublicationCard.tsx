@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { FiHeart } from 'react-icons/fi';
 import { BsBookmark, BsBookmarkFill } from 'react-icons/bs';
 import { Publication } from '@/app/types';
@@ -9,7 +10,19 @@ interface PublicationCardProps {
   onLike: (id: string | number) => void;
   onSave: (id: string | number) => void;
   onClick?: (publication: Publication) => void;
-  formatDate: (date: string) => string;
+  formatDate?: (date: string) => string;
+}
+
+function safeFormatDate(date: string): string {
+  if (!date) return '';
+  // Si ya tiene formato dd/mm/yyyy retornar tal cual
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(date)) return date;
+  // Si es ISO o cualquier formato parseable por Date
+  const d = new Date(date);
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleDateString('es-ES');
+  }
+  return date;
 }
 
 export default function PublicationCard({
@@ -21,6 +34,8 @@ export default function PublicationCard({
   onClick,
   formatDate,
 }: PublicationCardProps) {
+  const displayDate = formatDate ? formatDate(publication.date) : safeFormatDate(publication.date);
+
   return (
     <div
       onClick={() => onClick?.(publication)}
@@ -37,7 +52,7 @@ export default function PublicationCard({
           <div className="flex-1">
             <div className="flex flex-col gap-1">
               <span className="text-white font-semibold text-base">{authorName}</span>
-              <span className="text-white text-xs">{formatDate(publication.date)}</span>
+              <span className="text-white text-xs">{displayDate}</span>
             </div>
           </div>
         </div>
@@ -48,10 +63,15 @@ export default function PublicationCard({
         </p>
 
         {publication.image && (
-          <div className="mb-3">
-            <div className="w-full h-40 bg-riff-header rounded-sm flex items-center justify-center">
-              <span className="text-riff-text-secondary text-sm">Imagen del evento</span>
-            </div>
+          <div className="mb-3 relative w-full h-48 rounded-sm overflow-hidden">
+            <Image
+              src={publication.image}
+              alt="Imagen de publicación"
+              fill
+              className="object-cover"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              unoptimized
+            />
           </div>
         )}
 
@@ -76,10 +96,10 @@ export default function PublicationCard({
             }}
             disabled={isSaving}
             className={`flex items-center gap-2 transition-all duration-200 ${
-              isSaving 
-                ? 'opacity-50 cursor-wait' 
-                : publication.isSaved 
-                  ? 'text-yellow-400 hover:text-yellow-300' 
+              isSaving
+                ? 'opacity-50 cursor-wait'
+                : publication.isSaved
+                  ? 'text-yellow-400 hover:text-yellow-300'
                   : 'text-riff-text-secondary hover:text-yellow-400'
             }`}
             title={publication.isSaved ? 'Quitar de guardados' : 'Guardar publicación'}

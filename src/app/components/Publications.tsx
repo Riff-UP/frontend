@@ -83,7 +83,12 @@ export default function Publications() {
 
   const confirmDelete = async () => {
     if (deleteConfirmId !== null) {
-      await deletePost(String(deleteConfirmId));
+      const id = String(deleteConfirmId);
+      if (!id || id === 'undefined' || id === 'null' || id === '') {
+        setDeleteConfirmId(null);
+        return;
+      }
+      await deletePost(id);
       setDeleteConfirmId(null);
     }
   };

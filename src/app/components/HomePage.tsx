@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { FiSearch, FiMusic, FiCalendar, FiMapPin, FiHeart } from 'react-icons/fi';
+import { FiSearch, FiMusic, FiCalendar, FiMapPin, FiHeart, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { AiFillHeart, AiOutlineHeart } from 'react-icons/ai';
 import { BsPeopleFill } from 'react-icons/bs';
 import { MdMusicNote } from 'react-icons/md';
@@ -75,8 +75,9 @@ export default function HomePage() {
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [activeTab, setActiveTab] = useState<'artistas' | 'publicaciones' | 'eventos'>('artistas');
   const [likingId, setLikingId] = useState<string | null>(null);
-  // Mapa extra para nombres de usuarios no artistas
   const [userNamesMap, setUserNamesMap] = useState<Map<string, string>>(new Map());
+  // Mapa de seguidores: artistId -> count
+  const [followersMap, setFollowersMap] = useState<Map<string, number>>(new Map());
 
   // Mapa de artistas para lookup rápido
   const artistMap = useMemo(() => {
@@ -198,10 +199,38 @@ export default function HomePage() {
     };
 
     fetchNames();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posts, events, artistMap, loadingPosts, loadingEvents, loadingArtists]);
 
   const filteredArtists = artists; // ya filtrado por useArtists
+
+  // Artistas que el usuario sigue
+  const followedArtists = useMemo(() =>
+    artists.filter(a => isFollowing(a.id)),
+    [artists, isFollowing]
+  );
+
+  // Cargar seguidores de cada artista
+  useEffect(() => {
+    if (artists.length === 0) return;
+    const fetchFollowers = async () => {
+      const entries: [string, number][] = [];
+      await Promise.allSettled(
+        artists.map(async (artist) => {
+          try {
+            const res = await fetch(`${API_URL}/follows?followingId=${artist.id}`, { headers: getAuthHeaders(false) });
+            if (!res.ok) return;
+            const data = await res.json();
+            const arr = Array.isArray(data) ? data : (data?.data ?? []);
+            entries.push([artist.id, arr.length]);
+          } catch { /* silencioso */ }
+        })
+      );
+      if (entries.length > 0) {
+        setFollowersMap(new Map(entries));
+      }
+    };
+    fetchFollowers();
+  }, [artists]);
 
   const handleLike = async (postId: string) => {
     if (!user) return;
@@ -287,31 +316,59 @@ export default function HomePage() {
 
         {/* ARTISTAS */}
         {activeTab === 'artistas' && (
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-white text-xl font-bold">
-                {search ? `Resultados para "${search}"` : 'Artistas destacados'}
-              </h2>
-              <span className="text-white/50 text-sm">{filteredArtists.length} artistas</span>
-            </div>
-
-            {loadingArtists ? (
-              <ArtistsSkeleton />
-            ) : filteredArtists.length === 0 ? (
-              <EmptyState icon={<BsPeopleFill className="w-12 h-12" />} message="No se encontraron artistas" />
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredArtists.map(artist => (
-                  <ArtistCard
-                    key={artist.id}
-                    artist={artist}
-                    isFollowing={isFollowing(artist.id)}
-                    isLoggedIn={!!user}
-                    isSelf={user?.id === artist.id}
-                    onToggleFollow={() => toggleFollow(artist.id)}
-                  />
-                ))}
+          <div className="space-y-10">
+            {/* Buscador resultado */}
+            {search && (
+              <div>
+                <h2 className="text-white text-xl font-bold mb-4">
+                  Resultados para &ldquo;{search}&rdquo;
+                </h2>
+                {loadingArtists ? <ArtistsSkeleton /> : filteredArtists.length === 0 ? (
+                  <EmptyState icon={<BsPeopleFill className="w-12 h-12" />} message="No se encontraron artistas" />
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredArtists.map(artist => (
+                      <ArtistCard
+                        key={artist.id}
+                        artist={artist}
+                        followersCount={followersMap.get(artist.id) ?? 0}
+                        isFollowing={isFollowing(artist.id)}
+                        isLoggedIn={!!user}
+                        isSelf={user?.id === artist.id}
+                        onToggleFollow={() => toggleFollow(artist.id)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
+            )}
+
+            {/* Artistas Destacados */}
+            {!search && (
+              <ArtistScrollSection
+                title="Artistas Destacados"
+                artists={filteredArtists}
+                followersMap={followersMap}
+                isFollowing={isFollowing}
+                isLoggedIn={!!user}
+                currentUserId={user?.id}
+                onToggleFollow={toggleFollow}
+                loading={loadingArtists}
+              />
+            )}
+
+            {/* Tus artistas (seguidos) */}
+            {!search && user && followedArtists.length > 0 && (
+              <ArtistScrollSection
+                title="Tus artistas"
+                artists={followedArtists}
+                followersMap={followersMap}
+                isFollowing={isFollowing}
+                isLoggedIn={!!user}
+                currentUserId={user?.id}
+                onToggleFollow={toggleFollow}
+                loading={false}
+              />
             )}
           </div>
         )}
@@ -364,34 +421,112 @@ export default function HomePage() {
 
 /* ── Sub-componentes ── */
 
-function ArtistCard({
-  artist, isFollowing, isLoggedIn, isSelf, onToggleFollow,
+function ArtistScrollSection({
+  title, artists, followersMap, isFollowing, isLoggedIn, currentUserId, onToggleFollow, loading,
 }: {
-  artist: { id: string; name: string; biography?: string | null };
-  isFollowing: boolean; isLoggedIn: boolean; isSelf: boolean;
-  onToggleFollow: () => void;
+  title: string;
+  artists: { id: string; name: string; biography?: string | null; profileImage?: string | null }[];
+  followersMap: Map<string, number>;
+  isFollowing: (id: string) => boolean;
+  isLoggedIn: boolean;
+  currentUserId?: string;
+  onToggleFollow: (id: string) => void;
+  loading: boolean;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (dir: 'left' | 'right') => {
+    if (!scrollRef.current) return;
+    scrollRef.current.scrollBy({ left: dir === 'left' ? -320 : 320, behavior: 'smooth' });
+  };
+
   return (
-    <div className="bg-riff-header rounded-sm p-4 flex flex-col gap-3 border border-white/5 hover:border-riff-primary/30 transition-all">
-      <div className="flex items-center gap-3">
-        <Link href={`/artist/${artist.id}`} className="flex-shrink-0">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-riff-primary-dark to-riff-primary flex items-center justify-center">
-            <span className="text-white text-lg font-bold">{artist.name.charAt(0).toUpperCase()}</span>
-          </div>
-        </Link>
-        <div className="flex-1 min-w-0">
-          <Link href={`/artist/${artist.id}`}>
-            <h3 className="text-white font-semibold text-sm truncate hover:text-riff-primary transition-colors">
-              {artist.name}
-            </h3>
-          </Link>
-          {artist.biography && (
-            <p className="text-white/50 text-xs line-clamp-1 mt-0.5">{artist.biography}</p>
-          )}
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-white text-xl font-bold">{title}</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => scroll('left')}
+            className="w-8 h-8 rounded-full border border-riff-primary text-riff-primary flex items-center justify-center hover:bg-riff-primary/10 transition-all"
+          >
+            <FiChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => scroll('right')}
+            className="w-8 h-8 rounded-full border border-riff-primary text-riff-primary flex items-center justify-center hover:bg-riff-primary/10 transition-all"
+          >
+            <FiChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
-      <div className="flex gap-2">
+      {loading ? (
+        <ArtistsSkeleton />
+      ) : artists.length === 0 ? (
+        <EmptyState icon={<BsPeopleFill className="w-12 h-12" />} message="No se encontraron artistas" />
+      ) : (
+        <div
+          ref={scrollRef}
+          className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {artists.map(artist => (
+            <ArtistCard
+              key={artist.id}
+              artist={artist}
+              followersCount={followersMap.get(artist.id) ?? 0}
+              isFollowing={isFollowing(artist.id)}
+              isLoggedIn={isLoggedIn}
+              isSelf={currentUserId === artist.id}
+              onToggleFollow={() => onToggleFollow(artist.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ArtistCard({
+  artist, followersCount, isFollowing, isLoggedIn, isSelf, onToggleFollow,
+}: {
+  artist: { id: string; name: string; biography?: string | null; profileImage?: string | null };
+  followersCount: number;
+  isFollowing: boolean;
+  isLoggedIn: boolean;
+  isSelf: boolean;
+  onToggleFollow: () => void;
+}) {
+  const initial = artist.name.charAt(0).toUpperCase();
+
+  return (
+    <div className="bg-riff-header rounded-sm border border-white/5 hover:border-riff-primary/30 transition-all flex-shrink-0 w-64 p-4 flex flex-col gap-3">
+      {/* Avatar + nombre + seguidores */}
+      <Link href={`/artist/${artist.id}`} className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-riff-primary-dark to-riff-primary flex items-center justify-center">
+          {artist.profileImage ? (
+            <Image src={artist.profileImage} alt={artist.name} width={48} height={48} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-white text-lg font-bold">{initial}</span>
+          )}
+        </div>
+        <div className="min-w-0">
+          <h3 className="text-white font-semibold text-sm truncate hover:text-riff-primary transition-colors">
+            {artist.name}
+          </h3>
+          <p className="text-white/50 text-xs">
+            {followersCount.toLocaleString()} {followersCount === 1 ? 'seguidor' : 'seguidores'}
+          </p>
+        </div>
+      </Link>
+
+      {/* Biografía */}
+      {artist.biography && (
+        <p className="text-white/50 text-xs line-clamp-2 leading-relaxed">{artist.biography}</p>
+      )}
+
+      {/* Botones */}
+      <div className="flex gap-2 mt-auto">
         <Link
           href={`/artist/${artist.id}`}
           className="flex-1 text-center py-1.5 text-xs font-medium text-white/70 border border-white/20 rounded-sm hover:border-riff-primary/50 hover:text-white transition-all"

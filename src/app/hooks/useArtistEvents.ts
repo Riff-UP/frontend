@@ -6,6 +6,8 @@ import { API_BASE_URL, getAuthHeaders } from '../config/api';
 
 interface EventFromBackend {
   _id: string;
+  sql_user_id?: string;
+  organizerId?: string;
   title: string;
   description?: string;
   event_date: string;
@@ -26,8 +28,7 @@ export function useArtistEvents(artistId: string) {
       setLoading(true);
       setError(null);
 
-      // Filtrar por organizerId directamente en el backend
-      const res = await fetch(`${API_URL}/events?organizerId=${artistId}`, {
+      const res = await fetch(`${API_URL}/events`, {
         headers: getAuthHeaders(false),
       });
 
@@ -36,17 +37,19 @@ export function useArtistEvents(artistId: string) {
       const data = await res.json();
       const rawEvents: EventFromBackend[] = data.data || data || [];
 
-      const mapped: Event[] = rawEvents.map(e => {
-        const dateTime = new Date(e.event_date);
-        return {
-          id: e._id,
-          title: e.title,
-          location: e.location,
-          date: e.event_date.split('T')[0],
-          time: dateTime.toTimeString().slice(0, 5),
-          description: e.description,
-        };
-      });
+      const mapped: Event[] = rawEvents
+        .filter(e => String(e.sql_user_id ?? e.organizerId ?? '') === artistId)
+        .map(e => {
+          const dateTime = new Date(e.event_date);
+          return {
+            id: e._id,
+            title: e.title,
+            location: e.location,
+            date: e.event_date.split('T')[0],
+            time: dateTime.toTimeString().slice(0, 5),
+            description: e.description,
+          };
+        });
 
       setEvents(mapped);
     } catch (err) {

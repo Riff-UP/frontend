@@ -6,6 +6,9 @@ import { ProfileData } from '@/app/types';
 import SocialMediaInput from './profile/SocialMediaInput';
 import ProfileFromToken from './profile/ProfileFromToken';
 import { useUser } from '../hooks/useUser';
+import { API_BASE_URL, getAuthHeaders } from '../config/api';
+
+const API_URL = API_BASE_URL;
 
 export default function ProfileEdit() {
   const { user, loading, error, updateUser, deleteAccount, setPassword, addSocialMedia, updateSocialMedia, removeSocialMedia } = useUser();
@@ -74,6 +77,26 @@ export default function ProfileEdit() {
       setSocialMediaIds(idsMap);
     }
   }, [user]);
+
+  // Cargar conteo real de seguidores desde el backend
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchFollowers = async () => {
+      try {
+        const res = await fetch(`${API_URL}/follows?followedId=${user.id}`, {
+          headers: getAuthHeaders(),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const arr = Array.isArray(data) ? data : (data?.data ?? []);
+        setProfileData(prev => ({ ...prev, followers: arr.length }));
+      } catch { /* silencioso */ }
+    };
+    fetchFollowers();
+    // Refrescar cada 30 segundos para captar nuevos seguidores
+    const interval = setInterval(fetchFollowers, 30000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   const handleChange = (field: keyof ProfileData, value: string | number) => {
     setProfileData(prev => ({ ...prev, [field]: value }));

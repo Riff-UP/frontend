@@ -53,6 +53,7 @@ export default function ArtistPage() {
         }
 
         const data = await res.json();
+        console.log('🎨 Artista raw del backend:', data);
         setArtist(data);
       } catch {
         setError('Error de conexión');

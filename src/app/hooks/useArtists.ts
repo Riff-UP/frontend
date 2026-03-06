@@ -10,6 +10,8 @@ export interface ArtistData {
   role: 'ARTIST';
   status: boolean;
   createdAt: string;
+  profileImage?: string | null;
+  followersCount?: number;
   socialMedia?: { id: string; url: string }[];
 }
 
@@ -59,6 +61,9 @@ export function useArtists(): UseArtistsReturn {
       }
 
       setArtists(artistsList);
+      if (artistsList.length > 0) {
+        console.log('🎨 Primer artista de la lista:', artistsList[0]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {

@@ -31,6 +31,8 @@ export interface LoginData {
 
 export interface ArtistData {
   id: string;
+  userId?: string;       // ID alternativo que puede usar el backend
+  sqlUserId?: string;    // sql_user_id del backend
   name: string;
   biography?: string | null;
   role: 'USER' | 'ARTIST';

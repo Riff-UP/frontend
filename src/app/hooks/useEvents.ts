@@ -87,7 +87,8 @@ export function useEvents(userId?: string): UseEventsReturn {
     } finally {
       setLoading(false);
     }
-  }, [userId]); 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const createEvent = async (data: CreateEventData): Promise<EventData | null> => {
     const token = getToken();
