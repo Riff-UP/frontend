@@ -157,36 +157,6 @@ function HomeContent() {
         >
           <div className="absolute inset-0 bg-black/55" />
 
-          {heroPublications.length > 0 && (
-            <div className="absolute inset-y-0 right-0 z-0 hidden sm:flex items-center pr-4 md:pr-8 lg:pr-10 pointer-events-none">
-              <div className="grid grid-cols-2 gap-3 md:gap-4 w-[240px] md:w-[320px] lg:w-[420px] opacity-95">
-                {heroPublications.map((publication, index) => (
-                  <div
-                    key={publication.id}
-                    className={`relative overflow-hidden rounded-2xl border border-white/15 shadow-2xl ${index % 2 === 0 ? "translate-y-4" : "-translate-y-4"}`}
-                  >
-                    <div
-                      className="h-28 md:h-36 lg:h-44 bg-cover bg-center scale-105"
-                      style={{ backgroundImage: `url(${publication.imageUrl})` }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                    <div className="absolute inset-x-0 bottom-0 p-3">
-                      <p className="text-[10px] md:text-xs font-semibold uppercase tracking-[0.2em] text-riff-primary/90">
-                        Publicación
-                      </p>
-                      <p className="text-white text-xs md:text-sm font-semibold line-clamp-1">
-                        {publication.authorName}
-                      </p>
-                      <p className="text-white/80 text-[11px] md:text-xs line-clamp-2">
-                        {publication.caption}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="relative z-10 h-full flex items-start pt-4 sm:pt-8 lg:pt-2 px-4 sm:px-8 md:px-12 lg:px-6">
             <div className="max-w-xl lg:max-w-2xl">
               <h1
@@ -195,11 +165,6 @@ function HomeContent() {
               >
                 Con Riff, impulsa tu musica al siguiente nivel
               </h1>
-              {heroPublications.length > 0 && (
-                <p className="hidden sm:block mt-4 max-w-md text-sm md:text-base text-white/85">
-                  Descubre lo más reciente de la comunidad con publicaciones visuales de artistas destacando ahora mismo.
-                </p>
-              )}
             </div>
           </div>
         </section>
