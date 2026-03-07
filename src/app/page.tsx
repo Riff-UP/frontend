@@ -212,8 +212,7 @@ function HomeContent() {
               {artists.map((artist: ArtistData) => (
                 <div
                   key={artist.id}
-                  className="w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)] xl:w-[calc(25%-12px)] flex-shrink-0"
-                >
+                  className="w-full sm:w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)] xl:w-[calc(25%-12px)] flex-shrink-0"                >
                   <ArtistCard
                     id={artist.id}
                     name={artist.name}
