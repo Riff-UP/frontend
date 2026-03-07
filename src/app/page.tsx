@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Header from "@/app/components/layout/Header";
 import Footer from "@/app/components/layout/Footer";
@@ -61,6 +61,14 @@ function HomeContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [heroPosts, setHeroPosts] = useState<RawPost[]>([]);
   const { artists, loading, setSearch } = useArtists();
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  const scrollCarousel = (dir: 'left' | 'right') => {
+    if (!carouselRef.current) return;
+    const card = carouselRef.current.querySelector('article') as HTMLElement | null;
+    const cardWidth = card ? card.offsetWidth + 16 : 280;
+    carouselRef.current.scrollBy({ left: dir === 'right' ? cardWidth : -cardWidth, behavior: 'smooth' });
+  };
 
   const heroPublications = useMemo<HeroPublication[]>(() => {
     const artistNameMap = new Map(artists.map((artist) => [artist.id, artist.name]));
@@ -176,10 +184,10 @@ function HomeContent() {
               {searchQuery ? `Resultados para "${searchQuery}"` : 'Artistas destacados'}
             </h2>
             <div className="flex gap-2">
-              <button className="w-8 h-8 sm:w-10 sm:h-10 rounded-full items-center justify-center group">
+              <button onClick={() => scrollCarousel('left')} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group">
                 <FaCircleChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-riff-primary group-hover:text-riff-primary-dark transition-colors" />
               </button>
-              <button className="w-8 h-8 sm:w-10 sm:h-10 rounded-full items-center justify-center group">
+              <button onClick={() => scrollCarousel('right')} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group">
                 <FaCircleChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-riff-primary group-hover:text-riff-primary-dark transition-colors" />
               </button>
             </div>
@@ -197,16 +205,23 @@ function HomeContent() {
               {searchQuery ? 'No se encontraron artistas con ese nombre.' : 'Aún no hay artistas registrados.'}
             </p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 px-4 sm:px-0">
+            <div
+              ref={carouselRef}
+              className="flex gap-4 overflow-x-hidden scroll-smooth px-4 sm:px-0"
+            >
               {artists.map((artist: ArtistData) => (
-                <ArtistCard
+                <div
                   key={artist.id}
-                  id={artist.id}
-                  name={artist.name}
-                  image={artist.profileImage ?? undefined}
-                  followers={artist.followersCount ?? 0}
-                  description={artist.biography ?? undefined}
-                />
+                  className="w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)] xl:w-[calc(25%-12px)] flex-shrink-0"
+                >
+                  <ArtistCard
+                    id={artist.id}
+                    name={artist.name}
+                    image={artist.profileImage ?? undefined}
+                    followers={artist.followersCount ?? 0}
+                    description={artist.biography ?? undefined}
+                  />
+                </div>
               ))}
             </div>
           )}

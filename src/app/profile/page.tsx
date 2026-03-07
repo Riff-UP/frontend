@@ -33,7 +33,7 @@ function ProfilePageContent({ activeSection, setActiveSection }: { activeSection
       <MobileNav activeSection={activeSection} onSectionChange={setActiveSection} />
       <div className="flex flex-1 gap-8 sm:gap-12 lg:gap-16 p-4 sm:p-6 lg:p-8">
         <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
-        <main className="flex-1 min-w-0 pr-4 sm:pr-8 lg:pr-12">
+        <main className="flex-1 min-w-0">
           {renderContent()}
         </main>
       </div>
