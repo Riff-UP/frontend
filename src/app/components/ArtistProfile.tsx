@@ -262,14 +262,16 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
           <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 mb-4">
             <ArtistInfo artist={artistWithFollowers} />
           </div>
+        </div>
 
-          {/* Botón seguir — solo si no es el propio perfil y está autenticado */}
+        <div className="absolute bottom-0 left-0 right-0 px-2 sm:px-4 lg:px-8 z-20">
+          {/* Botón seguir — encima de los tabs para evitar sobreposición */}
           {isAuth && !isSelf && (
-            <div className="mt-2">
+            <div className="pb-2 px-1 sm:px-2">
               <button
                 onClick={handleToggleFollow}
                 disabled={followLoading}
-                className={`px-6 py-2 rounded-sm text-sm font-medium transition-all duration-200 ${
+                className={`px-6 py-1.5 rounded-sm text-sm font-medium transition-all duration-200 ${
                   isFollowing(artistData.id)
                     ? 'bg-white/10 text-white border border-white/20 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/30'
                     : 'bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white hover:opacity-90'
@@ -279,9 +281,6 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
               </button>
             </div>
           )}
-        </div>
-
-        <div className="absolute bottom-0 left-0 right-0 px-2 sm:px-4 lg:px-8 z-20">
           <div className="flex justify-start space-x-2 sm:space-x-4 overflow-x-auto scrollbar-hide">
             {tabs.map(tab => (
               <button

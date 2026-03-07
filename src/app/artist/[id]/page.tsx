@@ -53,6 +53,10 @@ export default function ArtistPage() {
         }
 
         const data = await res.json();
+        // Normalizar socialMedia: puede venir como snake_case desde el backend
+        if (!data.socialMedia && data.social_media) {
+          data.socialMedia = data.social_media;
+        }
         setArtist(data);
       } catch {
         setError('Error de conexión');
