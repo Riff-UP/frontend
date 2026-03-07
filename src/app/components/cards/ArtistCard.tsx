@@ -21,47 +21,38 @@ export default function ArtistCard({ id, name, image, followers = 0, description
 
   return (
     <Link href={`/artist/${id}`} className="group h-full">
-      <article className="h-full rounded-xl bg-riff-card p-4 sm:p-5 transition-all duration-300 hover:bg-riff-border hover:-translate-y-1">
-        <div className="flex h-full flex-col gap-4">
+      <article className="h-full rounded-sm bg-riff-card p-4 sm:p-5 transition-all duration-300 hover:bg-riff-border hover:-translate-y-1">
+        <div className="flex h-full flex-col gap-3">
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="relative flex h-16 w-16 sm:h-20 sm:w-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-riff-primary/20 ring-1 ring-white/10">
+            <div className="relative flex h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-riff-primary/20 ring-1 ring-white/10">
               {hasValidImage ? (
                 <Image
                   src={image!}
                   alt={name}
                   fill
                   className="object-cover transition-transform duration-300 group-hover:scale-110"
-                  sizes="(max-width: 640px) 64px, 80px"
+                  sizes="(max-width: 640px) 56px, 64px"
                 />
               ) : (
-                <span className="text-2xl sm:text-3xl font-bold text-riff-primary select-none">
+                <span className="text-2xl font-bold text-riff-primary select-none">
                   {name.charAt(0).toUpperCase()}
                 </span>
               )}
             </div>
 
             <div className="min-w-0 flex-1">
-              <h3 className="text-lg sm:text-xl font-semibold text-white transition-colors group-hover:text-riff-primary line-clamp-2">
+              <h3 className="text-base sm:text-lg font-bold text-white transition-colors group-hover:text-riff-primary line-clamp-1">
                 {name}
               </h3>
-              <p className="mt-1 text-xs sm:text-sm text-white/50">
-                Perfil de artista
+              <p className="text-sm text-white/60 mt-0.5">
+                {formatFollowers(followers)} seguidores
               </p>
             </div>
           </div>
 
-          <p className="flex-1 text-sm leading-6 text-white/75 line-clamp-4 min-h-[96px]">
+          <p className="text-sm leading-6 text-white/75 line-clamp-3">
             {biography}
           </p>
-
-          <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-2.5">
-            <span className="text-xs uppercase tracking-[0.18em] text-white/45">
-              Seguidores
-            </span>
-            <span className="text-sm sm:text-base font-semibold text-white">
-              {formatFollowers(followers)}
-            </span>
-          </div>
         </div>
       </article>
     </Link>
