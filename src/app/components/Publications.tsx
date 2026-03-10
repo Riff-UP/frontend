@@ -12,7 +12,7 @@ import { usePostReactions } from '../hooks/usePostReactions';
 
 export default function Publications() {
   const { user } = useUser();
-  const { posts, uploading, createPost, updatePost, deletePost, fetchPosts } = usePosts(user?.id);
+  const { posts, uploading, error, createPost, updatePost, deletePost, fetchPosts } = usePosts(user?.id);
   const { savedPosts, savePost, unsavePost, isPostSaved } = useSavedPostsContext();
   const { isLiked, toggleLike, processingPostId: likingPostId, reactedPosts, postReactionCounts, fetchPostReactionCounts, getReactionCount } = usePostReactions(user?.id);
 
@@ -211,6 +211,12 @@ export default function Publications() {
           onCancel={handleCancel}
           isUploading={uploading}
         />
+
+        {error && (
+          <div className="w-full lg:max-w-2xl mb-4 rounded-sm border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+            {error}
+          </div>
+        )}
 
         <div className="w-full lg:max-w-2xl">
           <div className="space-y-4">

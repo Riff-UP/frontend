@@ -3,6 +3,8 @@
  * Usa la API S3-compatible de R2 con CORS habilitado
  */
 
+const UPLOAD_TIMEOUT_MS = 20_000;
+
 /**
  * Genera un nombre de archivo único
  */
@@ -11,6 +13,29 @@ function generateUniqueFilename(originalName: string): string {
   const randomString = Math.random().toString(36).substring(2, 15);
   const extension = originalName.split('.').pop();
   return `${timestamp}-${randomString}.${extension}`;
+}
+
+/**
+ * Función auxiliar para fetch con timeout
+ */
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = UPLOAD_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('La subida de la imagen tardó demasiado. Intenta de nuevo.');
+    }
+
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 /**
@@ -40,7 +65,7 @@ export async function uploadToR2(file: File): Promise<string> {
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`/api/upload/r2`, {
+  const response = await fetchWithTimeout('/api/upload/r2', {
     method: 'POST',
     headers,
     body: formData,

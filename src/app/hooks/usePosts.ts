@@ -3,6 +3,7 @@ import { validateImageFile, uploadToR2 } from '../utils/r2Storage';
 import { API_BASE_URL, getAuthHeaders } from '../config/api';
 
 const API_URL = API_BASE_URL;
+const POST_REQUEST_TIMEOUT_MS = 20_000;
 
 // Extrae el id string de un objeto devuelto por el backend.
 // El backend puede devolver { id }, { _id } o { _id: { $oid } } (sin procesar de Mongo).
@@ -44,6 +45,41 @@ export interface CreatePostData {
   content: string;
   imageFile?: File;
   tags?: string[];
+}
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = POST_REQUEST_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('La solicitud tardó demasiado. Verifica tu conexión e inténtalo de nuevo.');
+    }
+
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+async function extractErrorMessage(response: Response): Promise<string> {
+  const rawText = await response.text();
+
+  if (!rawText) {
+    return `Error ${response.status}: ${response.statusText}`;
+  }
+
+  try {
+    const data = JSON.parse(rawText) as { message?: string; error?: string };
+    return data.message || data.error || rawText;
+  } catch {
+    return rawText;
+  }
 }
 
 export function usePosts(userId?: string) {
@@ -162,17 +198,20 @@ export function usePosts(userId?: string) {
       }
 
       // Obtener token JWT del localStorage
-      const token = localStorage.getItem('token');
+      const token = getToken();
+      if (!token) {
+        throw new Error('Tu sesión expiró. Vuelve a iniciar sesión para publicar.');
+      }
 
-      let response = await fetch(`${API_URL}/posts`, {
+      let response = await fetchWithTimeout(`${API_URL}/posts`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: formData,
       });
 
-      // Si la respuesta indica que el endpoint no soporta multipart o retorno 404, intentamos fallback
+      // Si la respuesta indica que el endpoint no soporta multipart o retornó 404, intentamos fallback
       if (!response.ok && (response.status === 404 || response.status === 415 || response.status === 400)) {
         // Si hay imagen, subir a R2 primero
         let mediaUrl: string | undefined;
@@ -182,39 +221,29 @@ export function usePosts(userId?: string) {
 
         // Enviar post como JSON con la URL de la imagen
         const payload: Record<string, unknown> = {
-           sql_user_id: userId,
-           type: 'image',
-           title: titleValue,
-           description: descriptionValue,
-         };
-         if (mediaUrl) payload.mediaUrl = mediaUrl;
+          sql_user_id: userId,
+          type: 'image',
+          title: titleValue,
+          description: descriptionValue,
+        };
+        if (mediaUrl) payload.mediaUrl = mediaUrl;
 
-        response = await fetch(`${API_URL}/posts`, {
+        response = await fetchWithTimeout(`${API_URL}/posts`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(payload),
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || `Error ${response.status}`);
+          throw new Error(await extractErrorMessage(response));
         }
       }
 
       if (!response.ok) {
-        const errorText = await response.text();
-
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          errorData = { message: errorText };
-        }
-
-        throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
+        throw new Error(await extractErrorMessage(response));
       }
 
       const newPost = await response.json();

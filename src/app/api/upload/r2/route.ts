@@ -1,20 +1,23 @@
 import { NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
-function getEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Falta variable de entorno: ${name}`);
+function getEnv(...names: string[]): string {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value) {
+      return value;
+    }
   }
-  return value;
+
+  throw new Error(`Falta variable de entorno: ${names.join(' o ')}`);
 }
 
 function getR2Config() {
-  const endpoint = getEnv('R2_ENDPOINT');
-  const accessKeyId = getEnv('R2_ACCESS_KEY_ID');
-  const secretAccessKey = getEnv('R2_SECRET_ACCESS_KEY');
-  const bucket = getEnv('R2_BUCKET');
-  const publicUrl = getEnv('R2_PUBLIC_URL');
+  const endpoint = getEnv('R2_ENDPOINT', 'NEXT_PUBLIC_R2_ENDPOINT');
+  const accessKeyId = getEnv('R2_ACCESS_KEY_ID', 'NEXT_PUBLIC_R2_ACCESS_KEY');
+  const secretAccessKey = getEnv('R2_SECRET_ACCESS_KEY', 'NEXT_PUBLIC_R2_SECRET_KEY');
+  const bucket = getEnv('R2_BUCKET', 'NEXT_PUBLIC_R2_BUCKET');
+  const publicUrl = getEnv('R2_PUBLIC_URL', 'NEXT_PUBLIC_R2_PUBLIC_URL');
 
   const client = new S3Client({
     region: 'auto',
@@ -62,6 +65,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url });
   } catch (err) {
-    return NextResponse.json({ message: 'Error al subir archivo', error: String(err) }, { status: 500 });
+    const message = err instanceof Error ? err.message : 'Error al subir archivo';
+    const status = message.includes('Falta variable de entorno') ? 500 : 500;
+
+    return NextResponse.json({ message, error: String(err) }, { status });
   }
 }
