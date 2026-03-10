@@ -8,17 +8,17 @@ import { BiImages } from "react-icons/bi";
 import { MdOutlineLibraryMusic, MdOutlineQueryStats } from "react-icons/md";
 import { IoIosLogOut, IoIosCalendar } from "react-icons/io";
 import { useLogout } from '@/app/hooks/useLogout';
-import { useUser } from '@/app/hooks/useUser';
+import type { UserData } from '@/app/hooks/useUser';
 
 interface SidebarProps {
   activeSection?: string;
   onSectionChange?: (section: string) => void;
+  user?: UserData | null;
 }
 
-export default function Sidebar({ activeSection = 'perfil', onSectionChange }: SidebarProps) {
+export default function Sidebar({ activeSection = 'perfil', onSectionChange, user }: SidebarProps) {
   const [active, setActive] = useState(activeSection);
   const { handleLogout } = useLogout();
-  const { user } = useUser();
 
   const handleSectionChange = (section: string) => {
     setActive(section);

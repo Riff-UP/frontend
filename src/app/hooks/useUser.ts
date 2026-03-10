@@ -6,6 +6,7 @@ import { getValidToken, getUserFromToken } from '../utils/jwt';
 import { API_BASE_URL } from '../config/api';
 
 const API_URL = API_BASE_URL;
+const REQUEST_TIMEOUT_MS = 12000;
 
 export interface SocialMedia {
   id: string;
@@ -28,7 +29,7 @@ export interface UserData {
   socialMedia?: SocialMedia[];
 }
 
-interface UseUserReturn {
+export interface UseUserReturn {
   user: UserData | null;
   loading: boolean;
   error: string | null;
@@ -51,6 +52,37 @@ export function useUser(): UseUserReturn {
     return getValidToken(); // Usa la utilidad que valida expiración
   };
 
+  const fetchWithTimeout = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      return await fetch(input, { ...init, signal: controller.signal });
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  }, []);
+
+  const getErrorMessage = useCallback(async (response: Response, fallback: string) => {
+    try {
+      const payload = await response.json();
+      if (Array.isArray(payload?.message)) {
+        return payload.message.join(', ');
+      }
+      return payload?.message || fallback;
+    } catch {
+      return fallback;
+    }
+  }, []);
+
+  const redirectToLogin = useCallback((message: string) => {
+    localStorage.removeItem('token');
+    setUser(null);
+    setError(message);
+    setLoading(false);
+    router.replace('/login');
+  }, [router]);
+
   const fetchUser = useCallback(async () => {
     const token = getToken();
     
@@ -66,6 +98,7 @@ export function useUser(): UseUserReturn {
       setUser(null);
       setLoading(false);
       setError('Token inválido');
+      localStorage.removeItem('token');
       return;
     }
 
@@ -73,7 +106,7 @@ export function useUser(): UseUserReturn {
       setLoading(true);
       setError(null);
 
-      const res = await fetch(`${API_URL}/users/me`, {
+      const res = await fetchWithTimeout(`${API_URL}/users/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -81,14 +114,13 @@ export function useUser(): UseUserReturn {
       });
 
       if (res.status === 401) {
-        localStorage.removeItem('token');
-        router.push('/login');
+        redirectToLogin('Tu sesión expiró. Inicia sesión de nuevo.');
         return;
       }
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        setError(errorData.message || 'Error al obtener usuario');
+        const message = await getErrorMessage(res, 'Error al obtener usuario');
+        setError(message);
         setUser(null);
         return;
       }
@@ -99,7 +131,7 @@ export function useUser(): UseUserReturn {
       try {
         let smData: SocialMediaResponse = null;
         try {
-          const smQueryRes = await fetch(`${API_URL}/social-media?userId=${userId}`, {
+          const smQueryRes = await fetchWithTimeout(`${API_URL}/social-media?userId=${userId}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -108,7 +140,7 @@ export function useUser(): UseUserReturn {
           if (smQueryRes.ok) {
             smData = await smQueryRes.json();
           } else {
-            const smRes = await fetch(`${API_URL}/social-media/user/${userId}`, {
+            const smRes = await fetchWithTimeout(`${API_URL}/social-media/user/${userId}`, {
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -120,7 +152,7 @@ export function useUser(): UseUserReturn {
           }
         } catch {
           try {
-            const smRes = await fetch(`${API_URL}/social-media/user/${userId}`, {
+            const smRes = await fetchWithTimeout(`${API_URL}/social-media/user/${userId}`, {
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -143,11 +175,16 @@ export function useUser(): UseUserReturn {
 
       setUser(userData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('La consulta del perfil tardó demasiado. Intenta de nuevo en unos segundos.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Error desconocido');
+      }
+      setUser(null);
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [fetchWithTimeout, getErrorMessage, redirectToLogin]);
 
   const updateUser = async (data: Partial<UserData>): Promise<boolean> => {
     const token = getToken();
@@ -160,7 +197,7 @@ export function useUser(): UseUserReturn {
     try {
       setError(null);
 
-      const res = await fetch(`${API_URL}/users/me`, {
+      const res = await fetchWithTimeout(`${API_URL}/users/me`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -170,14 +207,13 @@ export function useUser(): UseUserReturn {
       });
 
       if (res.status === 401) {
-        localStorage.removeItem('token');
-        router.push('/login');
+        redirectToLogin('Tu sesión expiró. Inicia sesión de nuevo.');
         return false;
       }
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        setError(errorData.message || 'Error al actualizar');
+        const message = await getErrorMessage(res, 'Error al actualizar');
+        setError(message);
         return false;
       }
 
@@ -186,7 +222,11 @@ export function useUser(): UseUserReturn {
       window.dispatchEvent(new Event('authChange'));
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al actualizar');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('La actualización tardó demasiado. Intenta nuevamente.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Error al actualizar');
+      }
       return false;
     }
   };
@@ -202,7 +242,7 @@ export function useUser(): UseUserReturn {
     try {
       setError(null);
 
-      const res = await fetch(`${API_URL}/users/${user.id}`, {
+      const res = await fetchWithTimeout(`${API_URL}/users/${user.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -220,7 +260,11 @@ export function useUser(): UseUserReturn {
       router.push('/login');
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al eliminar cuenta');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('La eliminación tardó demasiado. Intenta nuevamente.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Error al eliminar cuenta');
+      }
       return false;
     }
   };
@@ -236,7 +280,7 @@ export function useUser(): UseUserReturn {
     try {
       setError(null);
 
-      const res = await fetch(`${API_URL}/users/${user.id}/password`, {
+      const res = await fetchWithTimeout(`${API_URL}/users/${user.id}/password`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -246,20 +290,23 @@ export function useUser(): UseUserReturn {
       });
 
       if (res.status === 401) {
-        localStorage.removeItem('token');
-        router.push('/login');
+        redirectToLogin('Tu sesión expiró. Inicia sesión de nuevo.');
         return false;
       }
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        setError(errorData.message || 'Error al establecer contraseña');
+        const message = await getErrorMessage(res, 'Error al establecer contraseña');
+        setError(message);
         return false;
       }
 
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al establecer contraseña');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('La operación tardó demasiado. Intenta nuevamente.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Error al establecer contraseña');
+      }
       return false;
     }
   };
@@ -277,7 +324,7 @@ export function useUser(): UseUserReturn {
 
       const payload = { userId: user.id, url };
 
-      const res = await fetch(`${API_URL}/social-media`, {
+      const res = await fetchWithTimeout(`${API_URL}/social-media`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -287,8 +334,7 @@ export function useUser(): UseUserReturn {
       });
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        const msg = Array.isArray(errorData?.message) ? errorData.message.join(', ') : (errorData?.message || 'Error al agregar red social');
+        const msg = await getErrorMessage(res, 'Error al agregar red social');
         setError(msg);
         return null;
       }
@@ -302,7 +348,11 @@ export function useUser(): UseUserReturn {
 
       return newSocialMedia;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al agregar red social');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('La operación tardó demasiado. Intenta nuevamente.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Error al agregar red social');
+      }
       return null;
     }
   };
@@ -318,7 +368,7 @@ export function useUser(): UseUserReturn {
     try {
       setError(null);
 
-      const res = await fetch(`${API_URL}/social-media/${id}`, {
+      const res = await fetchWithTimeout(`${API_URL}/social-media/${id}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -328,8 +378,7 @@ export function useUser(): UseUserReturn {
       });
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        const msg = Array.isArray(errorData?.message) ? errorData.message.join(', ') : (errorData?.message || 'Error al actualizar red social');
+        const msg = await getErrorMessage(res, 'Error al actualizar red social');
         setError(msg);
         return false;
       }
@@ -341,7 +390,11 @@ export function useUser(): UseUserReturn {
 
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al actualizar red social');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('La operación tardó demasiado. Intenta nuevamente.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Error al actualizar red social');
+      }
       return false;
     }
   };
@@ -357,7 +410,7 @@ export function useUser(): UseUserReturn {
     try {
       setError(null);
 
-      const res = await fetch(`${API_URL}/social-media/${id}`, {
+      const res = await fetchWithTimeout(`${API_URL}/social-media/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -365,8 +418,7 @@ export function useUser(): UseUserReturn {
       });
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        const msg = Array.isArray(errorData?.message) ? errorData.message.join(', ') : (errorData?.message || 'Error al eliminar red social');
+        const msg = await getErrorMessage(res, 'Error al eliminar red social');
         setError(msg);
         return false;
       }
@@ -378,7 +430,11 @@ export function useUser(): UseUserReturn {
 
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al eliminar red social');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('La operación tardó demasiado. Intenta nuevamente.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Error al eliminar red social');
+      }
       return false;
     }
   };

@@ -13,17 +13,18 @@ import Saved from '../components/Saved';
 import Analytics from '../components/Analytics';
 import { SavedPostsProvider } from '../context/SavedPostsContext';
 import { useUser } from '../hooks/useUser';
+import { getValidToken } from '../utils/jwt';
 
-function ProfilePageContent({ activeSection, setActiveSection }: { activeSection: string; setActiveSection: (s: string) => void }) {
+function ProfilePageContent({ activeSection, setActiveSection, userState }: { activeSection: string; setActiveSection: (s: string) => void; userState: ReturnType<typeof useUser>; }) {
   const renderContent = () => {
     switch (activeSection) {
-      case 'perfil': return <ProfileEdit />;
+      case 'perfil': return <ProfileEdit userState={userState} />;
       case 'publicaciones': return <Publications />;
       case 'eventos': return <Events />;
       case 'musica': return <div className="text-white text-center py-20">Sección de Música - Próximamente</div>;
       case 'guardados': return <Saved />;
       case 'estadisticas': return <Analytics />;
-      default: return <ProfileEdit />;
+      default: return <ProfileEdit userState={userState} />;
     }
   };
 
@@ -32,7 +33,7 @@ function ProfilePageContent({ activeSection, setActiveSection }: { activeSection
       <Header />
       <MobileNav activeSection={activeSection} onSectionChange={setActiveSection} />
       <div className="flex flex-1 gap-8 sm:gap-12 lg:gap-16 p-4 sm:p-6 lg:p-8">
-        <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+        <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} user={userState.user} />
         <main className="flex-1 min-w-0 lg:pr-8">
           {renderContent()}
         </main>
@@ -45,19 +46,18 @@ function ProfilePageContent({ activeSection, setActiveSection }: { activeSection
 export default function ProfilePage() {
   const [activeSection, setActiveSection] = useState('perfil');
   const router = useRouter();
-  const { user } = useUser();
+  const userState = useUser();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = getValidToken();
     if (!token) {
       router.replace('/login');
     }
   }, [router]);
 
   return (
-    <SavedPostsProvider userId={user?.id}>
-      <ProfilePageContent activeSection={activeSection} setActiveSection={setActiveSection} />
+    <SavedPostsProvider userId={userState.user?.id}>
+      <ProfilePageContent activeSection={activeSection} setActiveSection={setActiveSection} userState={userState} />
     </SavedPostsProvider>
   );
 }
-

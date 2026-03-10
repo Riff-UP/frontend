@@ -5,15 +5,16 @@ import Image from 'next/image';
 import { ProfileData } from '@/app/types';
 import SocialMediaInput from './profile/SocialMediaInput';
 import ProfileFromToken from './profile/ProfileFromToken';
-import { useUser } from '../hooks/useUser';
-import { API_BASE_URL } from '../config/api';
+import type { UseUserReturn } from '../hooks/useUser';
 import { uploadToR2, validateImageFile } from '../utils/r2Storage';
 import { fetchFollowersCount } from '../utils/follows';
 
-const API_URL = API_BASE_URL;
+interface ProfileEditProps {
+  userState: UseUserReturn;
+}
 
-export default function ProfileEdit() {
-  const { user, loading, error, updateUser, deleteAccount, setPassword, addSocialMedia, updateSocialMedia, removeSocialMedia } = useUser();
+export default function ProfileEdit({ userState }: ProfileEditProps) {
+  const { user, loading, error, updateUser, deleteAccount, setPassword, addSocialMedia, updateSocialMedia, removeSocialMedia } = userState;
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   

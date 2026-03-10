@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { API_BASE_URL } from '../config/api';
+import { getValidToken } from '../utils/jwt';
+
+const REQUEST_TIMEOUT_MS = 12000;
 
 export function useLogin() {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -11,15 +14,49 @@ export function useLogin() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const fetchWithTimeout = useCallback(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+      try {
+        return await fetch(input, { ...init, signal: controller.signal });
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    },
+    []
+  );
+
+  const readResponseBody = useCallback(
+    async (response: Response) => {
+      const raw = await response.text();
+      if (!raw) return {};
+
+      try {
+        return JSON.parse(raw) as { token?: string; message?: string | string[] };
+      } catch {
+        return { message: raw };
+      }
+    },
+    []
+  );
+
   // Detectar errores de OAuth desde los parámetros de URL
   useEffect(() => {
+    const token = getValidToken();
+    if (token) {
+      router.replace('/profile');
+      return;
+    }
+
     const errorParam = searchParams.get('error');
     if (errorParam === 'google_auth_failed') {
       setError('Error al autenticarse con Google. Por favor, intenta de nuevo.');
     } else if (errorParam === 'storage_failed') {
       setError('Error al guardar la sesión. Por favor, verifica tu navegador.');
     }
-  }, [searchParams]);
+  }, [router, searchParams]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -31,24 +68,36 @@ export function useLogin() {
     setError(null);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
 
-      const data = await res.json();
+      const data = await readResponseBody(res);
+
+      if (!res.ok) {
+        const message = Array.isArray(data.message)
+          ? data.message.join(', ')
+          : (data.message || 'Correo o contraseña incorrectos');
+        setError(message);
+        return;
+      }
 
       if (data.token) {
         localStorage.setItem('token', data.token);
         // Disparar evento para actualizar Header
         window.dispatchEvent(new Event('authChange'));
-        router.push('/');
+        router.replace('/profile');
       } else {
-        setError('Correo o contraseña incorrectos');
+        setError('La respuesta del servidor no incluyó un token válido.');
       }
-    } catch {
-      setError('Error al conectar con el servidor');
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('El inicio de sesión tardó demasiado. Intenta de nuevo.');
+      } else {
+        setError('Error al conectar con el servidor');
+      }
     } finally {
       setLoading(false);
     }
