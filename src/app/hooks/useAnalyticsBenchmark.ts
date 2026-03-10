@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { API_BASE_URL, getAuthHeaders } from '@/app/config/api';
+import { getAuthHeaders } from '@/app/config/api';
 import type {
   AnalyticsActionResult,
   AnalyticsConfigEntry,
@@ -15,7 +15,7 @@ import type {
   AnalyticsWorkloadInput,
 } from '@/app/types';
 
-const ANALYTICS_BASE_URL = `${API_BASE_URL}/analytics`;
+const ANALYTICS_BASE_URL = '/api/analytics';
 const ANALYTICS_ACCESS_TOKEN_KEY = 'riff.analytics.access-token';
 
 const DEFAULT_HEALTH: AnalyticsHealth = {
