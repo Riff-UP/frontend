@@ -306,7 +306,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
         const hasSocial = instagram || facebook || whatsapp || email;
         if (!artistWithFollowers.biography && !hasSocial) return null;
         return (
-          <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-2">
+          <div className="px-3 sm:px-4 lg:px-8 pt-4 pb-2">
             {artistWithFollowers.biography && (
               <p className="text-white/80 text-sm leading-relaxed mb-3">{artistWithFollowers.biography}</p>
             )}
