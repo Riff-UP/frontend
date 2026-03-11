@@ -53,7 +53,7 @@ export default function EventForm({
             {isEditing ? 'Editar evento' : 'Subir evento'}
           </h3>
           <button
-            onClick={onClose}
+            onClick={onClose} 
             className="text-riff-primary hover:text-riff-primary/80 transition-colors"
           >
             <IoMdClose className="w-6 h-6" />
@@ -153,7 +153,7 @@ export default function EventForm({
           </button>
           <button
             onClick={onSubmit}
-            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-riff-save to-riff-save-2 hover:from-riff-save-2 hover:to-riff-save text-white text-sm font-medium rounded-sm transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-riff-primary-dark to-riff-primary hover:from-riff-primary hover:to-riff-primary-dark text-white text-sm font-medium rounded-sm transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
             disabled={!title || !date || !description || saving}
           >
             {saving ? (isEditing ? 'Guardando...' : 'Subiendo...') : (isEditing ? 'Guardar' : 'Subir')}
