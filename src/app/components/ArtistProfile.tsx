@@ -275,6 +275,50 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
               </button>
             ) : null}
           />
+          {/* Bio y redes sociales — dentro del cover, bajo ArtistInfo */}
+          {(() => {
+            const instagram = artistWithFollowers.socialMedia?.find(sm => sm.url.startsWith('instagram:'))?.url.slice('instagram:'.length) ?? null;
+            const facebook = artistWithFollowers.socialMedia?.find(sm => sm.url.startsWith('facebook:'))?.url.slice('facebook:'.length) ?? null;
+            const whatsapp = artistWithFollowers.socialMedia?.find(sm => sm.url.startsWith('whatsapp:'))?.url.slice('whatsapp:'.length) ?? null;
+            const email = (artistWithFollowers as { email?: string }).email ?? null;
+            const hasSocial = instagram || facebook || whatsapp || email;
+            if (!artistWithFollowers.biography && !hasSocial) return null;
+            return (
+              <div className="mt-3 pl-0">
+                {artistWithFollowers.biography && (
+                  <p className="text-white/80 text-xs sm:text-sm leading-relaxed mb-2">{artistWithFollowers.biography}</p>
+                )}
+                {hasSocial && (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {instagram && (
+                      <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
+                        <img src="/images/instagram.png" alt="Instagram" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span>{instagram}</span>
+                      </div>
+                    )}
+                    {facebook && (
+                      <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
+                        <img src="/images/facebook_n.png" alt="Facebook" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span>{facebook}</span>
+                      </div>
+                    )}
+                    {whatsapp && (
+                      <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
+                        <img src="/images/whatsapp.png" alt="WhatsApp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span>{whatsapp}</span>
+                      </div>
+                    )}
+                    {email && (
+                      <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
+                        <img src="/images/gmail.png" alt="Gmail" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span>{email}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 px-2 sm:px-4 lg:px-8 z-20">
@@ -296,51 +340,6 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
           </div>
         </div>
       </div>
-
-      {/* Bio y redes sociales — debajo del cover, fuera del absoluto */}
-      {(() => {
-        const instagram = artistWithFollowers.socialMedia?.find(sm => sm.url.startsWith('instagram:'))?.url.slice('instagram:'.length) ?? null;
-        const facebook = artistWithFollowers.socialMedia?.find(sm => sm.url.startsWith('facebook:'))?.url.slice('facebook:'.length) ?? null;
-        const whatsapp = artistWithFollowers.socialMedia?.find(sm => sm.url.startsWith('whatsapp:'))?.url.slice('whatsapp:'.length) ?? null;
-        const email = (artistWithFollowers as { email?: string }).email ?? null;
-        const hasSocial = instagram || facebook || whatsapp || email;
-        if (!artistWithFollowers.biography && !hasSocial) return null;
-        return (
-          <div className="px-3 sm:px-4 lg:px-8 pt-4 pb-2">
-            {artistWithFollowers.biography && (
-              <p className="text-white/80 text-sm leading-relaxed mb-3">{artistWithFollowers.biography}</p>
-            )}
-            {hasSocial && (
-              <div className="flex flex-wrap gap-x-5 gap-y-1.5">
-                {instagram && (
-                  <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
-                    <img src="/images/instagram.png" alt="Instagram" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span>{instagram}</span>
-                  </div>
-                )}
-                {facebook && (
-                  <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
-                    <img src="/images/facebook_n.png" alt="Facebook" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span>{facebook}</span>
-                  </div>
-                )}
-                {whatsapp && (
-                  <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
-                    <img src="/images/whatsapp.png" alt="WhatsApp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span>{whatsapp}</span>
-                  </div>
-                )}
-                {email && (
-                  <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
-                    <img src="/images/gmail.png" alt="Gmail" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span>{email}</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })()}
 
       {/* Content */}
       <div className="p-4 sm:p-6 lg:p-8">
