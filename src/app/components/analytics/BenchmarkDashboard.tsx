@@ -1,12 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Header from '@/app/components/layout/Header';
 import Footer from '@/app/components/layout/Footer';
 import { useAnalyticsBenchmark } from '@/app/hooks/useAnalyticsBenchmark';
 import type { AnalyticsConfigEntry, AnalyticsMetric } from '@/app/types';
-import { getValidToken } from '@/app/utils/jwt';
 import BenchmarkQueryPerformanceChart from './BenchmarkQueryPerformanceChart';
 import BenchmarkSnapshotTrendChart from './BenchmarkSnapshotTrendChart';
 
@@ -137,8 +135,6 @@ function EmptyState({ title, description }: { title: string; description: string
 }
 
 export default function BenchmarkDashboard() {
-  const router = useRouter();
-  const [accessReady, setAccessReady] = useState(false);
   const [configForm, setConfigForm] = useState({
     variableName: '',
     variableValue: '',
@@ -160,16 +156,6 @@ export default function BenchmarkDashboard() {
     limit: 100,
   });
   const [oauthTokenDraft, setOauthTokenDraft] = useState('');
-
-  useEffect(() => {
-    const token = getValidToken();
-    if (!token) {
-      router.replace('/login');
-      return;
-    }
-
-    setAccessReady(true);
-  }, [router]);
 
   const {
     health,
@@ -196,7 +182,6 @@ export default function BenchmarkDashboard() {
     createSnapshot,
     exportMetrics,
   } = useAnalyticsBenchmark({
-    enabled: accessReady,
     initialMetricsLimit: 25,
     initialSnapshotsLimit: 10,
   });
@@ -298,14 +283,6 @@ export default function BenchmarkDashboard() {
     window.location.assign(ANALYTICS_OAUTH_ROUTE);
   };
 
-  if (!accessReady) {
-    return (
-      <div className="min-h-screen bg-riff-text-primary flex items-center justify-center text-white">
-        Validando acceso a la vista privada…
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-riff-text-primary text-white flex flex-col">
       <Header />
@@ -323,7 +300,7 @@ export default function BenchmarkDashboard() {
                     Estado gateway: {health.status}
                   </span>
                   <span className="border border-white/10 bg-white/5 rounded-full px-3 py-1 text-xs font-semibold text-white/75">
-                    Ruta privada por URL directa
+                    Ruta especial por URL directa
                   </span>
                   <span className="border border-riff-primary/20 bg-riff-primary/10 rounded-full px-3 py-1 text-xs font-semibold text-riff-primary">
                     {HIDDEN_ROUTE}
@@ -342,7 +319,7 @@ export default function BenchmarkDashboard() {
                   <ActionButton label={dashboardLoading ? 'Actualizando…' : 'Refrescar panel'} onClick={refreshDashboard} disabled={dashboardLoading} />
                   <ActionButton label="Abrir OAuth de Google" onClick={openOAuthFlow} variant="secondary" />
                   <ActionButton
-                    label="Copiar ruta privada"
+                    label="Copiar ruta especial"
                     onClick={async () => {
                       await navigator.clipboard.writeText(`${window.location.origin}${HIDDEN_ROUTE}`);
                     }}
