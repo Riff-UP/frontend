@@ -33,26 +33,27 @@ export default function PublicationModal({
       onClick={onClose}
     >
       <div
-        className="bg-riff-header rounded-sm w-full max-w-4xl shadow-2xl flex flex-col md:flex-row overflow-y-auto md:overflow-hidden"
+        className="bg-riff-header rounded-sm w-full max-w-4xl shadow-2xl flex flex-col md:flex-row overflow-hidden"
         style={{ maxHeight: '90vh' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Columna izquierda: imagen */}
         {publication.image && (
-          <div className="bg-black flex items-center justify-center overflow-hidden md:flex-1 md:h-full">
+          <div className="md:flex-1 bg-black flex items-center justify-center overflow-hidden" style={{ maxHeight: '90vh' }}>
             <Image
               src={publication.image}
               alt="Imagen de publicación"
               width={800}
               height={800}
-              className="w-full object-contain max-h-[60vh] md:max-h-[90vh]"
+              className="w-full h-full object-contain"
+              style={{ maxHeight: '90vh' }}
               unoptimized
             />
           </div>
         )}
 
         {/* Columna derecha: header + descripción + acciones */}
-        <div className={`order-1 md:order-2 flex flex-col ${publication.image ? 'md:w-72 lg:w-80 md:overflow-hidden' : 'w-full'}`}>
+        <div className={`flex flex-col ${publication.image ? 'md:w-72 lg:w-80' : 'w-full'} overflow-hidden`}>
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-white/10 flex-shrink-0">
             <div className="flex items-center gap-3">
@@ -76,8 +77,8 @@ export default function PublicationModal({
             </button>
           </div>
 
-          {/* Descripción */}
-          <div className="md:flex-1 md:overflow-y-auto p-4">
+          {/* Descripción — scrolleable si es larga */}
+          <div className="flex-1 overflow-y-auto p-4">
             <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">
               {publication.content}
             </p>
