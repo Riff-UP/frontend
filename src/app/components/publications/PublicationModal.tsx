@@ -52,7 +52,7 @@ export default function PublicationModal({
         )}
 
         {/* Columna derecha: header + descripción + acciones */}
-        <div className={`flex flex-col ${publication.image ? 'md:w-72 lg:w-80 md:overflow-hidden' : 'w-full'}`}>
+        <div className={`order-1 md:order-2 flex flex-col ${publication.image ? 'md:w-72 lg:w-80 md:overflow-hidden' : 'w-full'}`}>
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-white/10 flex-shrink-0">
             <div className="flex items-center gap-3">
