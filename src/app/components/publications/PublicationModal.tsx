@@ -37,27 +37,47 @@ export default function PublicationModal({
         style={{ maxHeight: '90vh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Columna izquierda: imagen */}
+        {/* Header: solo visible en móvil (arriba de la imagen) */}
+        <div className="md:hidden flex items-center justify-between p-4 border-b border-white/10 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-linear-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center shrink-0 overflow-hidden">
+              {authorImage ? (
+                <Image src={authorImage} alt={authorName} width={40} height={40} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-white text-sm font-medium">{authorName.charAt(0)}</span>
+              )}
+            </div>
+            <div>
+              <h3 className="text-white font-semibold text-sm">{authorName}</h3>
+              <p className="text-white/60 text-xs">{formatDate(publication.date)}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-riff-primary hover:text-riff-primary/80 transition-colors shrink-0">
+            <IoMdClose className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Imagen */}
         {publication.image && (
-          <div className="md:flex-1 bg-black flex items-center justify-center overflow-hidden" style={{ maxHeight: '90vh' }}>
+          <div className="bg-black flex items-center justify-center overflow-hidden md:flex-1" style={{ maxHeight: publication.image ? '50vh' : undefined }}>
             <Image
               src={publication.image}
               alt="Imagen de publicación"
               width={800}
               height={800}
               className="w-full h-full object-contain"
-              style={{ maxHeight: '90vh' }}
+              style={{ maxHeight: '50vh' }}
               unoptimized
             />
           </div>
         )}
 
-        {/* Columna derecha: header + descripción + acciones */}
+        {/* Panel derecho (desktop) / sección inferior (móvil): header + descripción + acciones */}
         <div className={`flex flex-col ${publication.image ? 'md:w-72 lg:w-80' : 'w-full'} overflow-hidden`}>
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-white/10 flex-shrink-0">
+          {/* Header: solo visible en desktop (dentro del panel derecho) */}
+          <div className="hidden md:flex items-center justify-between p-4 border-b border-white/10 shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+              <div className="w-10 h-10 bg-linear-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center shrink-0 overflow-hidden">
                 {authorImage ? (
                   <Image src={authorImage} alt={authorName} width={40} height={40} className="w-full h-full object-cover" />
                 ) : (
@@ -69,15 +89,12 @@ export default function PublicationModal({
                 <p className="text-white/60 text-xs">{formatDate(publication.date)}</p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="text-riff-primary hover:text-riff-primary/80 transition-colors flex-shrink-0"
-            >
+            <button onClick={onClose} className="text-riff-primary hover:text-riff-primary/80 transition-colors shrink-0">
               <IoMdClose className="w-6 h-6" />
             </button>
           </div>
 
-          {/* Descripción — scrolleable si es larga */}
+          {/* Descripción */}
           <div className="flex-1 overflow-y-auto p-4">
             <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">
               {publication.content}
@@ -85,12 +102,9 @@ export default function PublicationModal({
           </div>
 
           {/* Acciones */}
-          <div className="flex items-center justify-end gap-4 p-4 border-t border-white/10 flex-shrink-0">
+          <div className="flex items-center justify-end gap-4 p-4 border-t border-white/10 shrink-0">
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onLike(publication.id);
-              }}
+              onClick={(e) => { e.stopPropagation(); onLike(publication.id); }}
               className={`flex items-center gap-2 transition-colors ${
                 publication.isLiked ? 'text-red-400' : 'text-riff-text-secondary hover:text-red-400'
               }`}
@@ -99,10 +113,7 @@ export default function PublicationModal({
               <span className="text-sm">{publication.likes}</span>
             </button>
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onSave(publication.id);
-              }}
+              onClick={(e) => { e.stopPropagation(); onSave(publication.id); }}
               disabled={isSaving}
               className={`flex items-center gap-2 transition-all duration-200 ${
                 isSaving
@@ -113,11 +124,7 @@ export default function PublicationModal({
               }`}
               title={publication.isSaved ? 'Quitar de guardados' : 'Guardar publicación'}
             >
-              {publication.isSaved ? (
-                <BsBookmarkFill className="w-6 h-6" />
-              ) : (
-                <BsBookmark className="w-6 h-6" />
-              )}
+              {publication.isSaved ? <BsBookmarkFill className="w-6 h-6" /> : <BsBookmark className="w-6 h-6" />}
             </button>
           </div>
         </div>
