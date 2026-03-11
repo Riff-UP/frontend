@@ -101,7 +101,7 @@ export default function PublicationModal({
           </div>
 
           {/* Acciones */}
-          <div className="flex items-center justify-end gap-4 p-4 border-t border-white/10 shrink-0">
+          <div className="flex items-center justify-end gap-4 p-4  shrink-0">
             <button
               onClick={(e) => { e.stopPropagation(); onLike(publication.id); }}
               className={`flex items-center gap-2 transition-colors ${

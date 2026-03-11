@@ -297,6 +297,22 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
               const num = val.replace(/\D/g, '');
               return `https://wa.me/${num}`;
             };
+            const formatWhatsappDisplay = (val: string) => {
+              const hasPlus = val.startsWith('+');
+              const digits = val.replace(/\D/g, '');
+              const parts: string[] = [];
+              if (hasPlus && digits.length >= 2) {
+                parts.push(digits.slice(0, 2));
+                if (digits.length > 2) parts.push(digits.slice(2, 5));
+                if (digits.length > 5) parts.push(digits.slice(5, 8));
+                if (digits.length > 8) parts.push(digits.slice(8, 12));
+              } else {
+                if (digits.length > 0) parts.push(digits.slice(0, 3));
+                if (digits.length > 3) parts.push(digits.slice(3, 6));
+                if (digits.length > 6) parts.push(digits.slice(6, 10));
+              }
+              return (hasPlus ? '+' : '') + parts.join(' ');
+            };
 
             return (
               <div className="mt-3 pl-0">
@@ -320,7 +336,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
                     {whatsapp && (
                       <a href={toWhatsappUrl(whatsapp)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-xs sm:text-sm">
                         <img src="/images/whatsapp.png" alt="WhatsApp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        <span>{whatsapp}</span>
+                        <span>{formatWhatsappDisplay(whatsapp)}</span>
                       </a>
                     )}
                     {email && (
