@@ -27,6 +27,40 @@ function toOrigin(value?: string | null): string | null {
   }
 }
 
+function extractTextValue(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function formatOAuthPopupError(raw: string): string | null {
+  const fallback = raw.trim();
+  if (!fallback) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(raw) as Record<string, unknown>;
+    const message = extractTextValue(payload.message) || 'No se pudo completar OAuth con Google.';
+    const errorCode = payload.details && typeof payload.details === 'object' && !Array.isArray(payload.details)
+      ? extractTextValue((payload.details as Record<string, unknown>).error)
+      : '';
+    const errorDescription = payload.details && typeof payload.details === 'object' && !Array.isArray(payload.details)
+      ? extractTextValue((payload.details as Record<string, unknown>).error_description)
+      : '';
+
+    if (errorCode === 'invalid_client') {
+      return 'El gateway no está autorizado ante Google para intercambiar el authorization code. Revisa en backend el client_id, client_secret, redirect_uri y el método de autenticación del cliente OAuth. Si este frontend puede apuntar a más de un gateway de analytics, fija ANALYTICS_API_URL o NEXT_PUBLIC_ANALYTICS_API_URL al gateway correcto.';
+    }
+
+    if (errorDescription) {
+      return `${message} (${errorDescription})`;
+    }
+
+    return message;
+  } catch {
+    return fallback;
+  }
+}
+
 function formatNumber(value: number): string {
   return value.toLocaleString('es-MX');
 }
@@ -377,11 +411,40 @@ export default function BenchmarkDashboard() {
     popup.focus();
     oauthPopupRef.current = popup;
     oauthPopupWatcherRef.current = window.setInterval(() => {
-      if (!oauthPopupRef.current || oauthPopupRef.current.closed) {
+      const currentPopup = oauthPopupRef.current;
+
+      if (!currentPopup || currentPopup.closed) {
         clearOAuthPopupWatcher();
         oauthPopupRef.current = null;
         setOauthLoading(false);
         setOauthMessage(null);
+        return;
+      }
+
+      try {
+        const popupUrl = new URL(currentPopup.location.href);
+        const sameOrigin = popupUrl.origin === window.location.origin;
+        const looksLikeAnalyticsProxy = popupUrl.pathname.startsWith('/api/analytics');
+
+        if (!sameOrigin || !looksLikeAnalyticsProxy) {
+          return;
+        }
+
+        const popupBody = currentPopup.document.body?.innerText?.trim() || '';
+        const popupError = formatOAuthPopupError(popupBody);
+
+        if (!popupError) {
+          return;
+        }
+
+        clearOAuthPopupWatcher();
+        currentPopup.close();
+        oauthPopupRef.current = null;
+        setOauthLoading(false);
+        setOauthMessage(null);
+        setOauthError(popupError);
+      } catch {
+        // Mientras el popup esté en Google o en otra origin, no podemos inspeccionarlo.
       }
     }, 500);
   };

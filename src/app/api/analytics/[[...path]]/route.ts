@@ -16,6 +16,11 @@ const HOP_BY_HOP_HEADERS = new Set([
   'upgrade',
 ]);
 
+const RETRYABLE_OAUTH_ERROR_CODES = new Set([
+  'invalid_client',
+  'unauthorized_client',
+]);
+
 function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }
@@ -61,7 +66,15 @@ function getAnalyticsBaseCandidates(): string[] {
   ]);
 }
 
-function buildForwardHeaders(source: Headers): Headers {
+function getForwardedPort(request: NextRequest, protocol: string): string {
+  if (request.nextUrl.port) {
+    return request.nextUrl.port;
+  }
+
+  return protocol === 'https' ? '443' : '80';
+}
+
+function buildForwardHeaders(source: Headers, request: NextRequest): Headers {
   const headers = new Headers();
 
   source.forEach((value, key) => {
@@ -69,6 +82,21 @@ function buildForwardHeaders(source: Headers): Headers {
       headers.set(key, value);
     }
   });
+
+  const protocol = request.nextUrl.protocol.replace(/:$/, '') || 'https';
+  const host = request.nextUrl.host;
+  const port = getForwardedPort(request, protocol);
+  const uri = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+
+  headers.set('x-forwarded-host', host);
+  headers.set('x-forwarded-proto', protocol);
+  headers.set('x-forwarded-port', port);
+  headers.set('x-forwarded-uri', uri);
+  headers.set('forwarded', `host=${host};proto=${protocol}`);
+
+  if (request.nextUrl.pathname === '/api/analytics' || request.nextUrl.pathname.startsWith('/api/analytics/')) {
+    headers.set('x-forwarded-prefix', '/api/analytics');
+  }
 
   return headers;
 }
@@ -96,6 +124,28 @@ function isRetryableStatus(status: number): boolean {
   return status >= 500 && status <= 599;
 }
 
+async function shouldRetryAlternateCandidateForOAuth(response: Response): Promise<boolean> {
+  if (response.status !== 400) {
+    return false;
+  }
+
+  try {
+    const payload = await response.clone().json() as Record<string, unknown>;
+    const details = payload.details && typeof payload.details === 'object' && !Array.isArray(payload.details)
+      ? payload.details as Record<string, unknown>
+      : null;
+    const errorCode = typeof details?.error === 'string'
+      ? details.error.trim().toLowerCase()
+      : typeof payload.error === 'string'
+        ? payload.error.trim().toLowerCase()
+        : '';
+
+    return RETRYABLE_OAUTH_ERROR_CODES.has(errorCode);
+  } catch {
+    return false;
+  }
+}
+
 async function resolvePathSegments(context: { params: Promise<{ path?: string[] }> | { path?: string[] } }): Promise<string[]> {
   const { path = [] } = await Promise.resolve(context.params);
   return path;
@@ -121,7 +171,7 @@ async function proxyAnalyticsRequest(
     try {
       const upstreamResponse = await fetch(`${baseUrl}${suffix}${search}`, {
         method: request.method,
-        headers: buildForwardHeaders(request.headers),
+        headers: buildForwardHeaders(request.headers, request),
         body: requestBody,
         cache: 'no-store',
         redirect: 'manual',
@@ -141,16 +191,23 @@ async function proxyAnalyticsRequest(
         );
       }
 
-      if (isRetryableStatus(upstreamResponse.status) && candidates.length > 1) {
-        lastRetryableResponse = upstreamResponse;
-        continue;
+      if (candidates.length > 1) {
+        if (isRetryableStatus(upstreamResponse.status)) {
+          lastRetryableResponse = upstreamResponse;
+          continue;
+        }
+
+        if (await shouldRetryAlternateCandidateForOAuth(upstreamResponse)) {
+          lastRetryableResponse = upstreamResponse;
+          continue;
+        }
       }
 
       return toNextResponse(upstreamResponse);
     } catch (error) {
       lastNetworkError = error instanceof Error ? error : new Error('No se pudo conectar con el gateway de analytics.');
-      if (candidates.length > 1) {
-        continue;
+      if (candidates.length === 1) {
+        break;
       }
     }
   }
