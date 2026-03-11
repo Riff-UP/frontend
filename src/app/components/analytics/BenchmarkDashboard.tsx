@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/app/components/layout/Header';
 import Footer from '@/app/components/layout/Footer';
-import { API_BASE_URL } from '@/app/config/api';
 import { useAnalyticsBenchmark } from '@/app/hooks/useAnalyticsBenchmark';
 import type { AnalyticsConfigEntry, AnalyticsMetric } from '@/app/types';
 import { getValidToken } from '@/app/utils/jwt';
@@ -12,6 +11,7 @@ import BenchmarkQueryPerformanceChart from './BenchmarkQueryPerformanceChart';
 import BenchmarkSnapshotTrendChart from './BenchmarkSnapshotTrendChart';
 
 const HIDDEN_ROUTE = '/lab/riff-benchmark-analytics-7f3k';
+const ANALYTICS_OAUTH_ROUTE = '/api/analytics/auth/google?state=riff-benchmark-view';
 
 function formatNumber(value: number): string {
   return value.toLocaleString('es-MX');
@@ -284,8 +284,18 @@ export default function BenchmarkDashboard() {
   };
 
   const openOAuthFlow = () => {
-    const url = `${API_BASE_URL}/analytics/auth/google?state=riff-benchmark-view`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const popup = window.open(
+      ANALYTICS_OAUTH_ROUTE,
+      'riff-analytics-oauth',
+      'popup=yes,width=640,height=760',
+    );
+
+    if (popup) {
+      popup.focus();
+      return;
+    }
+
+    window.location.assign(ANALYTICS_OAUTH_ROUTE);
   };
 
   if (!accessReady) {
