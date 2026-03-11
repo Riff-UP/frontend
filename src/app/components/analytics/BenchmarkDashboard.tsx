@@ -375,7 +375,7 @@ export default function BenchmarkDashboard() {
       oauthPopupRef.current = null;
       setOauthLoading(false);
       setOauthError(null);
-      setOauthMessage('OAuth completado correctamente. Refrescando panel…');
+      setOauthMessage('Callback OAuth recibido. Verificando conexión y refrescando panel…');
       void refreshDashboard();
     };
 
