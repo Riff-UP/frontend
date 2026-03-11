@@ -11,6 +11,70 @@ import BenchmarkSnapshotTrendChart from './BenchmarkSnapshotTrendChart';
 const HIDDEN_ROUTE = '/lab/riff-benchmark-analytics-7f3k';
 const ANALYTICS_OAUTH_ROUTE = '/api/analytics/auth/google?state=riff-benchmark-view';
 
+function parseJsonSafely(raw: string): unknown {
+  if (!raw.trim()) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return raw;
+  }
+}
+
+function extractOAuthUrl(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const directUrl = record.url ?? record.authUrl ?? record.authorizationUrl ?? record.redirectUrl;
+
+  if (typeof directUrl === 'string' && directUrl.trim()) {
+    return directUrl;
+  }
+
+  for (const nestedKey of ['data', 'result', 'payload']) {
+    const nested = extractOAuthUrl(record[nestedKey]);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return null;
+}
+
+function extractOAuthError(payload: unknown, fallback: string): string {
+  if (typeof payload === 'string' && payload.trim()) {
+    return payload;
+  }
+
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return fallback;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const directMessage = record.message ?? record.error ?? record.detail;
+
+  if (typeof directMessage === 'string' && directMessage.trim()) {
+    return directMessage;
+  }
+
+  if (Array.isArray(directMessage)) {
+    return directMessage.map((item) => String(item)).join(', ');
+  }
+
+  for (const nestedKey of ['data', 'result', 'payload']) {
+    const nested = extractOAuthError(record[nestedKey], '');
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return fallback;
+}
+
 function formatNumber(value: number): string {
   return value.toLocaleString('es-MX');
 }
@@ -156,6 +220,8 @@ export default function BenchmarkDashboard() {
     limit: 100,
   });
   const [oauthTokenDraft, setOauthTokenDraft] = useState('');
+  const [oauthLoading, setOauthLoading] = useState(false);
+  const [oauthError, setOauthError] = useState<string | null>(null);
 
   const {
     health,
@@ -268,19 +334,53 @@ export default function BenchmarkDashboard() {
     }
   };
 
-  const openOAuthFlow = () => {
-    const popup = window.open(
-      ANALYTICS_OAUTH_ROUTE,
-      'riff-analytics-oauth',
-      'popup=yes,width=640,height=760',
-    );
+  const openOAuthFlow = async () => {
+    setOauthLoading(true);
+    setOauthError(null);
+
+    const popup = window.open('', 'riff-analytics-oauth', 'popup=yes,width=640,height=760');
 
     if (popup) {
-      popup.focus();
-      return;
+      popup.document.write(`<!doctype html><html lang="es"><head><title>Conectando…</title></head><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#0b1020;color:#fff;font-family:system-ui,sans-serif;"><div>Conectando con Google…</div></body></html>`);
+      popup.document.close();
     }
 
-    window.location.assign(ANALYTICS_OAUTH_ROUTE);
+    try {
+      const response = await fetch(ANALYTICS_OAUTH_ROUTE, {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      const raw = await response.text();
+      const payload = parseJsonSafely(raw);
+
+      if (!response.ok) {
+        throw new Error(extractOAuthError(payload, `No se pudo iniciar OAuth (HTTP ${response.status}).`));
+      }
+
+      const oauthUrl = extractOAuthUrl(payload);
+      if (!oauthUrl) {
+        throw new Error('El endpoint de analytics no devolvió una URL OAuth válida.');
+      }
+
+      if (popup && !popup.closed) {
+        popup.location.replace(oauthUrl);
+        popup.focus();
+        return;
+      }
+
+      window.location.assign(oauthUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo iniciar el flujo OAuth de analytics.';
+      setOauthError(message);
+
+      if (popup && !popup.closed) {
+        popup.document.write(`<!doctype html><html lang="es"><head><title>Error OAuth</title></head><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#0b1020;color:#fff;font-family:system-ui,sans-serif;padding:24px;text-align:center;"><div><strong>No se pudo iniciar OAuth.</strong><p style="opacity:.8;">${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p></div></body></html>`);
+        popup.document.close();
+      }
+    } finally {
+      setOauthLoading(false);
+    }
   };
 
   return (
@@ -317,7 +417,7 @@ export default function BenchmarkDashboard() {
 
                 <div className="mt-6 flex flex-wrap gap-3">
                   <ActionButton label={dashboardLoading ? 'Actualizando…' : 'Refrescar panel'} onClick={refreshDashboard} disabled={dashboardLoading} />
-                  <ActionButton label="Abrir OAuth de Google" onClick={openOAuthFlow} variant="secondary" />
+                  <ActionButton label={oauthLoading ? 'Preparando OAuth…' : 'Abrir OAuth de Google'} onClick={openOAuthFlow} variant="secondary" disabled={oauthLoading} />
                   <ActionButton
                     label="Copiar ruta especial"
                     onClick={async () => {
@@ -381,6 +481,12 @@ export default function BenchmarkDashboard() {
             </div>
           ) : null}
 
+          {oauthError ? (
+            <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+              {oauthError}
+            </div>
+          ) : null}
+
           <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <MetricKpi
               label="Métricas"
@@ -431,7 +537,7 @@ export default function BenchmarkDashboard() {
                   disabled={!oauthTokenDraft.trim()}
                 />
                 <ActionButton label="Limpiar token" onClick={clearAnalyticsAccessToken} variant="ghost" disabled={!analyticsAccessToken} />
-                <ActionButton label="Iniciar OAuth" onClick={openOAuthFlow} variant="secondary" />
+                <ActionButton label={oauthLoading ? 'Preparando OAuth…' : 'Iniciar OAuth'} onClick={openOAuthFlow} variant="secondary" disabled={oauthLoading} />
                 <div className="text-sm text-white/60 space-y-1">
                   <p>Token almacenado: <span className="text-white">{analyticsAccessToken ? 'Sí' : 'No'}</span></p>
                   <p>Último snapshot: <span className="text-white">{formatDate(effectiveSummary.latestSnapshotDate)}</span></p>

@@ -85,6 +85,17 @@ function buildResponseHeaders(source: Headers): Headers {
   return headers;
 }
 
+function toNextResponse(response: Response): Promise<NextResponse> {
+  return response.arrayBuffer().then((body) => new NextResponse(body, {
+    status: response.status,
+    headers: buildResponseHeaders(response.headers),
+  }));
+}
+
+function isRetryableStatus(status: number): boolean {
+  return status >= 500 && status <= 599;
+}
+
 async function resolvePathSegments(context: { params: Promise<{ path?: string[] }> | { path?: string[] } }): Promise<string[]> {
   const { path = [] } = await Promise.resolve(context.params);
   return path;
@@ -103,6 +114,8 @@ async function proxyAnalyticsRequest(
 
   const candidates = getAnalyticsBaseCandidates();
   let notFoundCount = 0;
+  let lastRetryableResponse: Response | null = null;
+  let lastNetworkError: Error | null = null;
 
   for (const baseUrl of candidates) {
     try {
@@ -128,19 +141,31 @@ async function proxyAnalyticsRequest(
         );
       }
 
-      const body = await upstreamResponse.arrayBuffer();
-      return new NextResponse(body, {
-        status: upstreamResponse.status,
-        headers: buildResponseHeaders(upstreamResponse.headers),
-      });
+      if (isRetryableStatus(upstreamResponse.status) && candidates.length > 1) {
+        lastRetryableResponse = upstreamResponse;
+        continue;
+      }
+
+      return toNextResponse(upstreamResponse);
     } catch (error) {
-      return NextResponse.json(
-        {
-          message: error instanceof Error ? error.message : 'No se pudo conectar con el gateway de analytics.',
-        },
-        { status: 502 },
-      );
+      lastNetworkError = error instanceof Error ? error : new Error('No se pudo conectar con el gateway de analytics.');
+      if (candidates.length > 1) {
+        continue;
+      }
     }
+  }
+
+  if (lastRetryableResponse) {
+    return toNextResponse(lastRetryableResponse);
+  }
+
+  if (lastNetworkError) {
+    return NextResponse.json(
+      {
+        message: lastNetworkError.message,
+      },
+      { status: 502 },
+    );
   }
 
   return NextResponse.json(
