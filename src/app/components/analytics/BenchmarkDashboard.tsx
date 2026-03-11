@@ -1,78 +1,30 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Header from '@/app/components/layout/Header';
 import Footer from '@/app/components/layout/Footer';
 import { useAnalyticsBenchmark } from '@/app/hooks/useAnalyticsBenchmark';
 import type { AnalyticsConfigEntry, AnalyticsMetric } from '@/app/types';
 import BenchmarkQueryPerformanceChart from './BenchmarkQueryPerformanceChart';
 import BenchmarkSnapshotTrendChart from './BenchmarkSnapshotTrendChart';
+import { API_BASE_URL } from '@/app/config/api';
 
 const HIDDEN_ROUTE = '/lab/riff-benchmark-analytics-7f3k';
-const ANALYTICS_OAUTH_ROUTE = '/api/analytics/auth/google?state=riff-benchmark-view';
+const ANALYTICS_OAUTH_STATE = 'riff-benchmark-view';
+const ANALYTICS_OAUTH_ROUTE = `/api/analytics/auth/google?state=${ANALYTICS_OAUTH_STATE}`;
+const ANALYTICS_OAUTH_POPUP_NAME = 'riff-analytics-oauth';
+const ANALYTICS_OAUTH_MESSAGE_TYPE = 'analytics-oauth-success';
 
-function parseJsonSafely(raw: string): unknown {
-  if (!raw.trim()) {
+function toOrigin(value?: string | null): string | null {
+  if (!value?.trim()) {
     return null;
   }
 
   try {
-    return JSON.parse(raw) as unknown;
+    return new URL(value, typeof window !== 'undefined' ? window.location.origin : 'http://localhost').origin;
   } catch {
-    return raw;
-  }
-}
-
-function extractOAuthUrl(payload: unknown): string | null {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return null;
   }
-
-  const record = payload as Record<string, unknown>;
-  const directUrl = record.url ?? record.authUrl ?? record.authorizationUrl ?? record.redirectUrl;
-
-  if (typeof directUrl === 'string' && directUrl.trim()) {
-    return directUrl;
-  }
-
-  for (const nestedKey of ['data', 'result', 'payload']) {
-    const nested = extractOAuthUrl(record[nestedKey]);
-    if (nested) {
-      return nested;
-    }
-  }
-
-  return null;
-}
-
-function extractOAuthError(payload: unknown, fallback: string): string {
-  if (typeof payload === 'string' && payload.trim()) {
-    return payload;
-  }
-
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    return fallback;
-  }
-
-  const record = payload as Record<string, unknown>;
-  const directMessage = record.message ?? record.error ?? record.detail;
-
-  if (typeof directMessage === 'string' && directMessage.trim()) {
-    return directMessage;
-  }
-
-  if (Array.isArray(directMessage)) {
-    return directMessage.map((item) => String(item)).join(', ');
-  }
-
-  for (const nestedKey of ['data', 'result', 'payload']) {
-    const nested = extractOAuthError(record[nestedKey], '');
-    if (nested) {
-      return nested;
-    }
-  }
-
-  return fallback;
 }
 
 function formatNumber(value: number): string {
@@ -222,6 +174,9 @@ export default function BenchmarkDashboard() {
   const [oauthTokenDraft, setOauthTokenDraft] = useState('');
   const [oauthLoading, setOauthLoading] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
+  const [oauthMessage, setOauthMessage] = useState<string | null>(null);
+  const oauthPopupRef = useRef<Window | null>(null);
+  const oauthPopupWatcherRef = useRef<number | null>(null);
 
   const {
     health,
@@ -334,53 +289,101 @@ export default function BenchmarkDashboard() {
     }
   };
 
-  const openOAuthFlow = async () => {
-    setOauthLoading(true);
-    setOauthError(null);
+  const allowedOAuthOrigins = useMemo(() => {
+    const origins = new Set<string>();
+    const frontendOrigin = toOrigin(typeof window !== 'undefined' ? window.location.origin : null);
+    const apiOrigin = toOrigin(API_BASE_URL);
 
-    const popup = window.open('', 'riff-analytics-oauth', 'popup=yes,width=640,height=760');
-
-    if (popup) {
-      popup.document.write(`<!doctype html><html lang="es"><head><title>Conectando…</title></head><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#0b1020;color:#fff;font-family:system-ui,sans-serif;"><div>Conectando con Google…</div></body></html>`);
-      popup.document.close();
+    if (frontendOrigin) {
+      origins.add(frontendOrigin);
     }
 
-    try {
-      const response = await fetch(ANALYTICS_OAUTH_ROUTE, {
-        method: 'GET',
-        credentials: 'include',
-        cache: 'no-store',
-      });
-      const raw = await response.text();
-      const payload = parseJsonSafely(raw);
+    if (apiOrigin) {
+      origins.add(apiOrigin);
+    }
 
-      if (!response.ok) {
-        throw new Error(extractOAuthError(payload, `No se pudo iniciar OAuth (HTTP ${response.status}).`));
-      }
+    return origins;
+  }, []);
 
-      const oauthUrl = extractOAuthUrl(payload);
-      if (!oauthUrl) {
-        throw new Error('El endpoint de analytics no devolvió una URL OAuth válida.');
-      }
+  const clearOAuthPopupWatcher = () => {
+    if (oauthPopupWatcherRef.current !== null) {
+      window.clearInterval(oauthPopupWatcherRef.current);
+      oauthPopupWatcherRef.current = null;
+    }
+  };
 
-      if (popup && !popup.closed) {
-        popup.location.replace(oauthUrl);
-        popup.focus();
+  useEffect(() => {
+    const handleOAuthMessage = (event: MessageEvent) => {
+      if (!allowedOAuthOrigins.has(event.origin)) {
         return;
       }
 
-      window.location.assign(oauthUrl);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudo iniciar el flujo OAuth de analytics.';
-      setOauthError(message);
-
-      if (popup && !popup.closed) {
-        popup.document.write(`<!doctype html><html lang="es"><head><title>Error OAuth</title></head><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#0b1020;color:#fff;font-family:system-ui,sans-serif;padding:24px;text-align:center;"><div><strong>No se pudo iniciar OAuth.</strong><p style="opacity:.8;">${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p></div></body></html>`);
-        popup.document.close();
+      const payload = event.data;
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return;
       }
-    } finally {
+
+      const record = payload as Record<string, unknown>;
+      if (record.type !== ANALYTICS_OAUTH_MESSAGE_TYPE) {
+        return;
+      }
+
+      const messagePayload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
+        ? record.payload as Record<string, unknown>
+        : null;
+      const messageState = typeof messagePayload?.state === 'string' ? messagePayload.state : undefined;
+
+      if (messageState && messageState !== ANALYTICS_OAUTH_STATE) {
+        return;
+      }
+
+      clearOAuthPopupWatcher();
+      oauthPopupRef.current = null;
       setOauthLoading(false);
+      setOauthError(null);
+      setOauthMessage('OAuth completado correctamente. Refrescando panel…');
+      void refreshDashboard();
+    };
+
+    window.addEventListener('message', handleOAuthMessage);
+
+    return () => {
+      window.removeEventListener('message', handleOAuthMessage);
+      clearOAuthPopupWatcher();
+    };
+  }, [allowedOAuthOrigins, refreshDashboard]);
+
+  useEffect(() => {
+    if (!oauthLoading) {
+      clearOAuthPopupWatcher();
     }
+  }, [oauthLoading]);
+
+  const openOAuthFlow = () => {
+    setOauthLoading(true);
+    setOauthError(null);
+    setOauthMessage('Completa la autenticación en el popup de Google.');
+    clearOAuthPopupWatcher();
+
+    const popup = window.open(ANALYTICS_OAUTH_ROUTE, ANALYTICS_OAUTH_POPUP_NAME, 'popup=yes,width=640,height=760');
+
+    if (!popup) {
+      setOauthLoading(false);
+      setOauthMessage(null);
+      setOauthError('El navegador bloqueó el popup de OAuth. Permite ventanas emergentes e inténtalo de nuevo.');
+      return;
+    }
+
+    popup.focus();
+    oauthPopupRef.current = popup;
+    oauthPopupWatcherRef.current = window.setInterval(() => {
+      if (!oauthPopupRef.current || oauthPopupRef.current.closed) {
+        clearOAuthPopupWatcher();
+        oauthPopupRef.current = null;
+        setOauthLoading(false);
+        setOauthMessage(null);
+      }
+    }, 500);
   };
 
   return (
@@ -417,7 +420,7 @@ export default function BenchmarkDashboard() {
 
                 <div className="mt-6 flex flex-wrap gap-3">
                   <ActionButton label={dashboardLoading ? 'Actualizando…' : 'Refrescar panel'} onClick={refreshDashboard} disabled={dashboardLoading} />
-                  <ActionButton label={oauthLoading ? 'Preparando OAuth…' : 'Abrir OAuth de Google'} onClick={openOAuthFlow} variant="secondary" disabled={oauthLoading} />
+                  <ActionButton label={oauthLoading ? 'Esperando OAuth…' : 'Abrir OAuth de Google'} onClick={openOAuthFlow} variant="secondary" disabled={oauthLoading} />
                   <ActionButton
                     label="Copiar ruta especial"
                     onClick={async () => {
@@ -487,6 +490,12 @@ export default function BenchmarkDashboard() {
             </div>
           ) : null}
 
+          {oauthMessage ? (
+            <div className="rounded-2xl border border-sky-400/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
+              {oauthMessage}
+            </div>
+          ) : null}
+
           <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <MetricKpi
               label="Métricas"
@@ -526,7 +535,8 @@ export default function BenchmarkDashboard() {
                   className="w-full rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-white outline-none focus:border-riff-primary resize-none"
                 />
                 <p className="text-xs text-white/45 mt-2">
-                  Se guarda en <code>sessionStorage</code> del navegador, no en el backend.
+                  Se guarda en <code>sessionStorage</code> del navegador, no en el backend. Si el gateway devuelve un callback exitoso,
+                  este panel se refresca automáticamente.
                 </p>
               </div>
 
@@ -537,7 +547,7 @@ export default function BenchmarkDashboard() {
                   disabled={!oauthTokenDraft.trim()}
                 />
                 <ActionButton label="Limpiar token" onClick={clearAnalyticsAccessToken} variant="ghost" disabled={!analyticsAccessToken} />
-                <ActionButton label={oauthLoading ? 'Preparando OAuth…' : 'Iniciar OAuth'} onClick={openOAuthFlow} variant="secondary" disabled={oauthLoading} />
+                <ActionButton label={oauthLoading ? 'Esperando OAuth…' : 'Iniciar OAuth'} onClick={openOAuthFlow} variant="secondary" disabled={oauthLoading} />
                 <div className="text-sm text-white/60 space-y-1">
                   <p>Token almacenado: <span className="text-white">{analyticsAccessToken ? 'Sí' : 'No'}</span></p>
                   <p>Último snapshot: <span className="text-white">{formatDate(effectiveSummary.latestSnapshotDate)}</span></p>
