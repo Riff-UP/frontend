@@ -371,12 +371,24 @@ export default function BenchmarkDashboard() {
         return;
       }
 
+      const incomingToken =
+        typeof messagePayload?.access_token === 'string' ? messagePayload.access_token :
+        typeof messagePayload?.token === 'string' ? messagePayload.token :
+        typeof record.access_token === 'string' ? record.access_token :
+        typeof record.token === 'string' ? record.token :
+        '';
+
       clearOAuthPopupWatcher();
       oauthPopupRef.current = null;
       setOauthLoading(false);
       setOauthError(null);
       setOauthMessage('Callback OAuth recibido. Verificando conexión y refrescando panel…');
-      void refreshDashboard();
+
+      if (incomingToken) {
+        setAnalyticsAccessToken(incomingToken);
+      }
+
+      void refreshDashboard().then(() => setOauthMessage(null));
     };
 
     window.addEventListener('message', handleOAuthMessage);
@@ -385,7 +397,7 @@ export default function BenchmarkDashboard() {
       window.removeEventListener('message', handleOAuthMessage);
       clearOAuthPopupWatcher();
     };
-  }, [allowedOAuthOrigins, refreshDashboard]);
+  }, [allowedOAuthOrigins, refreshDashboard, setAnalyticsAccessToken]);
 
   useEffect(() => {
     if (!oauthLoading) {
