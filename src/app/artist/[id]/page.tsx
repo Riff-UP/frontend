@@ -7,7 +7,7 @@ import ArtistProfile from '@/app/components/ArtistProfile';
 import { ArtistData } from '@/app/types';
 import { SavedPostsProvider } from '@/app/context/SavedPostsContext';
 import { useUser } from '@/app/hooks/useUser';
-import { API_BASE_URL } from '@/app/config/api';
+import { API_BASE_URL, getAuthHeaders } from '@/app/config/api';
 
 const API_URL = API_BASE_URL;
 
@@ -56,6 +56,18 @@ export default function ArtistPage() {
         // Normalizar socialMedia: puede venir como snake_case desde el backend
         if (!data.socialMedia && data.social_media) {
           data.socialMedia = data.social_media;
+        }
+        // Si socialMedia no vino con el usuario, buscarlo en el endpoint dedicado
+        if (!data.socialMedia || data.socialMedia.length === 0) {
+          try {
+            const smRes = await fetch(`${API_URL}/social-media?userId=${data.id}`, {
+              headers: getAuthHeaders(false),
+            });
+            if (smRes.ok) {
+              const smData = await smRes.json();
+              data.socialMedia = Array.isArray(smData) ? smData : (smData?.data ?? []);
+            }
+          } catch { /* silencioso */ }
         }
         setArtist(data);
       } catch {

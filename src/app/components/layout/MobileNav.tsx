@@ -25,32 +25,32 @@ export default function MobileNav({ activeSection, onSectionChange }: MobileNavP
 
   return (
     <nav className="md:hidden sticky top-16 bg-gradient-to-b from-riff-card to-riff-header border-b border-white/10 z-10 mb-4">
-      <div className="flex justify-center overflow-x-auto scrollbar-hide">
+      <div className="flex justify-around">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeSection === item.id;
-          
+
           return (
             <button
               key={item.id}
               onClick={() => onSectionChange(item.id)}
-              className={`flex-shrink-0 flex flex-col items-center gap-1 px-4 py-3 transition-colors duration-200 border-b-2 ${
-                isActive 
-                  ? 'text-riff-primary border-riff-primary' 
+              title={item.label}
+              className={`flex-1 flex flex-col items-center py-2.5 transition-colors duration-200 border-b-2 ${
+                isActive
+                  ? 'text-riff-primary border-riff-primary'
                   : 'text-white/60 border-transparent hover:text-riff-primary'
               }`}
             >
               <Icon className="w-5 h-5" />
-              <span className="text-xs font-medium whitespace-nowrap">{item.label}</span>
             </button>
           );
         })}
         <button
           onClick={handleLogout}
-          className="flex-shrink-0 flex flex-col items-center gap-1 px-4 py-3 transition-colors duration-200 border-b-2 border-transparent text-red-400/80 hover:text-red-400"
+          title="Cerrar sesión"
+          className="flex-1 flex flex-col items-center py-2.5 transition-colors duration-200 border-b-2 border-transparent text-red-400/80 hover:text-red-400"
         >
           <IoIosLogOut className="w-5 h-5" />
-          <span className="text-xs font-medium whitespace-nowrap">Salir</span>
         </button>
       </div>
     </nav>
