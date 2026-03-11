@@ -9,6 +9,8 @@ import EventRatingModal from "@/app/components/common/EventRatingModal";
 import { useEventRating } from "@/app/hooks/useEventRating";
 import { FaCircleChevronLeft, FaCircleChevronRight } from "react-icons/fa6";
 import { useArtists, ArtistData } from "@/app/hooks/useArtists";
+import { useUser } from "@/app/hooks/useUser";
+import { useFollow } from "@/app/hooks/useFollow";
 import { API_BASE_URL, getAuthHeaders } from "@/app/config/api";
 
 const API_URL = API_BASE_URL;
@@ -61,7 +63,18 @@ function HomeContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [heroPosts, setHeroPosts] = useState<RawPost[]>([]);
   const { artists, loading, setSearch } = useArtists();
+  const { user } = useUser();
+  const { isFollowing } = useFollow(user?.id);
+  const followedArtists = artists.filter(a => isFollowing(a.id));
   const carouselRef = useRef<HTMLDivElement>(null);
+  const followedCarouselRef = useRef<HTMLDivElement>(null);
+
+  const scrollFollowedCarousel = (dir: 'left' | 'right') => {
+    if (!followedCarouselRef.current) return;
+    const card = followedCarouselRef.current.querySelector('article') as HTMLElement | null;
+    const cardWidth = card ? card.offsetWidth + 16 : 280;
+    followedCarouselRef.current.scrollBy({ left: dir === 'right' ? cardWidth : -cardWidth, behavior: 'smooth' });
+  };
 
   const scrollCarousel = (dir: 'left' | 'right') => {
     if (!carouselRef.current) return;
@@ -225,6 +238,36 @@ function HomeContent() {
             </div>
           )}
         </section>
+
+        {/* Artistas que sigues */}
+        {user && followedArtists.length > 0 && (
+          <section className="max-w-8xl mx-auto px-0 sm:px-4 lg:px-0 py-6 sm:py-8">
+            <div className="flex items-center justify-between mb-6 sm:mb-8 px-4 sm:px-0">
+              <h2 className="text-xl sm:text-2xl font-bold text-white">Artistas que sigues</h2>
+              <div className="flex gap-2">
+                <button onClick={() => scrollFollowedCarousel('left')} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group">
+                  <FaCircleChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-riff-primary group-hover:text-riff-primary-dark transition-colors" />
+                </button>
+                <button onClick={() => scrollFollowedCarousel('right')} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group">
+                  <FaCircleChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-riff-primary group-hover:text-riff-primary-dark transition-colors" />
+                </button>
+              </div>
+            </div>
+            <div ref={followedCarouselRef} className="flex gap-4 overflow-x-hidden scroll-smooth px-4 sm:px-0">
+              {followedArtists.map((artist: ArtistData) => (
+                <div key={artist.id} className="w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)] xl:w-[calc(25%-12px)] flex-shrink-0">
+                  <ArtistCard
+                    id={artist.id}
+                    name={artist.name}
+                    image={artist.profileImage ?? undefined}
+                    followers={artist.followersCount ?? 0}
+                    description={artist.biography ?? undefined}
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
       </main>
       <Footer />

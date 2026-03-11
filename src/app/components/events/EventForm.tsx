@@ -127,7 +127,7 @@ export default function EventForm({
 
           {/* Description */}
           <div>
-            <label className="block text-white text-sm mb-2">Descripción *</label>
+            <label className="block text-white text-sm mb-2">Descripción</label>
             <div className="relative">
               <FiFileText className="absolute left-3 top-3 text-white/50 w-4 h-4" />
               <textarea

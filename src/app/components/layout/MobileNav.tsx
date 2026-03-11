@@ -3,8 +3,9 @@
 import { CgProfile } from "react-icons/cg";
 import { BiImages } from "react-icons/bi";
 import { MdOutlineLibraryMusic, MdOutlineQueryStats } from "react-icons/md";
-import { IoIosCalendar } from "react-icons/io";
+import { IoIosCalendar, IoIosLogOut } from "react-icons/io";
 import { FiBookmark } from 'react-icons/fi';
+import { useLogout } from '@/app/hooks/useLogout';
 
 interface MobileNavProps {
   activeSection: string;
@@ -12,6 +13,7 @@ interface MobileNavProps {
 }
 
 export default function MobileNav({ activeSection, onSectionChange }: MobileNavProps) {
+  const { handleLogout } = useLogout();
   const menuItems = [
     { id: 'perfil', label: 'Perfil', icon: CgProfile },
     { id: 'publicaciones', label: 'Posts', icon: BiImages },
@@ -43,6 +45,13 @@ export default function MobileNav({ activeSection, onSectionChange }: MobileNavP
             </button>
           );
         })}
+        <button
+          onClick={handleLogout}
+          className="flex-shrink-0 flex flex-col items-center gap-1 px-4 py-3 transition-colors duration-200 border-b-2 border-transparent text-red-400/80 hover:text-red-400"
+        >
+          <IoIosLogOut className="w-5 h-5" />
+          <span className="text-xs font-medium whitespace-nowrap">Salir</span>
+        </button>
       </div>
     </nav>
   );

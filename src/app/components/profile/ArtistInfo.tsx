@@ -15,7 +15,8 @@ export default function ArtistInfo({ artist }: ArtistInfoProps) {
   const instagram = getSocialValue(artist.socialMedia, 'instagram');
   const facebook = getSocialValue(artist.socialMedia, 'facebook');
   const whatsapp = getSocialValue(artist.socialMedia, 'whatsapp');
-  const email = getSocialValue(artist.socialMedia, 'email');
+  // El email viene del campo directo del usuario, no de socialMedia
+  const email = (artist as { email?: string }).email ?? null;
 
   return (
     <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 mb-8">
