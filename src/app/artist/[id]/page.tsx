@@ -41,6 +41,7 @@ export default function ArtistPage() {
         setLoading(true);
         const res = await fetch(`${API_URL}/users/${id}`, {
           headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
         });
 
         if (!res.ok) {
@@ -59,15 +60,15 @@ export default function ArtistPage() {
         }
         // Siempre consultar el endpoint dedicado para obtener los datos más recientes
         try {
-          const smRes = await fetch(`${API_URL}/social-media?userId=${data.id}`, {
+          const smRes = await fetch(`${API_URL}/social-media?userId=${data.id}&_t=${Date.now()}`, {
             headers: getAuthHeaders(false),
+            cache: 'no-store',
           });
           if (smRes.ok) {
             const smData = await smRes.json();
             const smArray = Array.isArray(smData) ? smData : (smData?.data ?? []);
-            if (smArray.length > 0) {
-              data.socialMedia = smArray;
-            }
+            // Siempre sobreescribir con los datos más recientes (incluso si es vacío)
+            data.socialMedia = smArray;
           }
         } catch { /* silencioso */ }
         setArtist(data);
