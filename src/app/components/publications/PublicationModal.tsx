@@ -63,13 +63,14 @@ export default function PublicationModal({
         <div className="p-4 sm:p-6">
           {/* Imagen real de la publicación */}
           {publication.image && (
-            <div className="mb-4 rounded-sm overflow-hidden">
+            <div className="mb-4 rounded-sm overflow-hidden flex items-center justify-center" style={{ maxHeight: 'calc(90vh - 180px)' }}>
               <Image
                 src={publication.image}
                 alt="Imagen de publicación"
                 width={800}
-                height={450}
-                className="w-full object-cover rounded-sm"
+                height={800}
+                className="w-full h-full object-contain rounded-sm"
+                style={{ maxHeight: 'calc(90vh - 180px)' }}
                 unoptimized
               />
             </div>
