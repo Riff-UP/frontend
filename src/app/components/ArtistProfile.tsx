@@ -289,7 +289,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
                   <p className="text-white/80 text-xs sm:text-sm leading-relaxed mb-2">{artistWithFollowers.biography}</p>
                 )}
                 {hasSocial && (
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <div className="flex flex-col gap-y-1.5">
                     {instagram && (
                       <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
                         <img src="/images/instagram.png" alt="Instagram" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
