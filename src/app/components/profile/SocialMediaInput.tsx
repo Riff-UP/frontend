@@ -7,10 +7,10 @@ interface SocialMediaInputProps {
 }
 
 const platformConfig = {
-  instagram: { icon: '/images/instagram.png', alt: 'Instagram' },
-  facebook: { icon: '/images/facebook_n.png', alt: 'Facebook' },
-  whatsapp: { icon: '/images/whatsapp.png', alt: 'WhatsApp' },
-  email: { icon: '/images/gmail.png', alt: 'Gmail' },
+  instagram: { icon: '/images/instagram.png', alt: 'Instagram', placeholder: '@tu_usuario' },
+  facebook: { icon: '/images/facebook_n.png', alt: 'Facebook', placeholder: '@tu_usuario o URL' },
+  whatsapp: { icon: '/images/whatsapp.png', alt: 'WhatsApp', placeholder: '+52 55 1234 5678' },
+  email: { icon: '/images/gmail.png', alt: 'Gmail', placeholder: 'correo@ejemplo.com' },
 };
 
 export default function SocialMediaInput({ platform, value, onChange }: SocialMediaInputProps) {
@@ -31,6 +31,7 @@ export default function SocialMediaInput({ platform, value, onChange }: SocialMe
         type={platform === 'email' ? 'email' : 'text'}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        placeholder={config.placeholder}
         className="flex-1 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary
                  focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
                  transition-all duration-200"

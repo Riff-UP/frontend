@@ -57,18 +57,19 @@ export default function ArtistPage() {
         if (!data.socialMedia && data.social_media) {
           data.socialMedia = data.social_media;
         }
-        // Si socialMedia no vino con el usuario, buscarlo en el endpoint dedicado
-        if (!data.socialMedia || data.socialMedia.length === 0) {
-          try {
-            const smRes = await fetch(`${API_URL}/social-media?userId=${data.id}`, {
-              headers: getAuthHeaders(false),
-            });
-            if (smRes.ok) {
-              const smData = await smRes.json();
-              data.socialMedia = Array.isArray(smData) ? smData : (smData?.data ?? []);
+        // Siempre consultar el endpoint dedicado para obtener los datos más recientes
+        try {
+          const smRes = await fetch(`${API_URL}/social-media?userId=${data.id}`, {
+            headers: getAuthHeaders(false),
+          });
+          if (smRes.ok) {
+            const smData = await smRes.json();
+            const smArray = Array.isArray(smData) ? smData : (smData?.data ?? []);
+            if (smArray.length > 0) {
+              data.socialMedia = smArray;
             }
-          } catch { /* silencioso */ }
-        }
+          }
+        } catch { /* silencioso */ }
         setArtist(data);
       } catch {
         setError('Error de conexión');
