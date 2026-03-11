@@ -283,6 +283,21 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
             const email = (artistWithFollowers as { email?: string }).email ?? null;
             const hasSocial = instagram || facebook || whatsapp || email;
             if (!artistWithFollowers.biography && !hasSocial) return null;
+
+            const toInstagramUrl = (val: string) => {
+              const user = val.startsWith('@') ? val.slice(1) : val;
+              return `https://instagram.com/${user}`;
+            };
+            const toFacebookUrl = (val: string) => {
+              if (val.startsWith('http')) return val;
+              const user = val.startsWith('@') ? val.slice(1) : val;
+              return `https://facebook.com/${user}`;
+            };
+            const toWhatsappUrl = (val: string) => {
+              const num = val.replace(/\D/g, '');
+              return `https://wa.me/${num}`;
+            };
+
             return (
               <div className="mt-3 pl-0">
                 {artistWithFollowers.biography && (
@@ -291,28 +306,28 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
                 {hasSocial && (
                   <div className="flex flex-col gap-y-1.5">
                     {instagram && (
-                      <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
+                      <a href={toInstagramUrl(instagram)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-xs sm:text-sm">
                         <img src="/images/instagram.png" alt="Instagram" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span>{instagram}</span>
-                      </div>
+                      </a>
                     )}
                     {facebook && (
-                      <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
+                      <a href={toFacebookUrl(facebook)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-xs sm:text-sm">
                         <img src="/images/facebook_n.png" alt="Facebook" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span>{facebook}</span>
-                      </div>
+                      </a>
                     )}
                     {whatsapp && (
-                      <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
+                      <a href={toWhatsappUrl(whatsapp)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-xs sm:text-sm">
                         <img src="/images/whatsapp.png" alt="WhatsApp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span>{whatsapp}</span>
-                      </div>
+                      </a>
                     )}
                     {email && (
-                      <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
+                      <a href={`mailto:${email}`} className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-xs sm:text-sm">
                         <img src="/images/gmail.png" alt="Gmail" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span>{email}</span>
-                      </div>
+                      </a>
                     )}
                   </div>
                 )}
