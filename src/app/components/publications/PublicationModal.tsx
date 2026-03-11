@@ -33,57 +33,59 @@ export default function PublicationModal({
       onClick={onClose}
     >
       <div
-        className="bg-riff-header rounded-sm w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
+        className="bg-riff-header rounded-sm w-full max-w-4xl shadow-2xl flex flex-col md:flex-row overflow-hidden"
+        style={{ maxHeight: '90vh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 sticky top-0 bg-riff-header z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-              {authorImage ? (
-                <Image src={authorImage} alt={authorName} width={40} height={40} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-white text-sm font-medium">{authorName.charAt(0)}</span>
-              )}
-            </div>
-            <div>
-              <h3 className="text-white font-semibold text-base">{authorName}</h3>
-              <p className="text-white/60 text-xs">{formatDate(publication.date)}</p>
-            </div>
+        {/* Columna izquierda: imagen */}
+        {publication.image && (
+          <div className="md:flex-1 bg-black flex items-center justify-center overflow-hidden" style={{ maxHeight: '90vh' }}>
+            <Image
+              src={publication.image}
+              alt="Imagen de publicación"
+              width={800}
+              height={800}
+              className="w-full h-full object-contain"
+              style={{ maxHeight: '90vh' }}
+              unoptimized
+            />
           </div>
-          <button
-            onClick={onClose}
-            className="text-riff-primary hover:text-riff-primary/80 transition-colors"
-          >
-            <IoMdClose className="w-6 h-6" />
-          </button>
-        </div>
+        )}
 
-        {/* Modal Body */}
-        <div className="p-4 sm:p-6">
-          {/* Imagen real de la publicación */}
-          {publication.image && (
-            <div className="mb-4 rounded-sm overflow-hidden flex items-center justify-center" style={{ maxHeight: 'calc(90vh - 180px)' }}>
-              <Image
-                src={publication.image}
-                alt="Imagen de publicación"
-                width={800}
-                height={800}
-                className="w-full h-full object-contain rounded-sm"
-                style={{ maxHeight: 'calc(90vh - 180px)' }}
-                unoptimized
-              />
+        {/* Columna derecha: header + descripción + acciones */}
+        <div className={`flex flex-col ${publication.image ? 'md:w-72 lg:w-80' : 'w-full'} overflow-hidden`}>
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-white/10 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                {authorImage ? (
+                  <Image src={authorImage} alt={authorName} width={40} height={40} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-white text-sm font-medium">{authorName.charAt(0)}</span>
+                )}
+              </div>
+              <div>
+                <h3 className="text-white font-semibold text-sm">{authorName}</h3>
+                <p className="text-white/60 text-xs">{formatDate(publication.date)}</p>
+              </div>
             </div>
-          )}
+            <button
+              onClick={onClose}
+              className="text-riff-primary hover:text-riff-primary/80 transition-colors flex-shrink-0"
+            >
+              <IoMdClose className="w-6 h-6" />
+            </button>
+          </div>
 
-          <div className="mb-6">
-            <p className="text-white text-base leading-relaxed whitespace-pre-wrap">
+          {/* Descripción — scrolleable si es larga */}
+          <div className="flex-1 overflow-y-auto p-4">
+            <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">
               {publication.content}
             </p>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-4 pt-4">
+          {/* Acciones */}
+          <div className="flex items-center justify-end gap-4 p-4 border-t border-white/10 flex-shrink-0">
             <button
               onClick={(e) => {
                 e.stopPropagation();
