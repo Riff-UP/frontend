@@ -279,10 +279,19 @@ export function usePosts(userId?: string) {
     setError(null);
 
     try {
+      const payload: Record<string, unknown> = {};
+      if (data.content !== undefined) {
+        payload.title = data.content.substring(0, 100);
+        payload.description = data.content;
+      }
+      if (data.tags !== undefined) {
+        payload.tags = data.tags;
+      }
+
       const response = await fetch(`${API_URL}/posts/${postId}`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -290,10 +299,11 @@ export function usePosts(userId?: string) {
       }
 
       const updatedPost = await response.json();
+      const normalizedUpdated = { ...updatedPost, id: extractId(updatedPost._id ?? updatedPost.id) };
 
       // Actualizar en el estado
       setPosts(prevPosts =>
-        (Array.isArray(prevPosts) ? prevPosts : []).map(post => post.id === postId ? updatedPost : post)
+        (Array.isArray(prevPosts) ? prevPosts : []).map(post => post.id === postId ? { ...post, ...normalizedUpdated } : post)
       );
 
       return true;
