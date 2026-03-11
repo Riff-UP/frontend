@@ -259,19 +259,13 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
         )}
 
         <div className="absolute top-0 left-0 right-0 p-3 sm:p-6 lg:p-8 z-20">
-          <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 mb-4">
-            <ArtistInfo artist={artistWithFollowers} />
-          </div>
-        </div>
-
-        <div className="absolute bottom-0 left-0 right-0 px-2 sm:px-4 lg:px-8 z-20">
-          {/* Botón seguir — encima de los tabs para evitar sobreposición */}
-          {isAuth && !isSelf && (
-            <div className="pb-2 px-1 sm:px-2">
+          <ArtistInfo
+            artist={artistWithFollowers}
+            followButton={isAuth && !isSelf ? (
               <button
                 onClick={handleToggleFollow}
                 disabled={followLoading}
-                className={`px-6 py-1.5 rounded-sm text-sm font-medium transition-all duration-200 ${
+                className={`px-5 py-1.5 rounded-sm text-xs sm:text-sm font-medium transition-all duration-200 ${
                   isFollowing(artistData.id)
                     ? 'bg-white/10 text-white border border-white/20 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/30'
                     : 'bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white hover:opacity-90'
@@ -279,8 +273,11 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
               >
                 {followLoading ? '...' : isFollowing(artistData.id) ? 'Siguiendo' : 'Seguir'}
               </button>
-            </div>
-          )}
+            ) : null}
+          />
+        </div>
+
+        <div className="absolute bottom-0 left-0 right-0 px-2 sm:px-4 lg:px-8 z-20">
           <div className="flex justify-start space-x-2 sm:space-x-4 overflow-x-auto scrollbar-hide">
             {tabs.map(tab => (
               <button
@@ -299,6 +296,51 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
           </div>
         </div>
       </div>
+
+      {/* Bio y redes sociales — debajo del cover, fuera del absoluto */}
+      {(() => {
+        const instagram = artistWithFollowers.socialMedia?.find(sm => sm.url.startsWith('instagram:'))?.url.slice('instagram:'.length) ?? null;
+        const facebook = artistWithFollowers.socialMedia?.find(sm => sm.url.startsWith('facebook:'))?.url.slice('facebook:'.length) ?? null;
+        const whatsapp = artistWithFollowers.socialMedia?.find(sm => sm.url.startsWith('whatsapp:'))?.url.slice('whatsapp:'.length) ?? null;
+        const email = (artistWithFollowers as { email?: string }).email ?? null;
+        const hasSocial = instagram || facebook || whatsapp || email;
+        if (!artistWithFollowers.biography && !hasSocial) return null;
+        return (
+          <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-2">
+            {artistWithFollowers.biography && (
+              <p className="text-white/80 text-sm leading-relaxed mb-3">{artistWithFollowers.biography}</p>
+            )}
+            {hasSocial && (
+              <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+                {instagram && (
+                  <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
+                    <img src="/images/instagram.png" alt="Instagram" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span>{instagram}</span>
+                  </div>
+                )}
+                {facebook && (
+                  <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
+                    <img src="/images/facebook_n.png" alt="Facebook" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span>{facebook}</span>
+                  </div>
+                )}
+                {whatsapp && (
+                  <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
+                    <img src="/images/whatsapp.png" alt="WhatsApp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span>{whatsapp}</span>
+                  </div>
+                )}
+                {email && (
+                  <div className="flex items-center gap-1.5 text-white/70 text-xs sm:text-sm">
+                    <img src="/images/gmail.png" alt="Gmail" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span>{email}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Content */}
       <div className="p-4 sm:p-6 lg:p-8">
