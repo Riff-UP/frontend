@@ -194,7 +194,7 @@ function HomeContent() {
         <section className="max-w-8xl mx-auto px-0 sm:px-4 lg:px-0 py-6 sm:py-8">
           <div className="flex items-center justify-between mb-6 sm:mb-8 px-4 sm:px-0">
             <h2 className="text-xl sm:text-2xl font-bold text-white">
-              {searchQuery ? `Resultados para "${searchQuery}"` : 'Artistas destacados'}
+              {searchQuery ? `Resultados para "${searchQuery}"` : 'Descubre Nuevos Artistas'}
             </h2>
             <div className="flex gap-2">
               <button onClick={() => scrollCarousel('left')} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group">
@@ -243,7 +243,7 @@ function HomeContent() {
         {user && followedArtists.length > 0 && (
           <section className="max-w-8xl mx-auto px-0 sm:px-4 lg:px-0 py-6 sm:py-8">
             <div className="flex items-center justify-between mb-6 sm:mb-8 px-4 sm:px-0">
-              <h2 className="text-xl sm:text-2xl font-bold text-white">Artistas que sigues</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-white">Tus Artistas</h2>
               <div className="flex gap-2">
                 <button onClick={() => scrollFollowedCarousel('left')} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group">
                   <FaCircleChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-riff-primary group-hover:text-riff-primary-dark transition-colors" />
@@ -255,7 +255,7 @@ function HomeContent() {
             </div>
             <div ref={followedCarouselRef} className="flex gap-4 overflow-x-hidden scroll-smooth px-4 sm:px-0">
               {followedArtists.map((artist: ArtistData) => (
-                <div key={artist.id} className="w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)] xl:w-[calc(25%-12px)] flex-shrink-0">
+                <div key={artist.id} className="w-full sm:w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)] xl:w-[calc(25%-12px)] flex-shrink-0">
                   <ArtistCard
                     id={artist.id}
                     name={artist.name}
