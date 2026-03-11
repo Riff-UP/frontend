@@ -59,14 +59,13 @@ export default function PublicationModal({
 
         {/* Imagen */}
         {publication.image && (
-          <div className="bg-black flex items-center justify-center overflow-hidden md:flex-1" style={{ maxHeight: publication.image ? '50vh' : undefined }}>
+          <div className="bg-black flex items-center justify-center overflow-hidden md:flex-1">
             <Image
               src={publication.image}
               alt="Imagen de publicación"
               width={800}
               height={800}
-              className="w-full h-full object-contain"
-              style={{ maxHeight: '50vh' }}
+              className="w-full h-full object-contain max-h-[50vh] md:max-h-[90vh]"
               unoptimized
             />
           </div>
