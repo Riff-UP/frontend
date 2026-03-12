@@ -31,15 +31,14 @@ export interface LoginData {
 
 export interface ArtistData {
   id: string;
-  userId?: string;       // ID alternativo que puede usar el backend
-  sqlUserId?: string;    // sql_user_id del backend
+  userId?: string;
+  sqlUserId?: string;
   name: string;
   biography?: string | null;
   role: 'USER' | 'ARTIST';
   status: boolean;
   createdAt: string;
   socialMedia?: { id: string; url: string }[];
-  // campos opcionales para display
   coverImage?: string;
   profileImage?: string;
   followers?: number;
@@ -47,12 +46,24 @@ export interface ArtistData {
 
 export interface Publication {
   id: string | number;
-  content: string;
+  // ── tipo de post ───────────────────────────────────────────
+  type?: 'image' | 'audio';
+  // ── campos comunes ─────────────────────────────────────────
+  title?: string;
+  content: string;          // embedUrl para audio, imageUrl para image
+  description?: string;
   image?: string;
   date: string;
+  created_at?: string;      // ISO string del backend
+  // ── campos de audio ────────────────────────────────────────
+  provider?: 'youtube' | 'soundcloud' | 'spotify' | 'bandcamp' | string;
+  provider_meta?: {
+    provider_url?: string;  // URL original pegada por el artista
+  };
+  // ── interacciones ──────────────────────────────────────────
   likes: number;
   isLiked: boolean;
-  reactionId?: string;   // id del documento reaction para poder hacer DELETE
+  reactionId?: string;
   isSaved: boolean;
   author?: {
     name: string;
@@ -84,7 +95,6 @@ export interface ProfileData {
   email: string;
 }
 
-// User from backend
 export interface UserProfile {
   id: string;
   name: string;
