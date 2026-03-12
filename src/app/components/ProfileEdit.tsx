@@ -310,7 +310,7 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
   }
 
   return (
-    <div className="w-full flex justify-center">
+    <div className="w-full flex flex-col items-center">
       <div className="w-full max-w-4xl">
         <div className="bg-riff-header border border-white/0 rounded-sm p-3 sm:p-4 md:p-6">
         {/* Header con foto y seguidores */}
@@ -573,7 +573,6 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
 
         {/* Zona de peligro — recuadro separado */}
         <div className="w-full max-w-4xl mt-4 bg-riff-header border border-red-500/20 rounded-sm p-3 sm:p-4 md:p-6">
-          <p className="text-red-400/70 text-xs font-semibold uppercase tracking-wider mb-3">Zona de peligro</p>
           <div className="flex flex-col sm:flex-row gap-2">
             <button
               onClick={handleLogout}
