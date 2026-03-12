@@ -39,7 +39,8 @@ export default function MobileNav({ activeSection, onSectionChange }: MobileNavP
                   : 'text-white/60 border-transparent hover:text-riff-primary'
               }`}
             >
-              <Icon className="w-5 h-5" />
+              <Icon className="w-6 h-6" />
+              <span className="text-[10px] mt-0.5">{item.label}</span>
             </button>
           );
         })}

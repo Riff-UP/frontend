@@ -46,6 +46,9 @@ export default function EventCard({
               <BsCalendarEventFill className="w-4 h-4 flex-shrink-0" />
               <span className="text-sm">{formatDate(event.date, event.time)}</span>
             </div>
+            {event.description && (
+              <p className="text-white/60 text-sm mt-1">{event.description}</p>
+            )}
           </div>
         </div>
         {showAttendButton && onAttend && (

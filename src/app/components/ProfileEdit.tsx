@@ -568,10 +568,12 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
             Cancelar
           </button>
         </div>
+      </div>
+      </div>
 
-        {/* Zona de peligro */}
-        <div className="mt-6 pt-4 border-t border-red-500/20">
-          <p className="text-red-400/60 text-xs mb-3">Zona de peligro</p>
+        {/* Zona de peligro — recuadro separado */}
+        <div className="w-full max-w-4xl mt-4 bg-riff-header border border-red-500/20 rounded-sm p-3 sm:p-4 md:p-6">
+          <p className="text-red-400/70 text-xs font-semibold uppercase tracking-wider mb-3">Zona de peligro</p>
           <div className="flex flex-col sm:flex-row gap-2">
             <button
               onClick={handleLogout}
@@ -588,8 +590,6 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
             </button>
           </div>
         </div>
-      </div>
-      </div>
     </div>
   );
 }
