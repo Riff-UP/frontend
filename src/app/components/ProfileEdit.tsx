@@ -8,6 +8,7 @@ import ProfileFromToken from './profile/ProfileFromToken';
 import type { UseUserReturn } from '../hooks/useUser';
 import { uploadToR2, validateImageFile } from '../utils/r2Storage';
 import { fetchFollowersCount } from '../utils/follows';
+import { useLogout } from '../hooks/useLogout';
 
 interface ProfileEditProps {
   userState: UseUserReturn;
@@ -15,6 +16,7 @@ interface ProfileEditProps {
 
 export default function ProfileEdit({ userState }: ProfileEditProps) {
   const { user, loading, error, updateUser, deleteAccount, setPassword, addSocialMedia, updateSocialMedia, removeSocialMedia } = userState;
+  const { handleLogout } = useLogout();
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   
@@ -565,18 +567,26 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
           >
             Cancelar
           </button>
-          
-          <button
-            onClick={handleDeleteAccount}
-            disabled={saving}
-            className="px-5 py-2
-            bg-gradient-to-r from-riff-delete to-riff-delete-2
-            hover:from-riff-delete-2 hover:to-riff-delete
-             text-white text-sm font-medium rounded-sm transition-colors duration-200 sm:ml-auto
-             disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Eliminar cuenta
-          </button>
+        </div>
+
+        {/* Zona de peligro */}
+        <div className="mt-6 pt-4 border-t border-red-500/20">
+          <p className="text-red-400/60 text-xs mb-3">Zona de peligro</p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              onClick={handleLogout}
+              className="md:hidden px-5 py-2 bg-riff-text-secondary/30 hover:bg-riff-text-secondary/40 text-white text-sm font-medium rounded-sm border border-white/20 transition-colors duration-200"
+            >
+              Cerrar sesión
+            </button>
+            <button
+              onClick={handleDeleteAccount}
+              disabled={saving}
+              className="px-5 py-2 bg-gradient-to-r from-riff-delete to-riff-delete-2 hover:from-riff-delete-2 hover:to-riff-delete text-white text-sm font-medium rounded-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Eliminar cuenta
+            </button>
+          </div>
         </div>
       </div>
       </div>

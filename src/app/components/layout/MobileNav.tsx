@@ -3,9 +3,8 @@
 import { CgProfile } from "react-icons/cg";
 import { BiImages } from "react-icons/bi";
 import { MdOutlineLibraryMusic, MdOutlineQueryStats } from "react-icons/md";
-import { IoIosCalendar, IoIosLogOut } from "react-icons/io";
+import { IoIosCalendar } from "react-icons/io";
 import { FiBookmark } from 'react-icons/fi';
-import { useLogout } from '@/app/hooks/useLogout';
 
 interface MobileNavProps {
   activeSection: string;
@@ -13,7 +12,6 @@ interface MobileNavProps {
 }
 
 export default function MobileNav({ activeSection, onSectionChange }: MobileNavProps) {
-  const { handleLogout } = useLogout();
   const menuItems = [
     { id: 'perfil', label: 'Perfil', icon: CgProfile },
     { id: 'publicaciones', label: 'Posts', icon: BiImages },
@@ -45,13 +43,7 @@ export default function MobileNav({ activeSection, onSectionChange }: MobileNavP
             </button>
           );
         })}
-        <button
-          onClick={handleLogout}
-          title="Cerrar sesión"
-          className="flex-1 flex flex-col items-center py-2.5 transition-colors duration-200 border-b-2 border-transparent text-red-400/80 hover:text-red-400"
-        >
-          <IoIosLogOut className="w-5 h-5" />
-        </button>
+
       </div>
     </nav>
   );
