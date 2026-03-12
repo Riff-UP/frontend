@@ -46,9 +46,9 @@ export default function Musica() {
     await createPost({
       type: 'audio',
       title: data.title,
-      content: data.url,
+      url: data.url,
       description: data.description,
-    } as any);
+    });
     setShowAddModal(false);
     await fetchPosts();
   };
