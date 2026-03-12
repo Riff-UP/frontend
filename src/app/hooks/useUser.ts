@@ -226,7 +226,10 @@ export function useUser(): UseUserReturn {
       setUser(prev => ({
         ...(prev || {}),
         ...updatedUser,
-        // Preservar hasPassword y googleId que el backend puede no devolver correctamente
+        // El role NUNCA debe cambiar como resultado de un PATCH de perfil.
+        // El gateway envía role: USER por defecto, lo que puede contaminar la respuesta.
+        role: prev?.role ?? updatedUser.role,
+        // Preservar hasPassword y googleId que el PATCH puede no devolver correctamente
         googleId: prev?.googleId ?? updatedUser.googleId,
         hasPassword: prev?.hasPassword || updatedUser.hasPassword,
         socialMedia: prev?.socialMedia,
