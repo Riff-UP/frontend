@@ -295,7 +295,8 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
             </div>
           </div>
         </div>
-
+      </div>
+    );
   }
 
   // Si hay error (probablemente CORS), mostrar datos del token
