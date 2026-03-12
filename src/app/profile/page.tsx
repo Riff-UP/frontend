@@ -14,6 +14,7 @@ import Analytics from '../components/Analytics';
 import { SavedPostsProvider } from '../context/SavedPostsContext';
 import { useUser } from '../hooks/useUser';
 import { getValidToken } from '../utils/jwt';
+import Musica from '../components/Music';
 
 function ProfilePageContent({ activeSection, setActiveSection, userState }: { activeSection: string; setActiveSection: (s: string) => void; userState: ReturnType<typeof useUser>; }) {
   const renderContent = () => {
@@ -21,7 +22,7 @@ function ProfilePageContent({ activeSection, setActiveSection, userState }: { ac
       case 'perfil': return <ProfileEdit userState={userState} />;
       case 'publicaciones': return <Publications />;
       case 'eventos': return <Events />;
-      case 'musica': return <div className="text-white text-center py-20">Sección de Música - Próximamente</div>;
+      case 'musica': return <Musica />
       case 'guardados': return <Saved />;
       case 'estadisticas': return <Analytics />;
       default: return <ProfileEdit userState={userState} />;
