@@ -128,6 +128,11 @@ export function useUser(): UseUserReturn {
       const userData = await res.json();
       const userId = userData.id || tokenData.id;
 
+      // Si el usuario previamente estableció contraseña, restaurar el flag aunque el backend no lo refleje
+      if (!userData.hasPassword && localStorage.getItem(`riff_hp_${userId}`) === '1') {
+        userData.hasPassword = true;
+      }
+
       try {
         let smData: SocialMediaResponse = null;
         try {
@@ -299,6 +304,10 @@ export function useUser(): UseUserReturn {
         setError(message);
         return false;
       }
+
+      // Persistir el flag para que sobreviva entre sesiones
+      localStorage.setItem(`riff_hp_${user.id}`, '1');
+      setUser(prev => prev ? { ...prev, hasPassword: true } : null);
 
       return true;
     } catch (err) {
