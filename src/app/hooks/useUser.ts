@@ -223,7 +223,15 @@ export function useUser(): UseUserReturn {
       }
 
       const updatedUser = await res.json();
-      setUser(prev => ({ ...(prev || {}), ...updatedUser, socialMedia: prev?.socialMedia } as UserData));
+      setUser(prev => ({
+        ...(prev || {}),
+        ...updatedUser,
+        // Preservar campos críticos que nunca deben ser sobreescritos por una actualización parcial
+        role: prev?.role || updatedUser.role,
+        googleId: prev?.googleId ?? updatedUser.googleId,
+        hasPassword: prev?.hasPassword || updatedUser.hasPassword,
+        socialMedia: prev?.socialMedia,
+      } as UserData));
       window.dispatchEvent(new Event('authChange'));
       return true;
     } catch (err) {
