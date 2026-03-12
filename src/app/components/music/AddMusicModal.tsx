@@ -136,6 +136,7 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
               placeholder="Cuéntale algo a tu audiencia sobre esta canción..."
               rows={3}
               className="w-full px-3 py-2 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200 resize-none"
+            />
           </div>
 
           {/* Checkbox derechos */}
