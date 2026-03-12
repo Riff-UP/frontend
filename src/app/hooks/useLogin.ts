@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { API_BASE_URL } from '../config/api';
-import { getValidToken } from '../utils/jwt';
+import { getValidToken, decodeJWT } from '../utils/jwt';
 
 const REQUEST_TIMEOUT_MS = 12000;
 
@@ -86,6 +86,12 @@ export function useLogin() {
 
       if (data.token) {
         localStorage.setItem('token', data.token);
+        // Si el usuario pudo iniciar sesión con email+contraseña, definitivamente tiene contraseña.
+        // Guardar el flag para que el formulario de "establecer contraseña" no reaparezca.
+        const payload = decodeJWT<{ id?: string }>(data.token);
+        if (payload?.id) {
+          localStorage.setItem(`riff_hp_${payload.id}`, '1');
+        }
         // Disparar evento para actualizar Header
         window.dispatchEvent(new Event('authChange'));
         router.replace('/profile');
