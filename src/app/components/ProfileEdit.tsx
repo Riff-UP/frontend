@@ -590,7 +590,6 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
             </button>
           </div>
         </div>
-    </div>
 
       <DeleteConfirmModal
         isOpen={showDeleteModal}
@@ -599,5 +598,6 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
         onConfirm={confirmDeleteAccount}
         onCancel={() => setShowDeleteModal(false)}
       />
+    </div>
   );
 }
