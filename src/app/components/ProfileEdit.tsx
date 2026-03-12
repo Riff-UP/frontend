@@ -9,6 +9,7 @@ import type { UseUserReturn } from '../hooks/useUser';
 import { uploadToR2, validateImageFile } from '../utils/r2Storage';
 import { fetchFollowersCount } from '../utils/follows';
 import { useLogout } from '../hooks/useLogout';
+import DeleteConfirmModal from './common/DeleteConfirmModal';
 
 interface ProfileEditProps {
   userState: UseUserReturn;
@@ -18,6 +19,7 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
   const { user, loading, error, updateUser, deleteAccount, setPassword, addSocialMedia, updateSocialMedia, removeSocialMedia } = userState;
   const { handleLogout } = useLogout();
   const [saving, setSaving] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   
   // Estados para establecer contraseña
@@ -239,13 +241,12 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
   };
 
   const handleDeleteAccount = async () => {
-    const confirmed = window.confirm(
-      '¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer.'
-    );
-    
-    if (confirmed) {
-      await deleteAccount();
-    }
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteAccount = async () => {
+    setShowDeleteModal(false);
+    await deleteAccount();
   };
 
   const handleSetPassword = async () => {
@@ -294,8 +295,14 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
             </div>
           </div>
         </div>
-      </div>
-    );
+
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        title="Eliminar cuenta"
+        message="¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer."
+        onConfirm={confirmDeleteAccount}
+        onCancel={() => setShowDeleteModal(false)}
+      />
   }
 
   // Si hay error (probablemente CORS), mostrar datos del token
