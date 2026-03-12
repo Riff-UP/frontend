@@ -58,20 +58,24 @@ export function useEvents(): UseEventsReturn {
       setLoading(true);
       setError(null);
 
-      // El backend obtiene el userId del JWT, no enviar como query param
-      const url = `${API_URL}/events`;
-
-      // Construir headers con el token
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
 
-      // Solo inyectar Authorization si hay token
+      // Extraer el userId del JWT para filtrar client-side
+      let currentUserId: string | undefined;
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+        try {
+          const parts = token.split('.');
+          if (parts.length === 3) {
+            const payload = JSON.parse(atob(parts[1]));
+            currentUserId = payload.id || payload.userId || payload.sub || undefined;
+          }
+        } catch { /* si falla el parse, no filtramos */ }
       }
 
-      const res = await fetch(url, { headers });
+      const res = await fetch(`${API_URL}/events`, { headers });
 
       if (!res.ok) {
         const errorData = await res.json();
@@ -79,7 +83,15 @@ export function useEvents(): UseEventsReturn {
       }
 
       const data = await res.json();
-      setEvents(data.data || data || []);
+      const allEvents: EventData[] = data.data || data || [];
+
+      // El endpoint /events devuelve todos los eventos. Filtramos por el usuario
+      // actual para evitar mostrar eventos de otros usuarios en el perfil propio.
+      const filtered = currentUserId
+        ? allEvents.filter(e => String(e.sql_user_id) === currentUserId)
+        : allEvents;
+
+      setEvents(filtered);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
