@@ -54,9 +54,11 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
     loadUserData();
     window.addEventListener('storage', loadUserData);
     window.addEventListener('authChange', loadUserData);
+    window.addEventListener('profileChange', loadUserData);
     return () => {
       window.removeEventListener('storage', loadUserData);
       window.removeEventListener('authChange', loadUserData);
+      window.removeEventListener('profileChange', loadUserData);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);

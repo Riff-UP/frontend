@@ -232,7 +232,8 @@ export function useUser(): UseUserReturn {
         hasPassword: prev?.hasPassword || updatedUser.hasPassword,
         socialMedia: prev?.socialMedia,
       } as UserData));
-      window.dispatchEvent(new Event('authChange'));
+      // Usar 'profileChange' en vez de 'authChange' para que no se dispare un fetchUser completo
+      window.dispatchEvent(new Event('profileChange'));
       return true;
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
