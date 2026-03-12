@@ -59,18 +59,15 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-riff-overlay/70 backdrop-blur-sm" onClick={handleClose} />
-
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm p-4">
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-riff-header border border-riff-border rounded-xl shadow-2xl p-6">
+      <div className="relative w-full max-w-md bg-riff-card border border-white/20 rounded-lg shadow-2xl p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-white text-lg font-semibold">Agregar canción</h2>
           <button
             onClick={handleClose}
-            className="w-7 h-7 rounded-full bg-riff-card border border-riff-border flex items-center justify-center text-white/60 hover:text-white hover:border-riff-primary/50 transition-colors"
+            className="w-7 h-7 rounded-full bg-riff-header border border-white/20 flex items-center justify-center text-white/60 hover:text-white transition-colors"
           >
             <FaTimes className="w-3 h-3" />
           </button>
@@ -79,26 +76,26 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
         <div className="space-y-4">
           {/* Título */}
           <div>
-            <label className="block text-white/70 text-sm mb-1.5">Título</label>
+            <label className="block text-white text-xs sm:text-sm mb-1 sm:mb-1.5">Título</label>
             <input
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Nombre de la canción"
-              className="w-full bg-riff-card border border-riff-border rounded-lg px-3 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:border-riff-primary/60 transition-colors"
+              className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200"
             />
           </div>
 
           {/* Enlace */}
           <div>
-            <label className="block text-white/70 text-sm mb-1.5">Enlace de la canción</label>
+            <label className="block text-white text-xs sm:text-sm mb-1 sm:mb-1.5">Enlace de la canción</label>
             <div className="relative">
               <input
                 type="url"
                 value={url}
                 onChange={e => setUrl(e.target.value)}
                 placeholder="Pega el enlace de YouTube, SoundCloud, Spotify..."
-                className="w-full bg-riff-card border border-riff-border rounded-lg px-3 py-2.5 pr-10 text-white text-sm placeholder-white/30 focus:outline-none focus:border-riff-primary/60 transition-colors"
+                className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 pr-9 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200"
               />
               {providerCfg ? (
                 <providerCfg.Icon
@@ -119,7 +116,7 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
               </div>
             )}
 
-            <p className="mt-1.5 text-white/30 text-xs flex items-center gap-1.5 flex-wrap">
+            <p className="mt-1.5 text-riff-text-secondary text-xs flex items-center gap-1.5 flex-wrap">
               Soportado:
               <FaYoutube className="w-3 h-3 text-[#FF0000]" />
               <FaSoundcloud className="w-3 h-3 text-[#FF5500]" />
@@ -130,15 +127,15 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
 
           {/* Descripción */}
           <div>
-            <label className="block text-white/70 text-sm mb-1.5">
-              Descripción <span className="text-white/30">(opcional)</span>
+            <label className="block text-white text-xs sm:text-sm mb-1 sm:mb-1.5">
+              Descripción <span className="text-riff-text-secondary">(opcional)</span>
             </label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Cuéntale algo a tu audiencia sobre esta canción..."
               rows={2}
-              className="w-full bg-riff-card border border-riff-border rounded-lg px-3 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:border-riff-primary/60 transition-colors resize-none"
+              className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200 resize-none"
             />
           </div>
 
@@ -147,10 +144,10 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
             <div className="flex-shrink-0 mt-0.5">
               <input type="checkbox" checked={rightsConfirmed} onChange={e => setRightsConfirmed(e.target.checked)} className="sr-only" />
               <div
-                className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                className={`w-4 h-4 rounded-sm border flex items-center justify-center transition-colors ${
                   rightsConfirmed
                     ? 'bg-riff-primary border-riff-primary'
-                    : 'border-riff-border bg-riff-card group-hover:border-riff-primary/50'
+                    : 'border-white/20 bg-riff-text-primary/40 group-hover:border-riff-primary/50'
                 }`}
               >
                 {rightsConfirmed && (
@@ -160,32 +157,32 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
                 )}
               </div>
             </div>
-            <span className="text-white/50 text-xs leading-relaxed">
+            <span className="text-riff-text-secondary text-xs leading-relaxed">
               Confirmo que soy el titular de los derechos de este contenido o cuento con autorización para publicarlo. Entiendo que publicar contenido sin autorización puede resultar en la eliminación de la publicación.
             </span>
           </label>
 
           {/* Error */}
           {error && (
-            <p className="text-riff-delete-2 text-xs bg-riff-delete/10 border border-riff-delete/30 rounded-lg px-3 py-2">
+            <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/30 rounded-sm px-3 py-2">
               {error}
             </p>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 mt-6">
+        <div className="flex gap-3 mt-6">
           <button
             onClick={handleClose}
             disabled={isUploading}
-            className="px-4 py-2 rounded-lg text-sm text-white/60 hover:text-white hover:bg-riff-card border border-transparent hover:border-riff-border transition-colors disabled:opacity-50"
+            className="flex-1 px-4 py-2.5 bg-riff-text-secondary/30 hover:bg-riff-text-secondary/40 text-white text-sm font-medium rounded-sm border border-white/20 transition-colors duration-200 disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             onClick={handleSubmit}
             disabled={isUploading || !title.trim() || !url.trim() || !rightsConfirmed}
-            className="px-5 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white text-sm font-medium rounded-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isUploading ? (
               <>

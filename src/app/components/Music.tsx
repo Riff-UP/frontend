@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { FaMusic, FaTrash, FaEdit } from 'react-icons/fa';
+import { HiOutlineUpload } from "react-icons/hi";
 import { Publication } from '@/app/types';
 import MusicCard from './music/MusicCard';
 import MusicPlayer from './music/MusicPlayer';
@@ -70,13 +71,13 @@ export default function Musica() {
           <h2 className="text-white text-xl sm:text-2xl font-bold">Música</h2>
           <p className="text-white/60 text-xs sm:text-sm mt-1">
             Reproduce y administra tu contenido
-          </p>
+          </p>  
         </div>
         <button
           onClick={() => setShowAddModal(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white hover:opacity-90 transition-opacity"
         >
-          <span>↑</span>
+          <HiOutlineUpload className="w-4 h-4" />
           Subir
         </button>
       </div>
@@ -85,12 +86,7 @@ export default function Musica() {
         <div className="text-center py-20">
           <FaMusic className="w-12 h-12 text-white/20 mx-auto mb-4" />
           <p className="text-white/40 text-sm">Aún no has subido canciones.</p>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="mt-4 px-5 py-2 rounded-lg text-sm font-medium bg-white/10 text-white hover:bg-white/20 transition-colors"
-          >
-            Subir mi primera canción
-          </button>
+
         </div>
       ) : (
         <div className="flex flex-col gap-6">
