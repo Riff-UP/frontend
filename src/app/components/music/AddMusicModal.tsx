@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { FaTimes, FaLink, FaYoutube, FaSoundcloud, FaSpotify } from 'react-icons/fa';
+import { IoMdClose } from 'react-icons/io';
+import {  FaLink, FaYoutube, FaSoundcloud, FaSpotify } from 'react-icons/fa';
 
 interface AddMusicModalProps {
   isOpen: boolean;
@@ -69,7 +70,7 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
             onClick={handleClose}
             className="text-riff-primary hover:text-riff-primary/80 transition-colors"
           >
-            <FaTimes className="w-5 h-5" />
+            <IoMdClose className="w-6 h-6" />
           </button>
         </div>
 

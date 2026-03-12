@@ -75,8 +75,7 @@ export default function Musica() {
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white hover:opacity-90 transition-opacity"
-        >
+          className="px-4 py-2 bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white text-sm font-medium rounded-sm hover:from-riff-primary hover:to-riff-primary-dark transition-all duration-200 flex items-center gap-2"        >
           <HiOutlineUpload className="w-4 h-4" />
           Subir Canción
         </button>
