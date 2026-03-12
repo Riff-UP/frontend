@@ -62,35 +62,30 @@ export default function MusicPlayer({ provider, embedUrl, originalUrl }: MusicPl
         href={originalUrl ?? embedUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors group"
+        className="flex items-center gap-3 p-3 rounded-lg bg-riff-header hover:bg-riff-border transition-colors group border border-riff-border"
       >
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: cfg.color + '22' }}
-        >
+        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-riff-card">
           <Icon style={{ color: cfg.color }} className="w-4 h-4" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-white/50 text-xs">Escuchar en</p>
           <p className="text-white text-sm font-medium">{cfg.label}</p>
         </div>
-        <FaExternalLinkAlt className="w-3 h-3 text-white/30 group-hover:text-white/60 transition-colors" />
+        <FaExternalLinkAlt className="w-3 h-3 text-white/30 group-hover:text-riff-primary transition-colors" />
       </a>
     );
   }
 
   return (
-    <div className="w-full rounded-lg overflow-hidden bg-black/20">
-      {/* Provider badge */}
+    <div className="w-full rounded-lg overflow-hidden bg-riff-card border border-riff-border">
       <div className="flex items-center gap-1.5 px-3 pt-2 pb-1">
         <Icon style={{ color: cfg.color }} className="w-3 h-3" />
         <span className="text-white/40 text-xs">{cfg.label}</span>
       </div>
 
-      {/* Skeleton mientras carga */}
       {!loaded && (
         <div
-          className="w-full animate-pulse bg-white/5 flex items-center justify-center rounded"
+          className="w-full animate-pulse bg-riff-header flex items-center justify-center"
           style={{ height: cfg.iframeHeight }}
         >
           <Icon style={{ color: cfg.color + '55' }} className="w-7 h-7" />

@@ -10,7 +10,6 @@ interface AddMusicModalProps {
   onSubmit: (data: { title: string; url: string; description?: string }) => Promise<void>;
 }
 
-// Detecta el proveedor en el frontend para mostrar feedback visual inmediato
 function detectProviderClient(url: string): 'youtube' | 'soundcloud' | 'spotify' | 'bandcamp' | null {
   if (/youtube\.com|youtu\.be/.test(url)) return 'youtube';
   if (/soundcloud\.com/.test(url)) return 'soundcloud';
@@ -40,7 +39,6 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
 
   const handleSubmit = async () => {
     setError('');
-
     if (!title.trim()) { setError('El título es requerido.'); return; }
     if (!url.trim())   { setError('Pega el enlace de tu canción.'); return; }
     if (!detectedProvider) {
@@ -51,9 +49,7 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
       setError('Debes confirmar que tienes los derechos sobre este contenido.');
       return;
     }
-
     await onSubmit({ title: title.trim(), url: url.trim(), description: description.trim() || undefined });
-    // Reset
     setTitle(''); setUrl(''); setDescription(''); setRightsConfirmed(false); setError('');
   };
 
@@ -65,16 +61,16 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Overlay */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
+      <div className="absolute inset-0 bg-riff-overlay/70 backdrop-blur-sm" onClick={handleClose} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-[#1a1a2e] border border-white/10 rounded-xl shadow-2xl p-6">
+      <div className="relative w-full max-w-md bg-riff-header border border-riff-border rounded-xl shadow-2xl p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-white text-lg font-semibold">Agregar canción</h2>
           <button
             onClick={handleClose}
-            className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 transition-colors"
+            className="w-7 h-7 rounded-full bg-riff-card border border-riff-border flex items-center justify-center text-white/60 hover:text-white hover:border-riff-primary/50 transition-colors"
           >
             <FaTimes className="w-3 h-3" />
           </button>
@@ -89,7 +85,7 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Nombre de la canción"
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:border-riff-primary/50 transition-colors"
+              className="w-full bg-riff-card border border-riff-border rounded-lg px-3 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:border-riff-primary/60 transition-colors"
             />
           </div>
 
@@ -102,9 +98,8 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
                 value={url}
                 onChange={e => setUrl(e.target.value)}
                 placeholder="Pega el enlace de YouTube, SoundCloud, Spotify..."
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 pr-10 text-white text-sm placeholder-white/30 focus:outline-none focus:border-riff-primary/50 transition-colors"
+                className="w-full bg-riff-card border border-riff-border rounded-lg px-3 py-2.5 pr-10 text-white text-sm placeholder-white/30 focus:outline-none focus:border-riff-primary/60 transition-colors"
               />
-              {/* Icono del proveedor detectado */}
               {providerCfg ? (
                 <providerCfg.Icon
                   className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4"
@@ -115,7 +110,6 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
               )}
             </div>
 
-            {/* Badge de proveedor detectado */}
             {providerCfg && (
               <div className="mt-1.5 flex items-center gap-1.5">
                 <providerCfg.Icon className="w-3 h-3" style={{ color: providerCfg.color }} />
@@ -125,7 +119,6 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
               </div>
             )}
 
-            {/* Plataformas soportadas */}
             <p className="mt-1.5 text-white/30 text-xs flex items-center gap-1.5 flex-wrap">
               Soportado:
               <FaYoutube className="w-3 h-3 text-[#FF0000]" />
@@ -135,7 +128,7 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
             </p>
           </div>
 
-          {/* Descripción (opcional) */}
+          {/* Descripción */}
           <div>
             <label className="block text-white/70 text-sm mb-1.5">
               Descripción <span className="text-white/30">(opcional)</span>
@@ -145,24 +138,19 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
               onChange={e => setDescription(e.target.value)}
               placeholder="Cuéntale algo a tu audiencia sobre esta canción..."
               rows={2}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:border-riff-primary/50 transition-colors resize-none"
+              className="w-full bg-riff-card border border-riff-border rounded-lg px-3 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:border-riff-primary/60 transition-colors resize-none"
             />
           </div>
 
-          {/* Checkbox de derechos */}
+          {/* Checkbox derechos */}
           <label className="flex items-start gap-3 cursor-pointer group">
             <div className="flex-shrink-0 mt-0.5">
-              <input
-                type="checkbox"
-                checked={rightsConfirmed}
-                onChange={e => setRightsConfirmed(e.target.checked)}
-                className="sr-only"
-              />
+              <input type="checkbox" checked={rightsConfirmed} onChange={e => setRightsConfirmed(e.target.checked)} className="sr-only" />
               <div
                 className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
                   rightsConfirmed
                     ? 'bg-riff-primary border-riff-primary'
-                    : 'border-white/30 bg-white/5 group-hover:border-white/50'
+                    : 'border-riff-border bg-riff-card group-hover:border-riff-primary/50'
                 }`}
               >
                 {rightsConfirmed && (
@@ -179,7 +167,7 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
 
           {/* Error */}
           {error && (
-            <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            <p className="text-riff-delete-2 text-xs bg-riff-delete/10 border border-riff-delete/30 rounded-lg px-3 py-2">
               {error}
             </p>
           )}
@@ -190,7 +178,7 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
           <button
             onClick={handleClose}
             disabled={isUploading}
-            className="px-4 py-2 rounded-lg text-sm text-white/60 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+            className="px-4 py-2 rounded-lg text-sm text-white/60 hover:text-white hover:bg-riff-card border border-transparent hover:border-riff-border transition-colors disabled:opacity-50"
           >
             Cancelar
           </button>

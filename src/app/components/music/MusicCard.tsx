@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { FaPlay, FaPause, FaBookmark, FaRegBookmark } from 'react-icons/fa';
 import MusicPlayer from './MusicPlayer';
 import { Publication } from '@/app/types';
@@ -9,15 +8,14 @@ interface MusicCardProps {
   post: Publication;
   artistName: string;
   artistImage?: string;
-  isActive: boolean;           // ¿es la canción seleccionada actualmente?
+  isActive: boolean;
   isSaved: boolean;
   onSelect: (post: Publication) => void;
   onSave?: (postId: string | number) => void;
-  formatDate?: (date: string) => string;
 }
 
 export default function MusicCard({
-  post, artistName, artistImage, isActive, isSaved, onSelect, onSave, formatDate,
+  post, artistName, artistImage, isActive, isSaved, onSelect, onSave,
 }: MusicCardProps) {
   const embedUrl = post.content ?? '';
   const originalUrl = post.provider_meta?.provider_url ?? embedUrl;
@@ -27,14 +25,14 @@ export default function MusicCard({
     <div
       className={`flex flex-col rounded-lg overflow-hidden transition-colors border ${
         isActive
-          ? 'border-riff-primary/40 bg-riff-primary/10'
-          : 'border-white/5 bg-white/5 hover:bg-white/[0.08]'
+          ? 'border-riff-primary/50 bg-riff-overlay/30'
+          : 'border-riff-border bg-riff-card hover:bg-riff-header'
       }`}
     >
-      {/* ── Row principal ── */}
+      {/* Row principal */}
       <div className="flex items-center gap-3 px-3 py-3">
         {/* Thumbnail */}
-        <div className="relative w-11 h-11 rounded flex-shrink-0 overflow-hidden bg-white/10">
+        <div className="relative w-11 h-11 rounded flex-shrink-0 overflow-hidden bg-riff-header">
           {artistImage ? (
             <img src={artistImage} alt={artistName} className="w-full h-full object-cover" />
           ) : (
@@ -45,7 +43,7 @@ export default function MusicCard({
         {/* Info */}
         <div className="flex-1 min-w-0">
           <p className="text-white text-sm font-medium leading-snug truncate">{post.title}</p>
-          <p className="text-white/50 text-xs truncate">{artistName}</p>
+          <p className="text-riff-text-secondary text-xs truncate">{artistName}</p>
         </div>
 
         {/* Acciones */}
@@ -56,7 +54,7 @@ export default function MusicCard({
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
               isActive
                 ? 'bg-riff-primary text-white'
-                : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
+                : 'bg-riff-header text-white/70 hover:bg-riff-primary hover:text-white border border-riff-border'
             }`}
           >
             {isActive ? (
@@ -70,7 +68,7 @@ export default function MusicCard({
           {onSave && (
             <button
               onClick={() => onSave(post.id)}
-              className="w-7 h-7 flex items-center justify-center text-white/40 hover:text-white/80 transition-colors"
+              className="w-7 h-7 flex items-center justify-center text-white/40 hover:text-riff-primary transition-colors"
             >
               {isSaved ? (
                 <FaBookmark className="w-3.5 h-3.5 text-riff-primary" />
@@ -82,7 +80,7 @@ export default function MusicCard({
         </div>
       </div>
 
-      {/* ── Player embed (solo cuando está activo) ── */}
+      {/* Player embed (solo cuando está activo) */}
       {isActive && embedUrl && (
         <div className="px-3 pb-3">
           <MusicPlayer provider={provider} embedUrl={embedUrl} originalUrl={originalUrl} />
