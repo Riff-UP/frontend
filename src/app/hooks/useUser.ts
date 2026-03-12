@@ -128,6 +128,21 @@ export function useUser(): UseUserReturn {
       const userData = await res.json();
       const userId = userData.id || tokenData.id;
 
+      // El JWT contiene el rol real asignado en el login.
+      // Si el backend devuelve un rol incorrecto (ej: 'USER' en lugar de 'ARTIST'),
+      // el JWT es la fuente de verdad.
+      if (tokenData?.role) {
+        userData.role = tokenData.role;
+      }
+
+      // Guardar rol en localStorage como respaldo adicional
+      if (userData.role) {
+        localStorage.setItem(`riff_role_${userId}`, userData.role);
+      } else {
+        const storedRole = localStorage.getItem(`riff_role_${userId}`);
+        if (storedRole) userData.role = storedRole;
+      }
+
       // Si el usuario previamente estableció contraseña, restaurar el flag aunque el backend no lo refleje
       if (!userData.hasPassword && localStorage.getItem(`riff_hp_${userId}`) === '1') {
         userData.hasPassword = true;
@@ -227,7 +242,7 @@ export function useUser(): UseUserReturn {
         ...(prev || {}),
         ...updatedUser,
         // Preservar campos críticos que nunca deben ser sobreescritos por una actualización parcial
-        role: prev?.role || updatedUser.role,
+        role: prev?.role || updatedUser.role || (user?.id ? localStorage.getItem(`riff_role_${user.id}`) || undefined : undefined),
         googleId: prev?.googleId ?? updatedUser.googleId,
         hasPassword: prev?.hasPassword || updatedUser.hasPassword,
         socialMedia: prev?.socialMedia,
