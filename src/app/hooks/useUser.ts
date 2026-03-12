@@ -128,23 +128,6 @@ export function useUser(): UseUserReturn {
       const userData = await res.json();
       const userId = userData.id || tokenData.id;
 
-      console.log('[fetchUser] API /users/me response role:', userData.role, '| JWT role:', tokenData?.role);
-
-      // El JWT contiene el rol real asignado en el login.
-      // Si el backend devuelve un rol incorrecto (ej: 'USER' en lugar de 'ARTIST'),
-      // el JWT es la fuente de verdad.
-      if (tokenData?.role) {
-        userData.role = tokenData.role;
-      }
-
-      // Guardar rol en localStorage como respaldo adicional
-      if (userData.role) {
-        localStorage.setItem(`riff_role_${userId}`, userData.role);
-      } else {
-        const storedRole = localStorage.getItem(`riff_role_${userId}`);
-        if (storedRole) userData.role = storedRole;
-      }
-
       // Si el usuario previamente estableció contraseña, restaurar el flag aunque el backend no lo refleje
       if (!userData.hasPassword && localStorage.getItem(`riff_hp_${userId}`) === '1') {
         userData.hasPassword = true;
@@ -196,7 +179,6 @@ export function useUser(): UseUserReturn {
       }
 
       setUser(userData);
-      console.log('[fetchUser] setUser called with role:', userData.role);
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         setError('La consulta del perfil tardó demasiado. Intenta de nuevo en unos segundos.');
@@ -241,20 +223,14 @@ export function useUser(): UseUserReturn {
       }
 
       const updatedUser = await res.json();
-      console.log('[updateUser] API PATCH response role:', updatedUser.role);
-      console.log('[updateUser] prev.role before merge:', /* captured below */ 'see next log');
-      setUser(prev => {
-        console.log('[updateUser] setUser — prev.role:', prev?.role, '| updatedUser.role:', updatedUser.role);
-        return ({
+      setUser(prev => ({
         ...(prev || {}),
         ...updatedUser,
-        // Preservar campos críticos que nunca deben ser sobreescritos por una actualización parcial
-        role: prev?.role || updatedUser.role || (user?.id ? localStorage.getItem(`riff_role_${user.id}`) || undefined : undefined),
+        // Preservar hasPassword y googleId que el backend puede no devolver correctamente
         googleId: prev?.googleId ?? updatedUser.googleId,
         hasPassword: prev?.hasPassword || updatedUser.hasPassword,
         socialMedia: prev?.socialMedia,
-      } as UserData);
-      });
+      } as UserData));
       // Usar 'profileChange' en vez de 'authChange' para que no se dispare un fetchUser completo
       window.dispatchEvent(new Event('profileChange'));
       return true;
