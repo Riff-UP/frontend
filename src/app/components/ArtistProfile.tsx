@@ -325,25 +325,25 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
                 {hasSocial && (
                   <div className="flex flex-col gap-y-1.5">
                     {instagram && (
-                      <a href={toInstagramUrl(instagram)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-xs sm:text-sm">
+                      <a href={toInstagramUrl(instagram)} target="_blank" rel="noopener noreferrer" className="w-fit flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-xs sm:text-sm">
                         <img src="/images/instagram.png" alt="Instagram" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span>{instagram}</span>
                       </a>
                     )}
                     {facebook && (
-                      <a href={toFacebookUrl(facebook)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-xs sm:text-sm">
+                      <a href={toFacebookUrl(facebook)} target="_blank" rel="noopener noreferrer" className="w-fit flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-xs sm:text-sm">
                         <img src="/images/facebook_n.png" alt="Facebook" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span>{facebook}</span>
                       </a>
                     )}
                     {whatsapp && (
-                      <a href={toWhatsappUrl(whatsapp)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-xs sm:text-sm">
+                      <a href={toWhatsappUrl(whatsapp)} target="_blank" rel="noopener noreferrer" className="w-fit flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-xs sm:text-sm">
                         <img src="/images/whatsapp.png" alt="WhatsApp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span>{formatWhatsappDisplay(whatsapp)}</span>
                       </a>
                     )}
                     {email && (
-                      <a href={`mailto:${email}`} className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-xs sm:text-sm">
+                      <a href={`mailto:${email}`} className="w-fit flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-xs sm:text-sm">
                         <img src="/images/gmail.png" alt="Gmail" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span>{email}</span>
                       </a>

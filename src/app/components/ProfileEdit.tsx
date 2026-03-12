@@ -296,13 +296,6 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
           </div>
         </div>
 
-      <DeleteConfirmModal
-        isOpen={showDeleteModal}
-        title="Eliminar cuenta"
-        message="¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer."
-        onConfirm={confirmDeleteAccount}
-        onCancel={() => setShowDeleteModal(false)}
-      />
   }
 
   // Si hay error (probablemente CORS), mostrar datos del token
@@ -597,5 +590,13 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
           </div>
         </div>
     </div>
+
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        title="Eliminar cuenta"
+        message="¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer."
+        onConfirm={confirmDeleteAccount}
+        onCancel={() => setShowDeleteModal(false)}
+      />
   );
 }
