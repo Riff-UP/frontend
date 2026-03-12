@@ -46,7 +46,7 @@ export default function EventForm({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm p-4">
-      <div className="bg-riff-header border border-white/20 rounded-lg w-full max-w-2xl shadow-2xl">
+      <div className="bg-riff-header border border-white/20 rounded-lg w-full max-w-lg shadow-2xl">
         {/* Modal Header */}
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-white/10">
           <h3 className="text-white text-lg sm:text-xl font-semibold">

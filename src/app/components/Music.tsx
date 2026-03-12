@@ -78,7 +78,7 @@ export default function Musica() {
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white hover:opacity-90 transition-opacity"
         >
           <HiOutlineUpload className="w-4 h-4" />
-          Subir
+          Subir Canción
         </button>
       </div>
 

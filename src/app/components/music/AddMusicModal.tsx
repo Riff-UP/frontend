@@ -61,41 +61,41 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm p-4">
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-riff-card border border-white/20 rounded-lg shadow-2xl p-6">
+      <div className="bg-riff-header border border-white/20 rounded-lg w-full max-w-lg shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-white text-lg font-semibold">Agregar canción</h2>
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-white/10">
+          <h2 className="text-white text-lg sm:text-xl font-semibold">Agregar canción</h2>
           <button
             onClick={handleClose}
-            className="w-7 h-7 rounded-full bg-riff-header border border-white/20 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+            className="text-riff-primary hover:text-riff-primary/80 transition-colors"
           >
-            <FaTimes className="w-3 h-3" />
+            <FaTimes className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="space-y-4">
+        <div className="p-4 sm:p-6 space-y-4">
           {/* Título */}
           <div>
-            <label className="block text-white text-xs sm:text-sm mb-1 sm:mb-1.5">Título</label>
+            <label className="block text-white text-sm mb-2">Título</label>
             <input
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Nombre de la canción"
-              className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200"
+              className="w-full px-3 py-2 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200"
             />
           </div>
 
           {/* Enlace */}
           <div>
-            <label className="block text-white text-xs sm:text-sm mb-1 sm:mb-1.5">Enlace de la canción</label>
+            <label className="block text-white text-sm mb-2">Enlace de la canción</label>
             <div className="relative">
               <input
                 type="url"
                 value={url}
                 onChange={e => setUrl(e.target.value)}
                 placeholder="Pega el enlace de YouTube, SoundCloud, Spotify..."
-                className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 pr-9 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200"
+                className="w-full px-3 py-2 pr-9 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200"
               />
               {providerCfg ? (
                 <providerCfg.Icon
@@ -127,16 +127,15 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
 
           {/* Descripción */}
           <div>
-            <label className="block text-white text-xs sm:text-sm mb-1 sm:mb-1.5">
-              Descripción <span className="text-riff-text-secondary">(opcional)</span>
+            <label className="block text-white text-sm mb-2">
+              Descripción <span className="text-riff-text-secondary text-xs">(opcional)</span>
             </label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Cuéntale algo a tu audiencia sobre esta canción..."
-              rows={2}
-              className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-xs sm:text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200 resize-none"
-            />
+              rows={3}
+              className="w-full px-3 py-2 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200 resize-none"
           </div>
 
           {/* Checkbox derechos */}
@@ -171,7 +170,7 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 mt-6">
+        <div className="flex gap-3 p-4 sm:p-6 border-t border-white/10">
           <button
             onClick={handleClose}
             disabled={isUploading}
@@ -182,7 +181,7 @@ export default function AddMusicModal({ isOpen, isUploading, onClose, onSubmit }
           <button
             onClick={handleSubmit}
             disabled={isUploading || !title.trim() || !url.trim() || !rightsConfirmed}
-            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white text-sm font-medium rounded-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-riff-primary-dark to-riff-primary hover:from-riff-primary hover:to-riff-primary-dark text-white text-sm font-medium rounded-sm transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isUploading ? (
               <>
