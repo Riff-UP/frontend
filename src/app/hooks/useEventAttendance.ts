@@ -37,11 +37,8 @@ function loadFromStorage(userId: string): Map<string, string> {
 
 function saveToStorage(userId: string, map: Map<string, string>) {
   try {
-    const obj = Object.fromEntries(map.entries());
-    localStorage.setItem(STORAGE_KEY(userId), JSON.stringify(obj));
-  } catch {
-    // si localStorage no está disponible no bloqueamos
-  }
+    localStorage.setItem(STORAGE_KEY(userId), JSON.stringify(Object.fromEntries(map.entries())));
+  } catch { /* silencioso */ }
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -56,16 +53,34 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
     return null;
   };
 
-  // Actualiza estado + localStorage en una sola operación
-  const update = (fn: (prev: Map<string, string>) => Map<string, string>) => {
+  const update = (userId: string, fn: (prev: Map<string, string>) => Map<string, string>) => {
     setAttendedEvents(prev => {
       const next = fn(prev);
-      if (sqlUserId) saveToStorage(sqlUserId, next);
+      saveToStorage(userId, next);
       return next;
     });
   };
 
   const isAttending = (eventId: string) => attendedEvents.has(eventId);
+
+  // Recupera el attendance record existente para un evento — usado cuando el backend devuelve 409
+  const fetchExistingAttendance = async (
+    eventId: string,
+    userId: string,
+    token: string,
+  ): Promise<string | null> => {
+    try {
+      const res = await fetch(`${API_URL}/events/attendance/event/${eventId}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) return null;
+      const records: AttendanceRecord[] = await res.json();
+      const mine = records.find(r => r.sql_user_id === userId && r.status !== 'cancelled');
+      return mine?.id ?? null;
+    } catch {
+      return null;
+    }
+  };
 
   const attend = async (eventId: string, sqlUserId: string): Promise<boolean> => {
     const token = getToken();
@@ -74,7 +89,7 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
     setLoading(true);
 
     // Optimista
-    update(prev => { const next = new Map(prev); next.set(eventId, '__pending__'); return next; });
+    update(sqlUserId, prev => { const next = new Map(prev); next.set(eventId, '__pending__'); return next; });
 
     try {
       const res = await fetch(`${API_URL}/events/attendance`, {
@@ -83,16 +98,28 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
         body: JSON.stringify({ event_id: eventId, sql_user_id: sqlUserId, status: 'confirmed' }),
       });
 
+      if (res.status === 409) {
+        // Ya existe en BD — recuperar el ID para poder desasistir después
+        const existingId = await fetchExistingAttendance(eventId, sqlUserId, token);
+        if (existingId) {
+          update(sqlUserId, prev => { const next = new Map(prev); next.set(eventId, existingId); return next; });
+          return true;
+        }
+        // Si no pudimos recuperarlo, al menos marcar como asistiendo sin ID
+        update(sqlUserId, prev => { const next = new Map(prev); next.set(eventId, '__conflict__'); return next; });
+        return true;
+      }
+
       if (!res.ok) {
-        update(prev => { const next = new Map(prev); next.delete(eventId); return next; });
+        update(sqlUserId, prev => { const next = new Map(prev); next.delete(eventId); return next; });
         return false;
       }
 
       const record: AttendanceRecord = await res.json();
-      update(prev => { const next = new Map(prev); next.set(eventId, record.id); return next; });
+      update(sqlUserId, prev => { const next = new Map(prev); next.set(eventId, record.id); return next; });
       return true;
     } catch {
-      update(prev => { const next = new Map(prev); next.delete(eventId); return next; });
+      update(sqlUserId, prev => { const next = new Map(prev); next.delete(eventId); return next; });
       return false;
     } finally {
       setLoading(false);
@@ -104,10 +131,16 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
     const attendanceId = attendedEvents.get(eventId);
     if (!token || !attendanceId || attendanceId === '__pending__') return false;
 
+    // Si el ID es __conflict__ no podemos hacer DELETE (no tenemos el ID real)
+    if (attendanceId === '__conflict__') {
+      update(sqlUserId ?? '', prev => { const next = new Map(prev); next.delete(eventId); return next; });
+      return true;
+    }
+
     setLoading(true);
 
     // Optimista
-    update(prev => { const next = new Map(prev); next.delete(eventId); return next; });
+    update(sqlUserId ?? '', prev => { const next = new Map(prev); next.delete(eventId); return next; });
 
     try {
       const res = await fetch(`${API_URL}/events/attendance/${attendanceId}`, {
@@ -116,12 +149,12 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
       });
 
       if (!res.ok) {
-        update(prev => { const next = new Map(prev); next.set(eventId, attendanceId); return next; });
+        update(sqlUserId ?? '', prev => { const next = new Map(prev); next.set(eventId, attendanceId); return next; });
         return false;
       }
       return true;
     } catch {
-      update(prev => { const next = new Map(prev); next.set(eventId, attendanceId); return next; });
+      update(sqlUserId ?? '', prev => { const next = new Map(prev); next.set(eventId, attendanceId); return next; });
       return false;
     } finally {
       setLoading(false);
