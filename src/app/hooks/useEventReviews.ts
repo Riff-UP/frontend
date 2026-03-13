@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config/api';
 
 const API_URL = API_BASE_URL;
@@ -57,23 +57,37 @@ function buildEntry(reviews: EventReview[], sqlUserId?: string): EventReviewEntr
 export function useEventReviews(sqlUserId?: string): UseEventReviewsReturn {
   const [reviewsByEvent, setReviewsByEvent] = useState<Map<string, EventReviewEntry>>(new Map());
   const [loading, setLoading] = useState(false);
+  // Guarda los eventIds que ya fueron fetcheados para refetchear cuando sqlUserId llegue
+  const fetchedEventIds = useRef<Set<string>>(new Set());
 
   const getToken = (): string | null => {
     if (typeof window !== 'undefined') return localStorage.getItem('token');
     return null;
   };
 
-  const setEntry = (eventId: string, entry: EventReviewEntry) => {
+  const setEntry = useCallback((eventId: string, entry: EventReviewEntry) => {
     setReviewsByEvent(prev => { const next = new Map(prev); next.set(eventId, entry); return next; });
-  };
+  }, []);
 
   const fetchReviewsForEvent = useCallback(async (eventId: string) => {
     try {
       const res = await fetch(`${API_URL}/events/reviews/event/${eventId}`);
       if (!res.ok) return;
       const records: EventReview[] = await res.json();
-      if (Array.isArray(records)) setEntry(eventId, buildEntry(records, sqlUserId));
+      if (Array.isArray(records)) {
+        fetchedEventIds.current.add(eventId);
+        setEntry(eventId, buildEntry(records, sqlUserId));
+      }
     } catch { /* silencioso */ }
+  }, [sqlUserId, setEntry]);
+
+  // Cuando sqlUserId llega async (undefined → valor), refetchear todos los eventos
+  // ya cargados para recalcular userReviewId con el usuario correcto
+  useEffect(() => {
+    if (!sqlUserId) return;
+    fetchedEventIds.current.forEach(eventId => {
+      fetchReviewsForEvent(eventId);
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sqlUserId]);
 
@@ -95,6 +109,13 @@ export function useEventReviews(sqlUserId?: string): UseEventReviewsReturn {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ event_id: eventId, sql_user_id: sqlUserId, rating }),
       });
+
+      if (res.status === 409) {
+        // Ya existe en BD — refetchear para obtener el userReviewId real
+        await fetchReviewsForEvent(eventId);
+        return true;
+      }
+
       if (!res.ok) return false;
 
       const record: EventReview = await res.json();
@@ -126,7 +147,6 @@ export function useEventReviews(sqlUserId?: string): UseEventReviewsReturn {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
-        // Revertir
         await fetchReviewsForEvent(eventId);
         return false;
       }
