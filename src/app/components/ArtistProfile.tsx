@@ -15,6 +15,7 @@ import { useFollow } from '@/app/hooks/useFollow';
 import { usePublicArtistData } from '@/app/hooks/usePublicArtistData';
 import { usePostReactions } from '@/app/hooks/usePostReactions';
 import { useEventAttendance } from '@/app/hooks/useEventAttendance';
+import { useEventReviews } from '@/app/hooks/useEventReviews';
 import MusicPlayer from './music/MusicPlayer';
 
 interface ArtistProfileProps {
@@ -47,6 +48,8 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
   const { isLiked, toggleLike, reactedPosts, fetchPostReactionCounts, postReactionCounts, getReactionCount } =
     usePostReactions(user?.id);
   const { isAttending, attend, unattend } = useEventAttendance(user?.id);
+  const { getEventReviews, hasReviewed, submitReview, removeReview, fetchReviewsForEvent } =
+    useEventReviews(user?.id);
 
   const [, forceUpdate] = useState({});
   useEffect(() => { forceUpdate({}); }, [savedPosts]);
@@ -56,6 +59,12 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
     if (ids.length > 0) fetchPostReactionCounts(ids);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawPosts]);
+
+  // Cargar reseñas cuando los eventos estén disponibles
+  useEffect(() => {
+    events.forEach(event => fetchReviewsForEvent(event.id));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events]);
 
   const bannerImages = useMemo(() => {
     const imgs: string[] = [];
@@ -142,6 +151,15 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
     } else {
       await attend(eventId, user.id);
     }
+  };
+
+  const handleSubmitReview = async (eventId: string, rating: number): Promise<boolean> => {
+    if (!user) { alert('Debes iniciar sesión para calificar'); return false; }
+    return await submitReview(eventId, user.id, rating);
+  };
+
+  const handleRemoveReview = async (eventId: string): Promise<boolean> => {
+    return await removeReview(eventId);
   };
 
   const handlePrevMonth = () => {
@@ -493,15 +511,24 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
                   <p className="text-riff-text-secondary text-sm text-center py-8">Este artista no tiene eventos próximos.</p>
                 ) : (
                   <div className="space-y-4">
-                    {events.map(event => (
-                      <EventCard
-                        key={event.id}
-                        event={{ ...event, isAttending: isAttending(event.id) }}
-                        formatDate={formatEventDate}
-                        showAttendButton={!isSelf}
-                        onAttend={handleAttend}
-                      />
-                    ))}
+                    {events.map(event => {
+                      const { avgRating, totalReviews } = getEventReviews(event.id);
+                      return (
+                        <EventCard
+                          key={event.id}
+                          event={{ ...event, isAttending: isAttending(event.id) }}
+                          formatDate={formatEventDate}
+                          showAttendButton={!isSelf}
+                          onAttend={handleAttend}
+                          avgRating={avgRating}
+                          totalReviews={totalReviews}
+                          hasReviewed={hasReviewed(event.id)}
+                          showReviewSection={!isSelf && isAuth}
+                          onSubmitReview={handleSubmitReview}
+                          onRemoveReview={handleRemoveReview}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </div>
