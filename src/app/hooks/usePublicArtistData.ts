@@ -60,10 +60,10 @@ export function usePublicArtistData(artistId?: string) {
     setLoadingEvents(true);
 
     try {
-      // Cargar posts y eventos en paralelo
+      // cache: 'no-store' para evitar respuestas cacheadas en distintos dispositivos
       const [postsRes, eventsRes] = await Promise.all([
-        fetch(`${API_URL}/posts`, { headers: getAuthHeaders() }),
-        fetch(`${API_URL}/events`, { headers: getAuthHeaders() }),
+        fetch(`${API_URL}/posts`, { headers: getAuthHeaders(), cache: 'no-store' }),
+        fetch(`${API_URL}/events`, { headers: getAuthHeaders(), cache: 'no-store' }),
       ]);
 
       // ── POSTS ──
@@ -71,9 +71,6 @@ export function usePublicArtistData(artistId?: string) {
         ? await postsRes.json().then(d => Array.isArray(d) ? d : d?.data ?? d?.posts ?? [])
         : [];
 
-      // Construir el set de IDs reales del artista:
-      // El artistId (de users-ms) SÍ aparece en sql_user_id de posts
-      // Todos los sql_user_id de posts de este artista son IDs válidos suyos
       const knownIds = new Set<string>([artistId]);
       rawPosts
         .filter(p => String(p.sql_user_id ?? p.authorId ?? '') === artistId)
@@ -85,7 +82,6 @@ export function usePublicArtistData(artistId?: string) {
       const artistPosts = rawPosts
         .filter(p => knownIds.has(String(p.sql_user_id ?? p.authorId ?? '')))
         .map(p => {
-          // Priorizar _id de MongoDB; si no, usar id solo si parece ObjectId (24 hex chars)
           const mongoId = extractId(p._id);
           const fallbackId = extractId(p.id);
           const postId = mongoId || (fallbackId.length === 24 ? fallbackId : '');
@@ -109,31 +105,21 @@ export function usePublicArtistData(artistId?: string) {
       setLoadingPosts(false);
 
       // ── EVENTOS ──
-      // Si no encontramos el sql_user_id del artista en posts,
-      // buscamos en eventos directamente por todos los IDs conocidos
-      // Además intentamos inferir más IDs del nombre del artista buscando en follows
       const rawEvents: RawEvent[] = eventsRes.ok
         ? await eventsRes.json().then(d => Array.isArray(d) ? d : d?.data ?? [])
         : [];
 
-      // Si los posts no nos dieron más IDs, los eventos pueden tener el sql_user_id real
-      // Buscamos eventos cuyo sql_user_id matchee con CUALQUIER id conocido
-      // Si knownIds solo tiene artistId, probamos también matchear por follows
       const artistEvents = rawEvents.filter(e =>
         knownIds.has(String(e.sql_user_id ?? e.organizerId ?? ''))
       );
 
-      // Si no encontramos eventos con los IDs de posts, intentamos una búsqueda
-      // por follows: obtenemos los usuarios que siguen a este artista para inferir su ID real
       if (artistEvents.length === 0 && rawEvents.length > 0) {
         try {
-          const followsRes = await fetch(`${API_URL}/follows?followingId=${artistId}`, { headers: getAuthHeaders(false) });
+          const followsRes = await fetch(`${API_URL}/follows?followingId=${artistId}`, { headers: getAuthHeaders(false), cache: 'no-store' });
           if (followsRes.ok) {
             const followsData = await followsRes.json();
             const follows = Array.isArray(followsData) ? followsData : (followsData?.data ?? []);
-            // Los follows tienen followerId y followingId, el followingId es el artistId
-            // Pero también podemos buscar si el artista sigue a alguien
-            const followsAsFollower = await fetch(`${API_URL}/follows?followerId=${artistId}`, { headers: getAuthHeaders(false) });
+            const followsAsFollower = await fetch(`${API_URL}/follows?followerId=${artistId}`, { headers: getAuthHeaders(false), cache: 'no-store' });
             if (followsAsFollower.ok) {
               await followsAsFollower.json();
             }
