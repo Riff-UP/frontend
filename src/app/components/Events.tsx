@@ -36,8 +36,7 @@ export default function Events() {
   // El filtro por usuario se aplica en useEvents (client-side, por userId del JWT).
   const events: Event[] = backendEvents.map(e => {
     const date = e.event_date.split('T')[0];
-    const dateTime = new Date(e.event_date);
-    const time = dateTime.toTimeString().slice(0, 5);
+    const time = e.event_date.includes('T') ? e.event_date.substring(11, 16) : '';
     return {
       id: e._id,
       title: e.title,
