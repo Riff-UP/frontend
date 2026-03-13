@@ -212,6 +212,15 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
     return dateString;
   };
 
+  const eventHasPassed = (dateString: string): boolean => {
+    if (!dateString) return false;
+    const eventDate = new Date(dateString);
+    if (isNaN(eventDate.getTime())) return false;
+    const oneDayAfter = new Date(eventDate);
+    oneDayAfter.setDate(oneDayAfter.getDate() + 1);
+    return new Date() >= oneDayAfter;
+  };
+
   const artistWithFollowers: ArtistData = {
     ...artistData,
     followers: localFollowersCount ?? followersCount ?? artistData.followers,
@@ -523,7 +532,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
                           avgRating={avgRating}
                           totalReviews={totalReviews}
                           hasReviewed={hasReviewed(event.id)}
-                          showReviewSection={!isSelf && isAuth}
+                          showReviewSection={!isSelf && isAuth && eventHasPassed(event.date)}
                           onSubmitReview={handleSubmitReview}
                           onRemoveReview={handleRemoveReview}
                         />
