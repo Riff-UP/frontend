@@ -40,11 +40,10 @@ function saveToStorage(userId: string, map: Map<string, string>) {
 }
 
 export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn {
-  // Arrancamos con mapa vacío siempre — se hidrata en el useEffect
   const [attendedEvents, setAttendedEvents] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
 
-  // Cuando sqlUserId esté disponible (carga asíncrona del user), cargar desde localStorage
+  // Hidratar desde localStorage cuando sqlUserId esté disponible
   useEffect(() => {
     if (!sqlUserId) return;
     const stored = loadFromStorage(sqlUserId);
@@ -59,34 +58,19 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
   const update = (userId: string, fn: (prev: Map<string, string>) => Map<string, string>) => {
     setAttendedEvents(prev => {
       const next = fn(prev);
-      saveToStorage(userId, next);
+      if (userId) saveToStorage(userId, next);
       return next;
     });
   };
 
   const isAttending = (eventId: string) => attendedEvents.has(eventId);
 
-  const fetchExistingAttendance = async (
-    eventId: string,
-    userId: string,
-    token: string,
-  ): Promise<string | null> => {
-    try {
-      const res = await fetch(`${API_URL}/events/attendance/event/${eventId}`, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      if (!res.ok) return null;
-      const records: AttendanceRecord[] = await res.json();
-      const mine = records.find(r => r.sql_user_id === userId && r.status !== 'cancelled');
-      return mine?.id ?? null;
-    } catch {
-      return null;
-    }
-  };
-
   const attend = async (eventId: string, sqlUserId: string): Promise<boolean> => {
     const token = getToken();
     if (!token || !sqlUserId) return false;
+
+    // Si ya está marcado localmente (409 previo o registro existente), no hacer nada
+    if (attendedEvents.has(eventId)) return true;
 
     setLoading(true);
     update(sqlUserId, prev => { const next = new Map(prev); next.set(eventId, '__pending__'); return next; });
@@ -99,10 +83,8 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
       });
 
       if (res.status === 409) {
-        // Ya existe en BD — recuperar el ID real para poder desasistir
-        const existingId = await fetchExistingAttendance(eventId, sqlUserId, token);
-        const finalId = existingId ?? '__conflict__';
-        update(sqlUserId, prev => { const next = new Map(prev); next.set(eventId, finalId); return next; });
+        // Ya existe en BD — guardar como asistiendo (sin ID real para DELETE)
+        update(sqlUserId, prev => { const next = new Map(prev); next.set(eventId, '__conflict__'); return next; });
         return true;
       }
 
@@ -129,6 +111,7 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
 
     const uid = sqlUserId ?? '';
 
+    // Sin ID real no podemos hacer DELETE — solo limpiar localmente
     if (attendanceId === '__conflict__') {
       update(uid, prev => { const next = new Map(prev); next.delete(eventId); return next; });
       return true;
