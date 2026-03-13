@@ -16,7 +16,7 @@ interface ProfileEditProps {
 }
 
 export default function ProfileEdit({ userState }: ProfileEditProps) {
-  const { user, loading, error, updateUser, deleteAccount, setPassword, addSocialMedia, updateSocialMedia, removeSocialMedia } = userState;
+  const { user, loading, error, updateUser, refreshUser, deleteAccount, setPassword, addSocialMedia, updateSocialMedia, removeSocialMedia } = userState;
   const { handleLogout } = useLogout();
   const [saving, setSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -202,6 +202,10 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
       }
     }
     
+    if (profileSuccess) {
+      await refreshUser();
+    }
+
     if (profileSuccess && socialErrors.length === 0) {
       setSaveMessage({ type: 'success', text: 'Perfil actualizado correctamente' });
     } else if (!profileSuccess) {

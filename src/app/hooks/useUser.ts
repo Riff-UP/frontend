@@ -225,7 +225,12 @@ export function useUser(): UseUserReturn {
       const updatedUser = await res.json();
       setUser(prev => ({
         ...(prev || {}),
+        ...data,
         ...updatedUser,
+        name: String(updatedUser?.name ?? data.name ?? prev?.name ?? ''),
+        email: String(updatedUser?.email ?? data.email ?? prev?.email ?? ''),
+        biography: String(updatedUser?.biography ?? data.biography ?? prev?.biography ?? '') || null,
+        profileImage: String(updatedUser?.profileImage ?? data.profileImage ?? prev?.profileImage ?? '') || null,
         // El role NUNCA debe cambiar como resultado de un PATCH de perfil.
         // El gateway envía role: USER por defecto, lo que puede contaminar la respuesta.
         role: prev?.role ?? updatedUser.role,
