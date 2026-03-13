@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState } from 'react';
 import { API_BASE_URL } from '../config/api';
 
 const API_URL = API_BASE_URL;
@@ -14,7 +14,6 @@ export interface AttendanceRecord {
 }
 
 interface UseEventAttendanceReturn {
-  // Mapa de eventId → attendanceId (solo los eventos a los que el user asiste)
   attendedEvents: Map<string, string>;
   isAttending: (eventId: string) => boolean;
   attend: (eventId: string, sqlUserId: string) => Promise<boolean>;
@@ -23,7 +22,6 @@ interface UseEventAttendanceReturn {
 }
 
 export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn {
-  // eventId → attendance.id
   const [attendedEvents, setAttendedEvents] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
 
@@ -32,45 +30,15 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
     return null;
   };
 
-  // Cargar asistencias del usuario actual
-  const fetchMyAttendances = useCallback(async () => {
-    if (!sqlUserId) return;
-    const token = getToken();
-    if (!token) return;
-
-    try {
-      setLoading(true);
-      // Trae todas las asistencias y filtramos por sql_user_id client-side
-      // (el endpoint acepta ?userId= con el UUID de Mongo, pero tenemos el sql_user_id)
-      const res = await fetch(`${API_URL}/events/attendance`, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      if (!res.ok) return;
-
-      const data: AttendanceRecord[] = await res.json();
-      const mine = Array.isArray(data)
-        ? data.filter(a => a.sql_user_id === sqlUserId && a.status !== 'cancelled')
-        : [];
-
-      const map = new Map<string, string>();
-      mine.forEach(a => map.set(a.event_id, a.id));
-      setAttendedEvents(map);
-    } catch {
-      // silencioso — no bloquear la UI
-    } finally {
-      setLoading(false);
-    }
-  }, [sqlUserId]);
-
-  useEffect(() => { fetchMyAttendances(); }, [fetchMyAttendances]);
-
   const isAttending = (eventId: string) => attendedEvents.has(eventId);
 
   const attend = async (eventId: string, sqlUserId: string): Promise<boolean> => {
     const token = getToken();
     if (!token || !sqlUserId) return false;
 
-    // Optimista
+    setLoading(true);
+
+    // Actualización optimista
     setAttendedEvents(prev => {
       const next = new Map(prev);
       next.set(eventId, '__pending__');
@@ -85,7 +53,6 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
       });
 
       if (!res.ok) {
-        // Revertir
         setAttendedEvents(prev => {
           const next = new Map(prev);
           next.delete(eventId);
@@ -108,6 +75,8 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
         return next;
       });
       return false;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -116,7 +85,9 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
     const attendanceId = attendedEvents.get(eventId);
     if (!token || !attendanceId || attendanceId === '__pending__') return false;
 
-    // Optimista
+    setLoading(true);
+
+    // Actualización optimista
     setAttendedEvents(prev => {
       const next = new Map(prev);
       next.delete(eventId);
@@ -130,7 +101,6 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
       });
 
       if (!res.ok) {
-        // Revertir
         setAttendedEvents(prev => {
           const next = new Map(prev);
           next.set(eventId, attendanceId);
@@ -146,6 +116,8 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
         return next;
       });
       return false;
+    } finally {
+      setLoading(false);
     }
   };
 
