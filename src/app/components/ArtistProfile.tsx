@@ -69,7 +69,10 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
   const bannerImages = useMemo(() => {
     const imgs: string[] = [];
     if (artistData?.coverImage) imgs.push(artistData.coverImage);
-    rawPosts.forEach(p => { if (p.image) imgs.push(p.image); });
+    rawPosts.forEach(p => {
+      const isVideo = p.mediaType === 'video' || p.type === 'video';
+      if (p.image && !isVideo) imgs.push(p.image);
+    });
     return imgs;
   }, [artistData?.coverImage, rawPosts]);
 

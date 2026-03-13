@@ -13,6 +13,7 @@ interface RawPost {
   sql_id?: unknown;
   sql_user_id?: string;
   authorId?: string;
+  type?: string;
   title?: string;
   description?: string;
   content?: string;
@@ -44,6 +45,17 @@ function extractId(raw: unknown): string {
     if ('_id' in (raw as object)) return extractId((raw as { _id: unknown })._id);
   }
   return String(raw);
+}
+
+function inferMediaTypeFromUrl(url?: string): 'image' | 'video' | 'audio' | undefined {
+  if (!url) return undefined;
+  const cleanUrl = url.split('?')[0].toLowerCase();
+
+  if (/\.(mp4|m4v|mov|webm|avi)$/i.test(cleanUrl)) return 'video';
+  if (/\.(mp3|wav|ogg|aac|m4a|flac)$/i.test(cleanUrl)) return 'audio';
+  if (/\.(jpg|jpeg|png|gif|webp|avif|bmp)$/i.test(cleanUrl)) return 'image';
+
+  return undefined;
 }
 
 export function usePublicArtistData(artistId?: string) {
@@ -86,14 +98,35 @@ export function usePublicArtistData(artistId?: string) {
           const fallbackId = extractId(p.id);
           const postId = mongoId || (fallbackId.length === 24 ? fallbackId : '');
           if (!postId) return null;
+          const normalizedType: 'image' | 'video' | 'audio' | undefined =
+            p.type === 'video' || p.mediaType === 'video'
+              ? 'video'
+              : p.type === 'audio' || p.mediaType === 'audio'
+                ? 'audio'
+                : p.type === 'image' || p.mediaType === 'image'
+                  ? 'image'
+                  : inferMediaTypeFromUrl(p.mediaUrl)
+                    ?? inferMediaTypeFromUrl(p.content);
+
           const imageUrl = p.mediaUrl
-            || (p.content && (p.content.startsWith('http') || p.content.startsWith('/')) ? p.content : undefined);
+            || (
+              p.content
+              && (p.content.startsWith('http') || p.content.startsWith('/'))
+              && normalizedType !== 'audio'
+                ? p.content
+                : undefined
+            );
           const textContent = p.description
             || (p.content && !p.content.startsWith('http') ? p.content : '')
             || p.title || '';
           const rawDate = p.createdAt || p.created_at;
           return {
-            id: postId, content: textContent, text: textContent, image: imageUrl,
+            id: postId,
+            type: normalizedType,
+            mediaType: normalizedType,
+            content: textContent,
+            text: textContent,
+            image: imageUrl,
             date: rawDate ?? 'Sin fecha',
             time: rawDate ? formatTimeAgo(new Date(rawDate)) : '',
             likes: p.likesCount ?? 0, saved: 0, isLiked: false, isSaved: false,
