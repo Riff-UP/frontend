@@ -163,6 +163,52 @@ export function usePosts(userId?: string) {
         return normalized;
       }
 
+      // ── RAMA TEXTO: permitir publicar sin imagen ─────────────────────────
+      if (!postData.imageFile) {
+        const textValue = (postData.content ?? '').trim();
+        if (!textValue) throw new Error('La publicación no puede estar vacía');
+
+        const payload: Record<string, unknown> = {
+          sql_user_id: userId,
+          type: 'text',
+          title: textValue.substring(0, 100) || 'Nueva publicación',
+          description: textValue,
+          content: textValue,
+        };
+
+        if (postData.tags && postData.tags.length > 0) payload.tags = postData.tags;
+
+        let response = await fetchWithTimeout(`${API_URL}/posts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload),
+        });
+
+        // Fallback por compatibilidad con backends que no reconocen type:text
+        if (!response.ok && (response.status === 400 || response.status === 415)) {
+          const fallbackPayload: Record<string, unknown> = {
+            sql_user_id: userId,
+            title: textValue.substring(0, 100) || 'Nueva publicación',
+            description: textValue,
+            content: textValue,
+          };
+          if (postData.tags && postData.tags.length > 0) fallbackPayload.tags = postData.tags;
+
+          response = await fetchWithTimeout(`${API_URL}/posts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify(fallbackPayload),
+          });
+        }
+
+        if (!response.ok) throw new Error(await extractErrorMessage(response));
+
+        const newPost = await response.json();
+        const normalized: Post = { ...newPost, id: extractId(newPost._id ?? newPost.id) };
+        setPosts(prev => [normalized, ...(Array.isArray(prev) ? prev : [])]);
+        return normalized;
+      }
+
       // ── RAMA IMAGE: flujo original multipart → fallback JSON ─────────────
       if (postData.imageFile) {
         const validation = validateImageFile(postData.imageFile);

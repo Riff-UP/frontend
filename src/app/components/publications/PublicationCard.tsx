@@ -69,7 +69,7 @@ export default function PublicationCard({
         </p>
 
         {publication.image && (
-          <div className="mb-3 relative w-full h-48 rounded-sm overflow-hidden">
+          <div className="bg-riff-header mb-3 relative w-full h-48 rounded-sm overflow-hidden">
             <Image
               src={publication.image}
               alt="Imagen de publicación"
