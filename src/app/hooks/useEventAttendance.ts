@@ -43,11 +43,10 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
   const [attendedEvents, setAttendedEvents] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
 
-  // Hidratar desde localStorage cuando sqlUserId esté disponible
+  // Hidratar cada vez que sqlUserId esté disponible (cubre remount y carga asíncrona del user)
   useEffect(() => {
     if (!sqlUserId) return;
-    const stored = loadFromStorage(sqlUserId);
-    if (stored.size > 0) setAttendedEvents(stored);
+    setAttendedEvents(loadFromStorage(sqlUserId));
   }, [sqlUserId]);
 
   const getToken = (): string | null => {
@@ -69,8 +68,13 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
     const token = getToken();
     if (!token || !sqlUserId) return false;
 
-    // Si ya está marcado localmente (409 previo o registro existente), no hacer nada
-    if (attendedEvents.has(eventId)) return true;
+    // Leer localStorage directamente para evitar race condition con el estado de React
+    const stored = loadFromStorage(sqlUserId);
+    if (stored.has(eventId)) {
+      // Sincronizar estado si aún no lo tiene (race condition entre useEffect y click)
+      setAttendedEvents(stored);
+      return true;
+    }
 
     setLoading(true);
     update(sqlUserId, prev => { const next = new Map(prev); next.set(eventId, '__pending__'); return next; });
@@ -83,7 +87,6 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
       });
 
       if (res.status === 409) {
-        // Ya existe en BD — guardar como asistiendo (sin ID real para DELETE)
         update(sqlUserId, prev => { const next = new Map(prev); next.set(eventId, '__conflict__'); return next; });
         return true;
       }
@@ -111,7 +114,6 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
 
     const uid = sqlUserId ?? '';
 
-    // Sin ID real no podemos hacer DELETE — solo limpiar localmente
     if (attendanceId === '__conflict__') {
       update(uid, prev => { const next = new Map(prev); next.delete(eventId); return next; });
       return true;
