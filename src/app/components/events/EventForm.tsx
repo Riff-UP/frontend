@@ -10,6 +10,7 @@ interface EventFormProps {
   time: string;
   description: string;
   saving?: boolean;
+  originalDate?: string;
   onTitleChange: (value: string) => void;
   onLocationChange: (value: string) => void;
   onDateChange: (value: string) => void;
@@ -28,6 +29,7 @@ export default function EventForm({
   time,
   description,
   saving = false,
+  originalDate = '',
   onTitleChange,
   onLocationChange,
   onDateChange,
@@ -43,6 +45,13 @@ export default function EventForm({
   // Al editar: si la fecha actual del evento es pasada, permitir conservarla como mínimo.
   // Al crear: mínimo siempre es hoy.
   const minDate = isEditing && date && date < today ? date : today;
+
+  const isDateInvalid = (() => {
+    if (!date) return false;
+    if (!isEditing) return date < today;
+    // Al editar: inválida si cambió a una fecha pasada diferente a la original
+    return date !== originalDate && date < today;
+  })();
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm p-4">
@@ -85,11 +94,17 @@ export default function EventForm({
                 value={date}
                 min={minDate}
                 onChange={(e) => onDateChange(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm
+                className={`w-full pl-10 pr-3 py-2 bg-riff-text-primary border rounded-sm text-white text-sm
                          focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
-                         transition-all duration-200"
+                         transition-all duration-200 ${isDateInvalid ? 'border-red-500' : 'border-white/10'}`}
               />
             </div>
+            {isDateInvalid && (
+              <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1">
+                <span>⚠</span>
+                <span>La fecha no puede ser anterior a hoy.</span>
+              </p>
+            )}
           </div>
 
           {/* Location */}
@@ -153,7 +168,7 @@ export default function EventForm({
           <button
             onClick={onSubmit}
             className="flex-1 px-4 py-2.5 bg-gradient-to-r from-riff-primary-dark to-riff-primary hover:from-riff-primary hover:to-riff-primary-dark text-white text-sm font-medium rounded-sm transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
-            disabled={!title || !date || !description || saving}
+            disabled={!title || !date || !description || saving || isDateInvalid}
           >
             {saving ? (isEditing ? 'Guardando...' : 'Subiendo...') : (isEditing ? 'Guardar' : 'Subir')}
           </button>

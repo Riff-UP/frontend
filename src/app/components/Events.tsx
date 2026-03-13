@@ -291,6 +291,7 @@ export default function Events() {
         onDateChange={(value) => setNewEvent({ ...newEvent, date: value })}
         onTimeChange={(value) => setNewEvent({ ...newEvent, time: value })}
         onDescriptionChange={(value) => setNewEvent({ ...newEvent, description: value })}
+        originalDate={originalEditDate}
         onSubmit={handleCreateEvent}
         onClose={handleCloseModal}
       />
