@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import Footer from '@/app/components/layout/Footer';
-import { FaMusic, FaCalendarAlt, FaUsers, FaPlay } from 'react-icons/fa';
+import { FaCalendarAlt, FaUsers, FaPlay } from 'react-icons/fa';
+import { IoShareSocialSharp } from "react-icons/io5";
 import { MdOutlineRocketLaunch } from 'react-icons/md';
 import { Sora } from 'next/font/google';
 
@@ -12,13 +13,13 @@ const sora = Sora({
 
 const benefits = [
   {
-    title: 'Sube tu musica en minutos',
-    text: 'Comparte tus tracks con enlaces de YouTube, SoundCloud, Spotify y Bandcamp.',
-    icon: FaMusic,
+    title: 'Publica tu contenido',
+    text: 'Comparte tus canciones, videos y fotos para mantener a tu comunidad siempre conectada.',
+    icon: IoShareSocialSharp,
   },
   {
     title: 'Organiza tus eventos',
-    text: 'Publica fechas, lugar y descripcion para que tus seguidores no se pierdan nada.',
+    text: 'Publica fechas, lugar y descripción para que tus seguidores no se pierdan nada.',
     icon: FaCalendarAlt,
   },
   {
@@ -30,20 +31,20 @@ const benefits = [
 
 const faqs = [
   {
-    q: 'Riff tiene costo para artistas?',
+    q: '¿Riff tiene costo para artistas?',
     a: 'No. Puedes crear tu perfil, subir contenido y publicar eventos sin costo.',
   },
   {
-    q: 'Que tipo de musica puedo compartir?',
-    a: 'Cualquier genero. Riff esta pensado para artistas independientes y bandas emergentes.',
+    q: '¿Que tipo de musica puedo compartir?',
+    a: 'Cualquier género. Riff esta pensado para artistas independientes y bandas emergentes.',
   },
   {
-    q: 'Puedo editar o eliminar publicaciones?',
+    q: '¿Puedo editar o eliminar publicaciones?',
     a: 'Si. Tienes control total sobre tus publicaciones y eventos desde tu panel.',
   },
   {
-    q: 'Necesito equipo tecnico para usarlo?',
-    a: 'No. La plataforma esta diseñada para que empieces a publicar desde el primer dia.',
+    q: '¿Necesito equipo técnico para usarlo?',
+    a: 'No. La plataforma esta diseñada para que empieces a publicar desde el primer día.',
   },
 ];
 
@@ -59,7 +60,6 @@ export default function LandingPage() {
           <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
             <Link href="/" className="flex items-center gap-3">
               <Image src="/images/logo_riff.png" alt="Riff" width={82} height={40} className="object-contain" />
-              <span className="text-sm text-white/70">Para artistas independientes</span>
             </Link>
             <div className="flex items-center gap-2 sm:gap-3">
               <Link
@@ -85,7 +85,7 @@ export default function LandingPage() {
               Plataforma para despegar tu proyecto
             </p>
             <h1 className="max-w-2xl text-3xl font-extrabold leading-tight sm:text-5xl lg:text-6xl">
-              Impulsa tu musica y llena tus eventos desde un solo lugar.
+              Impulsa tu música y llena tus eventos desde un solo lugar.
             </h1>
             <p className="mt-5 max-w-xl text-sm text-white/75 sm:text-base">
               Riff te ayuda a publicar canciones, compartir tu historia y conectar con personas que quieren descubrirte en vivo.
@@ -97,26 +97,20 @@ export default function LandingPage() {
               >
                 Empieza gratis
               </Link>
-              <Link
-                href="/artist"
-                className="inline-flex items-center gap-2 rounded-sm border border-white/20 px-5 py-3 text-sm font-semibold text-white/85 transition-colors hover:text-white"
-              >
-                <FaPlay className="h-3 w-3" />
-                Ver artistas
-              </Link>
+              
             </div>
-            <div className="mt-10 grid grid-cols-3 gap-3 sm:max-w-md">
+            <div className="mt-10 grid grid-cols-1 gap-3 sm:max-w-2xl sm:grid-cols-3">
               <div className="rounded-sm border border-white/10 bg-white/5 p-3">
-                <p className="text-2xl font-bold text-riff-primary">+1.2K</p>
-                <p className="text-xs text-white/70">Artistas activos</p>
+                <p className="text-sm font-semibold text-riff-primary">Sin costos para empezar</p>
+                <p className="mt-1 text-xs text-white/70">Crea perfil, sube musica y publica eventos gratis.</p>
               </div>
               <div className="rounded-sm border border-white/10 bg-white/5 p-3">
-                <p className="text-2xl font-bold text-riff-primary">+4.8K</p>
-                <p className="text-xs text-white/70">Canciones compartidas</p>
+                <p className="text-sm font-semibold text-riff-primary">Enfocado en artistas emergentes</p>
+                <p className="mt-1 text-xs text-white/70">Pensado para proyectos independientes en crecimiento.</p>
               </div>
               <div className="rounded-sm border border-white/10 bg-white/5 p-3">
-                <p className="text-2xl font-bold text-riff-primary">+900</p>
-                <p className="text-xs text-white/70">Eventos publicados</p>
+                <p className="text-sm font-semibold text-riff-primary">Lanzamiento en progreso</p>
+                <p className="mt-1 text-xs text-white/70">Estamos mejorando para ofrecer la mejor experiencia.</p>
               </div>
             </div>
           </div>
@@ -125,22 +119,12 @@ export default function LandingPage() {
             <div className="absolute -inset-2 rounded-xl bg-gradient-to-r from-riff-primary/30 to-riff-primary-dark/40 blur-xl" />
             <div className="relative overflow-hidden rounded-xl border border-white/15 bg-riff-header/90 p-4 shadow-2xl backdrop-blur">
               <Image
-                src="/images/portada.jpg"
+                src="/images/land.png"
                 alt="Escenario musical"
                 width={900}
                 height={700}
                 className="h-56 w-full rounded-lg object-cover sm:h-72"
               />
-              <div className="mt-4 space-y-3">
-                <div className="rounded-sm border border-white/10 bg-riff-card/80 p-3">
-                  <p className="text-sm font-semibold">Nuevo single: Noches de Abril</p>
-                  <p className="text-xs text-white/65">Subido hace 2 horas</p>
-                </div>
-                <div className="rounded-sm border border-riff-primary/40 bg-riff-primary/10 p-3">
-                  <p className="text-sm font-semibold">Proximo evento confirmado</p>
-                  <p className="text-xs text-white/65">22 de marzo - Foro Indie Centro</p>
-                </div>
-              </div>
             </div>
           </div>
         </section>
@@ -151,7 +135,7 @@ export default function LandingPage() {
           <div className="mb-8 max-w-2xl">
             <h2 className="text-2xl font-bold sm:text-3xl">Todo lo que necesitas para mover tu proyecto</h2>
             <p className="mt-2 text-sm text-white/70 sm:text-base">
-              Menos herramientas sueltas, mas tiempo para crear.
+              Menos herramientas sueltas, más tiempo para crear.
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
@@ -172,7 +156,7 @@ export default function LandingPage() {
 
         <section className="border-y border-white/10 bg-riff-header/40">
           <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-            <h2 className="text-2xl font-bold sm:text-3xl">Como funciona</h2>
+            <h2 className="text-2xl font-bold sm:text-3xl">Cómo funciona</h2>
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <div className="rounded-sm border border-white/10 bg-riff-card/70 p-5">
                 <p className="text-xs font-bold text-riff-primary">PASO 1</p>
@@ -197,7 +181,7 @@ export default function LandingPage() {
           <div className="mb-8 flex items-end justify-between gap-4">
             <div>
               <h2 className="text-2xl font-bold sm:text-3xl">Preguntas frecuentes</h2>
-              <p className="mt-2 text-sm text-white/70">Respuestas rapidas para empezar sin friccion.</p>
+              <p className="mt-2 text-sm text-white/70">Respuestas rápidas para empezar sin problemas.</p>
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -212,7 +196,7 @@ export default function LandingPage() {
 
         <section className="mx-auto mb-14 max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="rounded-xl border border-riff-primary/35 bg-gradient-to-r from-riff-primary-dark/65 to-riff-primary/45 p-7 sm:p-10">
-            <h2 className="text-2xl font-extrabold sm:text-4xl">Tu siguiente fan esta a una cancion de distancia.</h2>
+            <h2 className="text-2xl font-extrabold sm:text-4xl">Construye tu comunidad y conecta con tu audiencia.</h2>
             <p className="mt-3 max-w-2xl text-sm text-white/80 sm:text-base">
               Crea tu cuenta hoy y empieza a construir una comunidad real alrededor de tu musica.
             </p>
