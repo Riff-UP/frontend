@@ -21,9 +21,9 @@ interface UseEventAttendanceReturn {
   loading: boolean;
 }
 
-const STORAGE_KEY = (userId: string | number) => `riff_attendance_${userId}`;
+const STORAGE_KEY = (userId: string) => `riff_attendance_${userId}`;
 
-function loadFromStorage(userId: string | number): Map<string, string> {
+function loadFromStorage(userId: string): Map<string, string> {
   try {
     if (typeof window === 'undefined') return new Map();
     const raw = localStorage.getItem(STORAGE_KEY(userId));
@@ -34,58 +34,72 @@ function loadFromStorage(userId: string | number): Map<string, string> {
   }
 }
 
-function saveToStorage(userId: string | number, map: Map<string, string>) {
+function saveToStorage(userId: string, map: Map<string, string>) {
   try {
     if (typeof window === 'undefined') return;
     localStorage.setItem(STORAGE_KEY(userId), JSON.stringify(Object.fromEntries(map.entries())));
   } catch { /* silencioso */ }
 }
 
-export function useEventAttendance(sqlUserId?: string | number): UseEventAttendanceReturn {
+export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn {
   const [attendedEvents, setAttendedEvents] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!sqlUserId) return;
-    setAttendedEvents(loadFromStorage(sqlUserId));
-  }, [sqlUserId]);
 
   const getToken = (): string | null => {
     if (typeof window !== 'undefined') return localStorage.getItem('token');
     return null;
   };
 
-  const update = (userId: string | number, fn: (prev: Map<string, string>) => Map<string, string>) => {
-    setAttendedEvents(prev => {
-      const next = fn(prev);
-      saveToStorage(userId, next);
-      return next;
-    });
+  // Al montar: cargar desde el servidor (fuente de verdad) y cachear en localStorage
+  useEffect(() => {
+    if (!sqlUserId) return;
+    const token = getToken();
+    if (!token) return;
+
+    const load = async () => {
+      try {
+        const res = await fetch(`${API_URL}/events/attendance?userId=${sqlUserId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('fetch failed');
+
+        const records: AttendanceRecord[] = await res.json();
+        const map = new Map<string, string>();
+        records.forEach(r => { if (r.status !== 'cancelled') map.set(r.event_id, r.id); });
+
+        // Guardar en localStorage y actualizar estado
+        saveToStorage(sqlUserId, map);
+        setAttendedEvents(map);
+      } catch {
+        // Backend no disponible — usar localStorage como fallback
+        setAttendedEvents(loadFromStorage(sqlUserId));
+      }
+    };
+
+    load();
+  }, [sqlUserId]);
+
+  // Guardar estado React + localStorage de forma desacoplada
+  const persist = (userId: string, map: Map<string, string>) => {
+    saveToStorage(userId, map);  // sincrónico, no depende del ciclo de React
+    setAttendedEvents(new Map(map));
   };
 
-  // Fuente de verdad: localStorage primero, React state como fallback
-  // Evita cualquier race condition entre useEffect y el primer render
-  const isAttending = (eventId: string): boolean => {
-    if (sqlUserId) {
-      const stored = loadFromStorage(sqlUserId);
-      if (stored.has(eventId)) return true;
-    }
-    return attendedEvents.has(eventId);
-  };
+  const isAttending = (eventId: string): boolean => attendedEvents.has(eventId);
 
-  const attend = async (eventId: string, sqlUserId: string | number): Promise<boolean> => {
+  const attend = async (eventId: string, sqlUserId: string): Promise<boolean> => {
     const token = getToken();
     if (!token || !sqlUserId) return false;
 
-    // Si ya está en localStorage no hacer el POST
-    const stored = loadFromStorage(sqlUserId);
-    if (stored.has(eventId)) {
-      setAttendedEvents(stored);
-      return true;
-    }
+    // Chequear estado actual — si ya asiste, no hacer nada
+    if (attendedEvents.has(eventId)) return true;
 
     setLoading(true);
-    update(sqlUserId, prev => { const next = new Map(prev); next.set(eventId, '__pending__'); return next; });
+
+    // Optimista — persistir inmediatamente (no dentro de setAttendedEvents)
+    const optimistic = new Map(attendedEvents);
+    optimistic.set(eventId, '__pending__');
+    persist(sqlUserId, optimistic);
 
     try {
       const res = await fetch(`${API_URL}/events/attendance`, {
@@ -95,20 +109,29 @@ export function useEventAttendance(sqlUserId?: string | number): UseEventAttenda
       });
 
       if (res.status === 409) {
-        update(sqlUserId, prev => { const next = new Map(prev); next.set(eventId, '__conflict__'); return next; });
+        // Ya existe en BD — marcar y persistir
+        const updated = new Map(attendedEvents);
+        updated.set(eventId, '__conflict__');
+        persist(sqlUserId, updated);
         return true;
       }
 
       if (!res.ok) {
-        update(sqlUserId, prev => { const next = new Map(prev); next.delete(eventId); return next; });
+        const reverted = new Map(attendedEvents);
+        reverted.delete(eventId);
+        persist(sqlUserId, reverted);
         return false;
       }
 
       const record: AttendanceRecord = await res.json();
-      update(sqlUserId, prev => { const next = new Map(prev); next.set(eventId, record.id); return next; });
+      const confirmed = new Map(attendedEvents);
+      confirmed.set(eventId, record.id);
+      persist(sqlUserId, confirmed);
       return true;
     } catch {
-      update(sqlUserId, prev => { const next = new Map(prev); next.delete(eventId); return next; });
+      const reverted = new Map(attendedEvents);
+      reverted.delete(eventId);
+      persist(sqlUserId, reverted);
       return false;
     } finally {
       setLoading(false);
@@ -117,20 +140,23 @@ export function useEventAttendance(sqlUserId?: string | number): UseEventAttenda
 
   const unattend = async (eventId: string): Promise<boolean> => {
     const token = getToken();
-    const attendanceId = attendedEvents.get(eventId)
-      ?? (sqlUserId ? loadFromStorage(sqlUserId).get(eventId) : undefined);
-
+    const attendanceId = attendedEvents.get(eventId);
     if (!token || !attendanceId || attendanceId === '__pending__') return false;
 
     const uid = sqlUserId ?? '';
 
     if (attendanceId === '__conflict__') {
-      update(uid, prev => { const next = new Map(prev); next.delete(eventId); return next; });
+      const updated = new Map(attendedEvents);
+      updated.delete(eventId);
+      persist(uid, updated);
       return true;
     }
 
     setLoading(true);
-    update(uid, prev => { const next = new Map(prev); next.delete(eventId); return next; });
+
+    const optimistic = new Map(attendedEvents);
+    optimistic.delete(eventId);
+    persist(uid, optimistic);
 
     try {
       const res = await fetch(`${API_URL}/events/attendance/${attendanceId}`, {
@@ -139,12 +165,16 @@ export function useEventAttendance(sqlUserId?: string | number): UseEventAttenda
       });
 
       if (!res.ok) {
-        update(uid, prev => { const next = new Map(prev); next.set(eventId, attendanceId); return next; });
+        const reverted = new Map(attendedEvents);
+        reverted.set(eventId, attendanceId);
+        persist(uid, reverted);
         return false;
       }
       return true;
     } catch {
-      update(uid, prev => { const next = new Map(prev); next.set(eventId, attendanceId); return next; });
+      const reverted = new Map(attendedEvents);
+      reverted.set(eventId, attendanceId);
+      persist(uid, reverted);
       return false;
     } finally {
       setLoading(false);
