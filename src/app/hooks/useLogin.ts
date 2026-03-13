@@ -7,6 +7,27 @@ import { getValidToken, decodeJWT } from '../utils/jwt';
 
 const REQUEST_TIMEOUT_MS = 12000;
 
+function normalizeLoginErrorMessage(message: string): string {
+  const normalized = message.trim().toLowerCase();
+
+  if (
+    normalized.includes('invalid credentials') ||
+    normalized.includes('invalid credential') ||
+    normalized.includes('credenciales invalidas') ||
+    normalized.includes('credenciales inválidas') ||
+    normalized.includes('unauthorized') ||
+    normalized.includes('invalid login')
+  ) {
+    return 'Los datos ingresados no son válidos. Revisa tu correo y contraseña.';
+  }
+
+  if (normalized.includes('user not found') || normalized.includes('usuario no encontrado')) {
+    return 'No encontramos una cuenta con ese correo.';
+  }
+
+  return message;
+}
+
 export function useLogin() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +101,7 @@ export function useLogin() {
         const message = Array.isArray(data.message)
           ? data.message.join(', ')
           : (data.message || 'Correo o contraseña incorrectos');
-        setError(message);
+        setError(normalizeLoginErrorMessage(message));
         return;
       }
 
