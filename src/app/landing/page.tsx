@@ -143,41 +143,16 @@ export default function LandingPage() {
           </div>
 
           <div data-reveal data-reveal-delay="220ms" className="reveal-on-scroll relative">
-            <div className="relative overflow-hidden rounded-xl border border-white/15 bg-riff-header/90 p-4 shadow-xl backdrop-blur">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="relative overflow-hidden rounded-lg border border-white/10 sm:col-span-2">
-                  <Image
-                    src="/images/land.png"
-                    alt="Vista principal de Riff"
-                    width={900}
-                    height={700}
-                    className="h-44 w-full object-cover sm:h-52"
-                  />
-                </div>
-
-                <div className="anim-float relative rounded-xl border border-white/15 bg-riff-card p-2">
-                  <div className="overflow-hidden rounded-md border border-white/10">
-                    <Image
-                      src="/images/mobile.png"
-                      alt="Riff en móvil - perfil y publicaciones"
-                      width={420}
-                      height={900}
-                      className="h-48 w-full object-cover object-top"
-                    />
-                  </div>
-                </div>
-
-                <div className="anim-float relative rounded-xl border border-white/15 bg-riff-card p-2 [animation-delay:1.5s]">
-                  <div className="overflow-hidden rounded-md border border-white/10">
-                    <Image
-                      src="/images/mob.png"
-                      alt="Riff en móvil - feed y publicación"
-                      width={420}
-                      height={900}
-                      className="h-48 w-full object-cover object-top"
-                    />
-                  </div>
-                </div>
+            <div className="anim-float relative overflow-hidden rounded-xl border border-white/15 bg-riff-header/90 p-4 shadow-xl backdrop-blur">
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-0 rounded-lg bg-gradient-to-r from-riff-primary/18 to-riff-primary-dark/22 blur-sm opacity-60" />
+                <Image
+                  src="/images/land.png"
+                  alt="Escenario musical"
+                  width={900}
+                  height={700}
+                  className="relative h-56 w-full rounded-lg object-cover sm:h-72"
+                />
               </div>
             </div>
           </div>
