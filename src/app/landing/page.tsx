@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import Footer from '@/app/components/layout/Footer';
-import { FaCalendarAlt, FaUsers, FaPlay } from 'react-icons/fa';
+import { FaUsers } from 'react-icons/fa';
 import { IoShareSocialSharp } from "react-icons/io5";
 import { MdOutlineRocketLaunch } from 'react-icons/md';
 import { Sora } from 'next/font/google';
+import { CiCalendarDate } from "react-icons/ci";
 
 const sora = Sora({
   subsets: ['latin'],
@@ -20,7 +21,7 @@ const benefits = [
   {
     title: 'Organiza tus eventos',
     text: 'Publica fechas, lugar y descripción para que tus seguidores no se pierdan nada.',
-    icon: FaCalendarAlt,
+    icon: CiCalendarDate,
   },
   {
     title: 'Haz crecer tu comunidad',
@@ -35,16 +36,16 @@ const faqs = [
     a: 'No. Puedes crear tu perfil, subir contenido y publicar eventos sin costo.',
   },
   {
-    q: '¿Que tipo de musica puedo compartir?',
-    a: 'Cualquier género. Riff esta pensado para artistas independientes y bandas emergentes.',
+    q: '¿Qué tipo de música puedo compartir?',
+    a: 'Cualquier género. Riff está pensado para artistas independientes y bandas emergentes.',
   },
   {
     q: '¿Puedo editar o eliminar publicaciones?',
-    a: 'Si. Tienes control total sobre tus publicaciones y eventos desde tu panel.',
+    a: 'Sí. Tienes control total sobre tus publicaciones y eventos desde tu panel.',
   },
   {
     q: '¿Necesito equipo técnico para usarlo?',
-    a: 'No. La plataforma esta diseñada para que empieces a publicar desde el primer día.',
+    a: 'No. La plataforma está diseñada para que empieces a publicar desde el primer día.',
   },
 ];
 
@@ -105,8 +106,8 @@ export default function LandingPage() {
                 <p className="mt-1 text-xs text-white/70">Crea perfil, sube musica y publica eventos gratis.</p>
               </div>
               <div className="rounded-sm border border-white/10 bg-white/5 p-3">
-                <p className="text-sm font-semibold text-riff-primary">Enfocado en artistas emergentes</p>
-                <p className="mt-1 text-xs text-white/70">Pensado para proyectos independientes en crecimiento.</p>
+                <p className="text-sm font-semibold text-riff-primary">Enfocado en nuevos artistas</p>
+                <p className="mt-1 text-xs text-white/70">Pensado para proyectos independientes.</p>
               </div>
               <div className="rounded-sm border border-white/10 bg-white/5 p-3">
                 <p className="text-sm font-semibold text-riff-primary">Lanzamiento en progreso</p>
@@ -117,7 +118,7 @@ export default function LandingPage() {
 
           <div className="relative">
             <div className="absolute -inset-2 rounded-xl bg-gradient-to-r from-riff-primary/30 to-riff-primary-dark/40 blur-xl" />
-            <div className="relative overflow-hidden rounded-xl border border-white/15 bg-riff-header/90 p-4 shadow-2xl backdrop-blur">
+            <div className="relative overflow-hidden rounded-xl border border-white/15 bg-riff-header/90 p-4 shadow-xl backdrop-blur">
               <Image
                 src="/images/land.png"
                 alt="Escenario musical"
@@ -161,7 +162,7 @@ export default function LandingPage() {
               <div className="rounded-sm border border-white/10 bg-riff-card/70 p-5">
                 <p className="text-xs font-bold text-riff-primary">PASO 1</p>
                 <h3 className="mt-2 text-lg font-semibold">Crea tu perfil</h3>
-                <p className="mt-2 text-sm text-white/70">Muestra quien eres, tu estilo y enlaces de contacto en minutos.</p>
+                <p className="mt-2 text-sm text-white/70">Muestra quién eres, tu estilo y enlaces de contacto en minutos.</p>
               </div>
               <div className="rounded-sm border border-white/10 bg-riff-card/70 p-5">
                 <p className="text-xs font-bold text-riff-primary">PASO 2</p>
@@ -171,7 +172,7 @@ export default function LandingPage() {
               <div className="rounded-sm border border-white/10 bg-riff-card/70 p-5">
                 <p className="text-xs font-bold text-riff-primary">PASO 3</p>
                 <h3 className="mt-2 text-lg font-semibold">Convierte oyentes en fans</h3>
-                <p className="mt-2 text-sm text-white/70">Usa cada lanzamiento para llevar publico a tus siguientes shows.</p>
+                <p className="mt-2 text-sm text-white/70">Usa cada lanzamiento para llevar público a tus siguientes shows.</p>
               </div>
             </div>
           </div>
