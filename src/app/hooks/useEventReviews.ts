@@ -26,6 +26,7 @@ interface UseEventReviewsReturn {
   getEventReviews: (eventId: string) => EventReviewEntry;
   hasReviewed: (eventId: string) => boolean;
   submitReview: (eventId: string, sqlUserId: string, rating: number) => Promise<boolean>;
+  updateReview: (eventId: string, rating: number) => Promise<boolean>;
   removeReview: (eventId: string) => Promise<boolean>;
   fetchReviewsForEvent: (eventId: string) => Promise<void>;
   loading: boolean;
@@ -130,6 +131,33 @@ export function useEventReviews(sqlUserId?: string): UseEventReviewsReturn {
     }
   };
 
+  const updateReview = async (eventId: string, rating: number): Promise<boolean> => {
+    const token = getToken();
+    const reviewId = reviewsByEvent.get(eventId)?.userReviewId;
+    if (!token || !reviewId) return false;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/events/reviews/${reviewId}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating }),
+      });
+      if (!res.ok) return false;
+
+      const current = reviewsByEvent.get(eventId) ?? EMPTY_ENTRY;
+      const updated = current.reviews.map(r =>
+        resolveId(r) === reviewId ? { ...r, rating } : r
+      );
+      setEntry(eventId, { ...buildEntry(updated, sqlUserId), userReviewId: reviewId });
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const removeReview = async (eventId: string): Promise<boolean> => {
     const token = getToken();
     const reviewId = reviewsByEvent.get(eventId)?.userReviewId;
@@ -159,5 +187,5 @@ export function useEventReviews(sqlUserId?: string): UseEventReviewsReturn {
     }
   };
 
-  return { reviewsByEvent, getEventReviews, hasReviewed, submitReview, removeReview, fetchReviewsForEvent, loading };
+  return { reviewsByEvent, getEventReviews, hasReviewed, submitReview, updateReview, removeReview, fetchReviewsForEvent, loading };
 }

@@ -20,6 +20,7 @@ interface EventCardProps {
   totalReviews?: number;
   hasReviewed?: boolean;
   onSubmitReview?: (eventId: string, rating: number) => Promise<boolean>;
+  onUpdateReview?: (eventId: string, rating: number) => Promise<boolean>;
   onRemoveReview?: (eventId: string) => Promise<boolean>;
   showReviewSection?: boolean;
 }
@@ -72,10 +73,12 @@ export default function EventCard({
   totalReviews = 0,
   hasReviewed = false,
   onSubmitReview,
+  onUpdateReview,
   onRemoveReview,
   showReviewSection = false,
 }: EventCardProps) {
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [editingReview, setEditingReview] = useState(false);
   const [hovered, setHovered] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
@@ -84,6 +87,19 @@ export default function EventCard({
     setSubmitting(true);
     const ok = await onSubmitReview(event.id, rating);
     if (ok) setReviewOpen(false);
+    setSubmitting(false);
+  };
+
+  const handleEditReview = () => {
+    setEditingReview(true);
+    setHovered(0);
+  };
+
+  const handleStarUpdate = async (rating: number) => {
+    if (!onUpdateReview || submitting) return;
+    setSubmitting(true);
+    const ok = await onUpdateReview(event.id, rating);
+    if (ok) setEditingReview(false);
     setSubmitting(false);
   };
 
@@ -158,13 +174,41 @@ export default function EventCard({
           {showReviewSection && (event.isAttending || event.attending) && (
             <div onClick={e => e.stopPropagation()}>
               {hasReviewed ? (
-                <button
-                  onClick={handleRemove}
-                  disabled={submitting}
-                  className="w-full sm:w-auto px-4 py-2 rounded-sm text-xs text-white/50 hover:text-riff-delete transition-colors border border-white/10 hover:border-riff-delete/40 disabled:opacity-50"
-                >
-                  Eliminar reseña
-                </button>
+                editingReview ? (
+                  <div className="flex flex-col items-center gap-2 bg-riff-card border border-riff-border rounded-sm px-4 py-3">
+                    <span className="text-white/70 text-xs">Nueva calificación</span>
+                    <StarRating
+                      value={0}
+                      interactive
+                      hovered={hovered}
+                      onHover={setHovered}
+                      onClick={handleStarUpdate}
+                    />
+                    <button
+                      onClick={() => setEditingReview(false)}
+                      className="text-white/30 text-xs hover:text-white/60 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleEditReview}
+                      disabled={submitting}
+                      className="flex-1 sm:flex-none px-4 py-2 rounded-sm text-xs text-white/60 hover:text-white transition-colors border border-white/10 hover:border-white/30 disabled:opacity-50"
+                    >
+                      Editar reseña
+                    </button>
+                    <button
+                      onClick={handleRemove}
+                      disabled={submitting}
+                      className="flex-1 sm:flex-none px-4 py-2 rounded-sm text-xs text-white/50 hover:text-riff-delete transition-colors border border-white/10 hover:border-riff-delete/40 disabled:opacity-50"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                )
               ) : reviewOpen ? (
                 <div className="flex flex-col items-center gap-2 bg-riff-card border border-riff-border rounded-sm px-4 py-3">
                   <span className="text-white/70 text-xs">Selecciona tu calificación</span>

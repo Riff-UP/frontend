@@ -48,7 +48,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
   const { isLiked, toggleLike, reactedPosts, fetchPostReactionCounts, postReactionCounts, getReactionCount } =
     usePostReactions(user?.id);
   const { isAttending, attend, unattend } = useEventAttendance(user?.id);
-  const { getEventReviews, hasReviewed, submitReview, removeReview, fetchReviewsForEvent } =
+  const { getEventReviews, hasReviewed, submitReview, updateReview, removeReview, fetchReviewsForEvent } =
     useEventReviews(user?.id);
 
   const [, forceUpdate] = useState({});
@@ -160,6 +160,10 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
 
   const handleRemoveReview = async (eventId: string): Promise<boolean> => {
     return await removeReview(eventId);
+  };
+
+  const handleUpdateReview = async (eventId: string, rating: number): Promise<boolean> => {
+    return await updateReview(eventId, rating);
   };
 
   const handlePrevMonth = () => {
@@ -534,6 +538,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
                           hasReviewed={hasReviewed(event.id)}
                           showReviewSection={!isSelf && isAuth && eventHasPassed(event.date)}
                           onSubmitReview={handleSubmitReview}
+                          onUpdateReview={handleUpdateReview}
                           onRemoveReview={handleRemoveReview}
                         />
                       );
