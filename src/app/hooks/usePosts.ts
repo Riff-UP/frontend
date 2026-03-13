@@ -250,7 +250,11 @@ export function usePosts(userId?: string) {
           title: titleValue,
           description: descriptionValue,
         };
-        if (mediaUrl) payload.mediaUrl = mediaUrl;
+        if (mediaUrl) {
+          // Compatibilidad: algunos backends exigen content como URL para posts de imagen/video.
+          payload.content = mediaUrl;
+          payload.mediaUrl = mediaUrl;
+        }
 
         response = await fetchWithTimeout(`${API_URL}/posts`, {
           method: 'POST',
