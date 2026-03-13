@@ -133,13 +133,16 @@ export function usePublicArtistData(artistId?: string) {
           const eventId = extractId(e._id ?? e.id);
           if (!eventId) return null;
           const rawDate = e.event_date || e.startDate || e.start_date || '';
-          const dateObj = rawDate ? new Date(rawDate) : null;
+          // Extraer fecha y hora directamente del string ISO para evitar conversiones de timezone
+          // "2025-03-12T11:00:00.000Z" → date="2025-03-12", time="11:00"
+          const isoDate = rawDate ? rawDate.substring(0, 10) : '';
+          const isoTime = rawDate && rawDate.includes('T') ? rawDate.substring(11, 16) : '';
           return {
             id: eventId,
             title: e.title ?? 'Evento',
             location: e.location ?? '',
-            date: dateObj ? dateObj.toISOString().split('T')[0] : '',
-            time: dateObj ? dateObj.toTimeString().slice(0, 5) : '',
+            date: isoDate,
+            time: isoTime,
             description: e.description,
             isAttending: false,
           } as Event;
