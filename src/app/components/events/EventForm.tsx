@@ -38,11 +38,11 @@ export default function EventForm({
 }: EventFormProps) {
   if (!isOpen) return null;
 
-  // Fecha mínima: hoy en formato YYYY-MM-DD
   const today = new Date().toISOString().split('T')[0];
-  // Limitar año a 2026
-  const minDate = today > '2026-12-31' ? '2026-12-31' : (today < '2026-01-01' ? '2026-01-01' : today);
-  const maxDate = '2026-12-31';
+
+  // Al editar: si la fecha actual del evento es pasada, permitir conservarla como mínimo.
+  // Al crear: mínimo siempre es hoy.
+  const minDate = isEditing && date && date < today ? date : today;
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm p-4">
@@ -53,7 +53,7 @@ export default function EventForm({
             {isEditing ? 'Editar evento' : 'Subir evento'}
           </h3>
           <button
-            onClick={onClose} 
+            onClick={onClose}
             className="text-riff-primary hover:text-riff-primary/80 transition-colors"
           >
             <IoMdClose className="w-6 h-6" />
@@ -84,7 +84,6 @@ export default function EventForm({
                 type="date"
                 value={date}
                 min={minDate}
-                max={maxDate}
                 onChange={(e) => onDateChange(e.target.value)}
                 className="w-full pl-10 pr-3 py-2 bg-riff-text-primary border border-white/10 rounded-sm text-white text-sm
                          focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary
