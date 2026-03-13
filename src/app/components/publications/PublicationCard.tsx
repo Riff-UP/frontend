@@ -37,6 +37,7 @@ export default function PublicationCard({
   formatDate,
 }: PublicationCardProps) {
   const displayDate = formatDate ? formatDate(publication.date) : safeFormatDate(publication.date);
+  const isVideoPublication = publication.mediaType === 'video' || publication.type === 'video';
 
   return (
     <div
@@ -70,14 +71,23 @@ export default function PublicationCard({
 
         {publication.image && (
           <div className="bg-riff-header mb-3 relative w-full h-48 rounded-sm overflow-hidden">
-            <Image
-              src={publication.image}
-              alt="Imagen de publicación"
-              fill
-              className="object-cover"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              unoptimized
-            />
+            {isVideoPublication ? (
+              <video
+                src={publication.image}
+                controls
+                preload="metadata"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <Image
+                src={publication.image}
+                alt="Imagen de publicación"
+                fill
+                className="object-cover"
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                unoptimized
+              />
+            )}
           </div>
         )}
 

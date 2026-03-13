@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { validateImageFile, uploadToR2 } from '../utils/r2Storage';
+import { validateMediaFile, uploadToR2 } from '../utils/r2Storage';
 import { API_BASE_URL, getAuthHeaders } from '../config/api';
 
 const API_URL = API_BASE_URL;
@@ -38,12 +38,13 @@ export interface Post {
 }
 
 export interface CreatePostData {
-  // ── campos para image posts (flujo original) ──
+  // ── campos para media posts (imagen/video) ──
   content?: string;
+  mediaFile?: File;
   imageFile?: File;
   tags?: string[];
   // ── campos para audio posts ──
-  type?: 'image' | 'audio';
+  type?: 'image' | 'video' | 'audio';
   title?: string;
   description?: string;
   url?: string;          // URL de la canción (audio posts)
@@ -163,8 +164,10 @@ export function usePosts(userId?: string) {
         return normalized;
       }
 
-      // ── RAMA TEXTO: permitir publicar sin imagen ─────────────────────────
-      if (!postData.imageFile) {
+      const mediaFile = postData.mediaFile ?? postData.imageFile;
+
+      // ── RAMA TEXTO: permitir publicar sin media ─────────────────────────
+      if (!mediaFile) {
         const textValue = (postData.content ?? '').trim();
         if (!textValue) throw new Error('La publicación no puede estar vacía');
 
@@ -209,21 +212,26 @@ export function usePosts(userId?: string) {
         return normalized;
       }
 
-      // ── RAMA IMAGE: flujo original multipart → fallback JSON ─────────────
-      if (postData.imageFile) {
-        const validation = validateImageFile(postData.imageFile);
+      // ── RAMA MEDIA (imagen/video): multipart → fallback JSON ─────────────
+      if (mediaFile) {
+        const validation = validateMediaFile(mediaFile);
         if (!validation.valid) throw new Error(validation.error);
       }
+
+      const mediaType: 'image' | 'video' = mediaFile?.type.startsWith('video/') ? 'video' : 'image';
 
       const titleValue = (postData.content ?? '').substring(0, 100) || 'Nueva publicación';
       const descriptionValue = postData.content || 'Sin descripción';
 
       const formData = new FormData();
       formData.append('sql_user_id', userId);
-      formData.append('type', 'image');
+      formData.append('type', mediaType);
       formData.append('title', titleValue);
       formData.append('description', descriptionValue);
-      if (postData.imageFile) formData.append('image', postData.imageFile);
+      if (mediaFile) {
+        formData.append('image', mediaFile);
+        formData.append('file', mediaFile);
+      }
       if (postData.tags && postData.tags.length > 0) formData.append('tags', JSON.stringify(postData.tags));
 
       let response = await fetchWithTimeout(`${API_URL}/posts`, {
@@ -234,11 +242,11 @@ export function usePosts(userId?: string) {
 
       if (!response.ok && (response.status === 404 || response.status === 415 || response.status === 400)) {
         let mediaUrl: string | undefined;
-        if (postData.imageFile) mediaUrl = await uploadToR2(postData.imageFile);
+        if (mediaFile) mediaUrl = await uploadToR2(mediaFile);
 
         const payload: Record<string, unknown> = {
           sql_user_id: userId,
-          type: 'image',
+          type: mediaType,
           title: titleValue,
           description: descriptionValue,
         };

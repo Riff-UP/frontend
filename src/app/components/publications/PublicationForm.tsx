@@ -2,9 +2,10 @@ import { MdOutlineAddPhotoAlternate } from 'react-icons/md';
 
 interface PublicationFormProps {
   text: string;
-  selectedImage: string | null;
+  selectedMediaPreview: string | null;
+  selectedMediaType: 'image' | 'video' | null;
   onTextChange: (value: string) => void;
-  onImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onMediaSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onPublish: () => void;
   onCancel: () => void;
   isUploading?: boolean;
@@ -12,9 +13,10 @@ interface PublicationFormProps {
 
 export default function PublicationForm({
   text,
-  selectedImage,
+  selectedMediaPreview,
+  selectedMediaType,
   onTextChange,
-  onImageSelect,
+  onMediaSelect,
   onPublish,
   onCancel,
   isUploading = false,
@@ -34,23 +36,31 @@ export default function PublicationForm({
                    transition-all duration-200 resize-none mb-3"
         />
 
-        {selectedImage && (
+        {selectedMediaPreview && (
           <div className="mb-3 overflow-hidden rounded-sm">
-            <img
-              src={selectedImage}
-              alt="Selected"
-              className="w-full h-auto max-h-80 object-contain"
-            />
+            {selectedMediaType === 'video' ? (
+              <video
+                src={selectedMediaPreview}
+                controls
+                className="w-full h-auto max-h-80 object-contain"
+              />
+            ) : (
+              <img
+                src={selectedMediaPreview}
+                alt="Selected"
+                className="w-full h-auto max-h-80 object-contain"
+              />
+            )}
           </div>
         )}
 
         <label className="flex items-center gap-2 text-riff-primary hover:text-riff-primary/80 cursor-pointer mb-3 w-fit">
           <MdOutlineAddPhotoAlternate className="w-5 h-5" />
-          <span className="text-sm">Añadir imagen</span>
+          <span className="text-sm">Añadir imagen o video</span>
           <input
             type="file"
-            accept="image/*"
-            onChange={onImageSelect}
+            accept="image/*,video/*"
+            onChange={onMediaSelect}
             className="hidden"
           />
         </label>
@@ -65,7 +75,7 @@ export default function PublicationForm({
           </button>
           <button
             onClick={onPublish}
-            disabled={(!text.trim() && !selectedImage) || isUploading}
+            disabled={(!text.trim() && !selectedMediaPreview) || isUploading}
             className="flex-1 px-4 py-2 bg-gradient-to-r from-riff-primary-dark to-riff-primary text-white text-sm font-medium rounded-sm hover:from-riff-primary hover:to-riff-primary-dark transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isUploading ? 'Subiendo...' : 'Publicar'}

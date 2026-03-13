@@ -38,6 +38,8 @@ export default function PublicationListCard({
   onSaveEdit,
   onCancelEdit,
 }: PublicationListCardProps) {
+  const isVideoPublication = publication.mediaType === 'video' || publication.type === 'video';
+
   const handleLikeClick = () => {
     if (!isLiking && onLike) onLike(publication.id);
   };
@@ -128,16 +130,25 @@ export default function PublicationListCard({
         <p className="text-white text-sm mb-3">{publication.text || publication.content}</p>
       )}
 
-      {/* Image */}
+      {/* Media */}
       {publication.image && (
         <div className="mb-3 overflow-hidden flex items-center justify-center bg-riff-header relative w-full" style={{ minHeight: '200px' }}>
-          <Image
-            src={publication.image}
-            alt="Publicación"
-            width={800}
-            height={400}
-            className="w-full h-auto max-h-[400px] object-contain"
-          />
+          {isVideoPublication ? (
+            <video
+              src={publication.image}
+              controls
+              preload="metadata"
+              className="w-full h-auto max-h-[400px] object-contain"
+            />
+          ) : (
+            <Image
+              src={publication.image}
+              alt="Publicación"
+              width={800}
+              height={400}
+              className="w-full h-auto max-h-[400px] object-contain"
+            />
+          )}
         </div>
       )}
 

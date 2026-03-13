@@ -29,7 +29,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('La subida de la imagen tardó demasiado. Intenta de nuevo.');
+      throw new Error('La subida del archivo tardó demasiado. Intenta de nuevo.');
     }
 
     throw error;
@@ -43,7 +43,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
  */
 export async function uploadToR2(file: File): Promise<string> {
   // Validar archivo
-  const validation = validateImageFile(file);
+  const validation = validateMediaFile(file);
   if (!validation.valid) {
     throw new Error(validation.error);
   }
@@ -88,10 +88,49 @@ export async function uploadToR2(file: File): Promise<string> {
 }
 
 /**
- * Valida que el archivo sea una imagen válida
+ * Valida que el archivo sea una imagen o video válido para publicaciones
+ */
+export function validateMediaFile(file: File): { valid: boolean; error?: string } {
+  const isVideo = file.type.startsWith('video/');
+  const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+
+  const allowedTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'video/mp4',
+    'video/quicktime',
+    'video/webm',
+    'video/x-msvideo',
+    'video/x-m4v',
+  ];
+
+  if (!allowedTypes.includes(file.type)) {
+    return {
+      valid: false,
+      error: 'Tipo de archivo no permitido. Solo se permiten imágenes o videos compatibles (JPG, PNG, GIF, WEBP, MP4, MOV, WEBM, AVI, M4V).',
+    };
+  }
+
+  if (file.size > maxSize) {
+    return {
+      valid: false,
+      error: isVideo
+        ? 'El video es muy grande. Tamaño máximo: 100MB'
+        : 'La imagen es muy grande. Tamaño máximo: 10MB',
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Valida que el archivo sea una imagen válida (compatibilidad con flujos existentes)
  */
 export function validateImageFile(file: File): { valid: boolean; error?: string } {
-  const maxSize = 10 * 1024 * 1024; // 10MB
+  const maxSize = 10 * 1024 * 1024;
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
 
   if (!allowedTypes.includes(file.type)) {

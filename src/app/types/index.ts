@@ -47,7 +47,8 @@ export interface ArtistData {
 export interface Publication {
   id: string | number;
   // ── tipo de post ───────────────────────────────────────────
-  type?: 'image' | 'audio';
+  type?: 'image' | 'video' | 'audio';
+  mediaType?: 'image' | 'video' | 'audio';
   // ── campos comunes ─────────────────────────────────────────
   title?: string;
   content: string;          // embedUrl para audio, imageUrl para image

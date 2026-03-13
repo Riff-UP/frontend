@@ -27,6 +27,8 @@ export default function PublicationModal({
 }: PublicationModalProps) {
   if (!publication) return null;
 
+  const isVideoPublication = publication.mediaType === 'video' || publication.type === 'video';
+
   return (
     <div
       className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm p-4"
@@ -57,17 +59,26 @@ export default function PublicationModal({
           </button>
         </div>
 
-        {/* Imagen */}
+        {/* Media */}
         {publication.image && (
           <div className="bg-black flex items-center justify-center overflow-hidden md:flex-1">
-            <Image
-              src={publication.image}
-              alt="Imagen de publicación"
-              width={800}
-              height={800}
-              className="w-full h-full object-contain max-h-[50vh] md:max-h-[90vh]"
-              unoptimized
-            />
+            {isVideoPublication ? (
+              <video
+                src={publication.image}
+                controls
+                preload="metadata"
+                className="w-full h-full object-contain max-h-[50vh] md:max-h-[90vh]"
+              />
+            ) : (
+              <Image
+                src={publication.image}
+                alt="Imagen de publicación"
+                width={800}
+                height={800}
+                className="w-full h-full object-contain max-h-[50vh] md:max-h-[90vh]"
+                unoptimized
+              />
+            )}
           </div>
         )}
 

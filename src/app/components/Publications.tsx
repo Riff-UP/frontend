@@ -17,7 +17,8 @@ export default function Publications() {
   const { isLiked, toggleLike, processingPostId: likingPostId, reactedPosts, postReactionCounts, fetchPostReactionCounts, getReactionCount } = usePostReactions(user?.id);
 
   const [newPost, setNewPost] = useState('');
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedMediaPreview, setSelectedMediaPreview] = useState<string | null>(null);
+  const [selectedMediaType, setSelectedMediaType] = useState<'image' | 'video' | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
   const [editingId, setEditingId] = useState<string | number | null>(null);
@@ -49,32 +50,51 @@ export default function Publications() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [openMenuId]);
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (selectedMediaPreview) {
+        URL.revokeObjectURL(selectedMediaPreview);
+      }
+
       setSelectedFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => setSelectedImage(reader.result as string);
-      reader.readAsDataURL(file);
+      setSelectedMediaType(file.type.startsWith('video/') ? 'video' : 'image');
+      setSelectedMediaPreview(URL.createObjectURL(file));
     }
   };
 
   const handlePublish = async () => {
     if (!newPost.trim() && !selectedFile) return;
     if (!user) return;
-    const result = await createPost({ content: newPost, imageFile: selectedFile || undefined, tags: [] });
+    const result = await createPost({ content: newPost, mediaFile: selectedFile || undefined, tags: [] });
     if (result) {
       setNewPost('');
-      setSelectedImage(null);
+      if (selectedMediaPreview) {
+        URL.revokeObjectURL(selectedMediaPreview);
+      }
+      setSelectedMediaPreview(null);
+      setSelectedMediaType(null);
       setSelectedFile(null);
     }
   };
 
   const handleCancel = () => {
     setNewPost('');
-    setSelectedImage(null);
+    if (selectedMediaPreview) {
+      URL.revokeObjectURL(selectedMediaPreview);
+    }
+    setSelectedMediaPreview(null);
+    setSelectedMediaType(null);
     setSelectedFile(null);
   };
+
+  useEffect(() => {
+    return () => {
+      if (selectedMediaPreview) {
+        URL.revokeObjectURL(selectedMediaPreview);
+      }
+    };
+  }, [selectedMediaPreview]);
 
   const handleDelete = (id: string | number) => {
     setDeleteConfirmId(id);
@@ -164,8 +184,22 @@ export default function Publications() {
     if (!Array.isArray(posts)) return [];
     return posts.map(post => {
       const postId = post.id || '';
+      const normalizedType: 'image' | 'video' | 'audio' | undefined =
+        post.type === 'video' || post.mediaType === 'video'
+          ? 'video'
+          : post.type === 'audio' || post.mediaType === 'audio'
+            ? 'audio'
+            : post.type === 'image' || post.mediaType === 'image'
+              ? 'image'
+              : undefined;
       const imageUrl = post.mediaUrl
-        || (post.content && (post.content.startsWith('http') || post.content.startsWith('/')) ? post.content : undefined);
+        || (
+          post.content
+          && (post.content.startsWith('http') || post.content.startsWith('/'))
+          && normalizedType !== 'audio'
+            ? post.content
+            : undefined
+        );
       const textContent = post.description
         || (post.content && !post.content.startsWith('http') ? post.content : '')
         || post.title || '';
@@ -176,6 +210,8 @@ export default function Publications() {
       const baseLikes = hasServerCount ? serverCount : (post.likesCount ?? 0);
       return {
         id: postId,
+        type: normalizedType,
+        mediaType: normalizedType,
         content: textContent,
         image: imageUrl,
         date: rawDate ? new Date(rawDate).toLocaleDateString() : 'Sin fecha',
@@ -204,9 +240,10 @@ export default function Publications() {
 
         <PublicationForm
           text={newPost}
-          selectedImage={selectedImage}
+          selectedMediaPreview={selectedMediaPreview}
+          selectedMediaType={selectedMediaType}
           onTextChange={setNewPost}
-          onImageSelect={handleImageSelect}
+          onMediaSelect={handleMediaSelect}
           onPublish={handlePublish}
           onCancel={handleCancel}
           isUploading={uploading}
