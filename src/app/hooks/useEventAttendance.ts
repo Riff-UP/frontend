@@ -21,10 +21,11 @@ interface UseEventAttendanceReturn {
   loading: boolean;
 }
 
-const STORAGE_KEY = (userId: string) => `riff_attendance_${userId}`;
+const STORAGE_KEY = (userId: string | number) => `riff_attendance_${userId}`;
 
-function loadFromStorage(userId: string): Map<string, string> {
+function loadFromStorage(userId: string | number): Map<string, string> {
   try {
+    if (typeof window === 'undefined') return new Map();
     const raw = localStorage.getItem(STORAGE_KEY(userId));
     if (!raw) return new Map();
     return new Map(Object.entries(JSON.parse(raw) as Record<string, string>));
@@ -33,17 +34,23 @@ function loadFromStorage(userId: string): Map<string, string> {
   }
 }
 
-function saveToStorage(userId: string, map: Map<string, string>) {
+function saveToStorage(userId: string | number, map: Map<string, string>) {
   try {
+    if (typeof window === 'undefined') return;
     localStorage.setItem(STORAGE_KEY(userId), JSON.stringify(Object.fromEntries(map.entries())));
   } catch { /* silencioso */ }
 }
 
-export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn {
-  const [attendedEvents, setAttendedEvents] = useState<Map<string, string>>(new Map());
+export function useEventAttendance(sqlUserId?: string | number): UseEventAttendanceReturn {
+  // Inicialización SINCRÓNICA: si sqlUserId ya está disponible al montar, carga localStorage
+  // en el mismo render — sin parpadeo de botón azul→verde
+  const [attendedEvents, setAttendedEvents] = useState<Map<string, string>>(() => {
+    if (!sqlUserId) return new Map();
+    return loadFromStorage(sqlUserId);
+  });
   const [loading, setLoading] = useState(false);
 
-  // Hidratar cada vez que sqlUserId esté disponible (cubre remount y carga asíncrona del user)
+  // Fallback: si sqlUserId llega async (undefined → valor), hidratar cuando esté listo
   useEffect(() => {
     if (!sqlUserId) return;
     setAttendedEvents(loadFromStorage(sqlUserId));
@@ -54,24 +61,23 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
     return null;
   };
 
-  const update = (userId: string, fn: (prev: Map<string, string>) => Map<string, string>) => {
+  const update = (userId: string | number, fn: (prev: Map<string, string>) => Map<string, string>) => {
     setAttendedEvents(prev => {
       const next = fn(prev);
-      if (userId) saveToStorage(userId, next);
+      saveToStorage(userId, next);
       return next;
     });
   };
 
   const isAttending = (eventId: string) => attendedEvents.has(eventId);
 
-  const attend = async (eventId: string, sqlUserId: string): Promise<boolean> => {
+  const attend = async (eventId: string, sqlUserId: string | number): Promise<boolean> => {
     const token = getToken();
     if (!token || !sqlUserId) return false;
 
-    // Leer localStorage directamente para evitar race condition con el estado de React
+    // Leer localStorage directo — fuente de verdad ante cualquier race condition
     const stored = loadFromStorage(sqlUserId);
     if (stored.has(eventId)) {
-      // Sincronizar estado si aún no lo tiene (race condition entre useEffect y click)
       setAttendedEvents(stored);
       return true;
     }
@@ -87,6 +93,7 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
       });
 
       if (res.status === 409) {
+        // Ya existe en BD — marcar como asistiendo y persistir
         update(sqlUserId, prev => { const next = new Map(prev); next.set(eventId, '__conflict__'); return next; });
         return true;
       }
