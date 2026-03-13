@@ -74,13 +74,13 @@ body {
 
 @keyframes authBgPan {
   0% {
-    transform: scale(1.03) translate3d(0, 0, 0);
+    transform: scale(1.04) translate3d(0, 0, 0);
   }
   50% {
-    transform: scale(1.06) translate3d(-1.2%, -0.8%, 0);
+    transform: scale(1.1) translate3d(-2.4%, -1.4%, 0);
   }
   100% {
-    transform: scale(1.03) translate3d(0, 0, 0);
+    transform: scale(1.04) translate3d(0, 0, 0);
   }
 }
 
@@ -100,13 +100,13 @@ body {
 
 @keyframes authWaveDrift {
   0% {
-    transform: translate3d(-2%, 0, 0) scale(1.02);
+    transform: translate3d(-4%, 0, 0) scale(1.04);
   }
   50% {
-    transform: translate3d(2%, -2%, 0) scale(1.04);
+    transform: translate3d(4%, -3%, 0) scale(1.08);
   }
   100% {
-    transform: translate3d(-2%, 0, 0) scale(1.02);
+    transform: translate3d(-4%, 0, 0) scale(1.04);
   }
 }
 
@@ -116,12 +116,26 @@ body {
     opacity: 0.5;
   }
   50% {
-    transform: translate3d(12px, -16px, 0);
-    opacity: 0.75;
+    transform: translate3d(20px, -22px, 0);
+    opacity: 0.9;
   }
   100% {
     transform: translate3d(0, 0, 0);
     opacity: 0.5;
+  }
+}
+
+@keyframes authBeamSpin {
+  0% {
+    transform: rotate(0deg) scale(1);
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.34;
+  }
+  100% {
+    transform: rotate(360deg) scale(1.02);
+    opacity: 0.2;
   }
 }
 
@@ -131,16 +145,27 @@ body {
 
 .auth-bg-motion {
   background:
-    radial-gradient(circle at 18% 78%, rgba(0, 123, 255, 0.3), transparent 35%),
-    radial-gradient(circle at 82% 12%, rgba(0, 34, 102, 0.5), transparent 38%),
-    linear-gradient(145deg, #061340 0%, #041133 34%, #030a27 62%, #05091e 100%);
-  animation: authBgPan 18s ease-in-out infinite;
+    radial-gradient(circle at 14% 84%, rgba(0, 123, 255, 0.42), transparent 34%),
+    radial-gradient(circle at 85% 10%, rgba(15, 65, 200, 0.45), transparent 36%),
+    linear-gradient(145deg, #071a4f 0%, #041744 32%, #041235 58%, #040b25 100%);
+  animation: authBgPan 13s ease-in-out infinite;
   will-change: transform;
 }
 
+.auth-bg-canvas::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background: conic-gradient(from 110deg, transparent 0deg, rgba(0, 123, 255, 0.18) 70deg, transparent 140deg, rgba(67, 210, 255, 0.18) 220deg, transparent 300deg);
+  mix-blend-mode: screen;
+  filter: blur(10px);
+  animation: authBeamSpin 14s linear infinite;
+  pointer-events: none;
+}
+
 .auth-light-sweep {
-  background: linear-gradient(100deg, transparent 15%, rgba(255, 255, 255, 0.08) 50%, transparent 85%);
-  animation: authLightSweep 14s ease-in-out infinite alternate;
+  background: linear-gradient(100deg, transparent 10%, rgba(255, 255, 255, 0.14) 48%, transparent 86%);
+  animation: authLightSweep 8s ease-in-out infinite alternate;
   will-change: transform, opacity;
 }
 
@@ -150,15 +175,15 @@ body {
   width: 116%;
   border-radius: 999px;
   filter: blur(2px);
-  opacity: 0.45;
-  animation: authWaveDrift 16s ease-in-out infinite;
+  opacity: 0.56;
+  animation: authWaveDrift 11s ease-in-out infinite;
   will-change: transform;
 }
 
 .auth-wave-a {
   height: 250px;
   top: 26%;
-  background: linear-gradient(90deg, rgba(0, 123, 255, 0.2), rgba(67, 210, 255, 0.38), rgba(0, 123, 255, 0.2));
+  background: linear-gradient(90deg, rgba(0, 123, 255, 0.3), rgba(67, 210, 255, 0.52), rgba(0, 123, 255, 0.28));
   transform: rotate(-9deg);
   animation-delay: 0s;
 }
@@ -166,7 +191,7 @@ body {
 .auth-wave-b {
   height: 210px;
   top: 48%;
-  background: linear-gradient(90deg, rgba(0, 52, 180, 0.2), rgba(0, 123, 255, 0.34), rgba(0, 45, 160, 0.2));
+  background: linear-gradient(90deg, rgba(0, 52, 180, 0.28), rgba(0, 123, 255, 0.44), rgba(0, 45, 160, 0.26));
   transform: rotate(-7deg);
   animation-delay: 2s;
 }
@@ -174,7 +199,7 @@ body {
 .auth-wave-c {
   height: 180px;
   top: 62%;
-  background: linear-gradient(90deg, rgba(0, 40, 150, 0.15), rgba(0, 123, 255, 0.28), rgba(0, 40, 150, 0.15));
+  background: linear-gradient(90deg, rgba(0, 40, 150, 0.22), rgba(0, 123, 255, 0.36), rgba(0, 40, 150, 0.2));
   transform: rotate(-6deg);
   animation-delay: 4s;
 }
@@ -182,8 +207,8 @@ body {
 .auth-orb {
   position: absolute;
   border-radius: 999px;
-  filter: blur(22px);
-  animation: authOrbFloat 12s ease-in-out infinite;
+  filter: blur(20px);
+  animation: authOrbFloat 8s ease-in-out infinite;
   will-change: transform, opacity;
 }
 
@@ -192,7 +217,7 @@ body {
   height: 220px;
   top: 10%;
   left: 58%;
-  background: rgba(0, 123, 255, 0.28);
+  background: rgba(0, 123, 255, 0.42);
   animation-delay: 0s;
 }
 
@@ -201,7 +226,7 @@ body {
   height: 160px;
   top: 58%;
   left: 72%;
-  background: rgba(67, 210, 255, 0.25);
+  background: rgba(67, 210, 255, 0.34);
   animation-delay: 1.6s;
 }
 
@@ -210,7 +235,7 @@ body {
   height: 140px;
   top: 70%;
   left: 45%;
-  background: rgba(0, 123, 255, 0.2);
+  background: rgba(0, 123, 255, 0.3);
   animation-delay: 3.2s;
 }
 
@@ -251,5 +276,10 @@ body {
     transition: none !important;
     opacity: 1 !important;
     transform: none !important;
+  }
+
+  .auth-bg-canvas::before {
+    animation: none !important;
+    opacity: 0 !important;
   }
 }
