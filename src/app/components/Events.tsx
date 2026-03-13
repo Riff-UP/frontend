@@ -23,6 +23,7 @@ export default function Events() {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [originalEditDate, setOriginalEditDate] = useState<string>('');
   
   // Form state
   const [newEvent, setNewEvent] = useState({
@@ -33,7 +34,6 @@ export default function Events() {
     description: '',
   });
 
-  // El filtro por usuario se aplica en useEvents (client-side, por userId del JWT).
   const events: Event[] = backendEvents.map(e => {
     const date = e.event_date.split('T')[0];
     const time = e.event_date.includes('T') ? e.event_date.substring(11, 16) : '';
@@ -68,9 +68,12 @@ export default function Events() {
   const handleCreateEvent = async () => {
     if (!newEvent.title || !newEvent.date || !user) return;
 
+    const today = new Date().toISOString().split('T')[0];
+    if (!editingEventId && newEvent.date < today) return;
+    if (editingEventId && newEvent.date !== originalEditDate && newEvent.date < today) return;
+
     setSaving(true);
 
-    // Construir fecha ISO completa con zona horaria
     const timeStr = newEvent.time || '00:00';
     const eventDateTime = `${newEvent.date}T${timeStr}:00.000Z`;
 
@@ -92,7 +95,6 @@ export default function Events() {
         });
       }
     } else {
-      // NO enviar userId - el backend lo obtiene del JWT en Authorization header
       const result = await createEvent({
         title: newEvent.title,
         location: newEvent.location,
@@ -111,6 +113,7 @@ export default function Events() {
     setSaving(false);
     setNewEvent({ title: '', location: '', date: '', time: '', description: '' });
     setEditingEventId(null);
+    setOriginalEditDate('');
     setShowModal(false);
   };
 
@@ -122,6 +125,7 @@ export default function Events() {
       time: event.time,
       description: event.description || '',
     });
+    setOriginalEditDate(event.date);
     setEditingEventId(event.id);
     setShowModal(true);
   };
@@ -151,6 +155,7 @@ export default function Events() {
     setShowModal(false);
     setNewEvent({ title: '', location: '', date: '', time: '', description: '' });
     setEditingEventId(null);
+    setOriginalEditDate('');
   };
 
   const formatEventDate = (dateString: string, timeString?: string) => {
@@ -173,7 +178,6 @@ export default function Events() {
 
   return (
     <div className="w-full">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-white text-xl sm:text-2xl font-bold">Eventos</h2>
@@ -189,9 +193,7 @@ export default function Events() {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Left Column: Calendar and Selected Event */}
         <div className="w-full lg:w-96 space-y-6">
-          {/* Calendar */}
           <Calendar
             currentMonth={currentMonth}
             currentYear={currentYear}
@@ -202,15 +204,12 @@ export default function Events() {
             hasEventOnDate={hasEventOnDate}
           />
 
-          {/* Selected Event Details */}
           {selectedEvent && (
             <div className="bg-riff-header border border-white/10 rounded-sm overflow-hidden">
               <div className="h-1 bg-gradient-to-r from-riff-primary-dark to-riff-primary"></div>
               <div className="p-4">
                 <h3 className="text-white text-base font-semibold mb-4">Evento seleccionado</h3>
-
                 <h4 className="text-white font-semibold text-lg mb-4">{selectedEvent.title}</h4>
-
                 <div className="space-y-3 mb-4">
                   <div className="flex items-start gap-3">
                     <FiMapPin className="w-5 h-5 text-riff-primary flex-shrink-0 mt-0.5" />
@@ -218,25 +217,23 @@ export default function Events() {
                       <p className="text-white text-sm">{selectedEvent.location || 'Sin ubicación'}</p>
                     </div>
                   </div>
-
                   <div className="flex items-start gap-3">
                     <FiCalendar className="w-5 h-5 text-riff-primary flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-white text-sm">
                         {formatEventDate(selectedEvent.date, selectedEvent.time)}
                       </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleEditEvent(selectedEvent)}
-                  className="flex-1 px-3 py-2 bg-riff-primary/20 hover:bg-riff-primary/30 text-riff-primary border border-riff-primary/30 rounded-sm transition-colors flex items-center justify-center gap-2"
-                >
-                  <MdEdit className="w-4 h-4" />
-                  <span className="text-sm">Editar</span>
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleEditEvent(selectedEvent)}
+                    className="flex-1 px-3 py-2 bg-riff-primary/20 hover:bg-riff-primary/30 text-riff-primary border border-riff-primary/30 rounded-sm transition-colors flex items-center justify-center gap-2"
+                  >
+                    <MdEdit className="w-4 h-4" />
+                    <span className="text-sm">Editar</span>
+                  </button>
                   <button
                     onClick={() => handleDeleteClick(selectedEvent.id)}
                     className="flex-1 px-3 py-2 bg-red-400/20 hover:bg-red-400/30 text-red-400 border border-red-400/30 rounded-sm transition-colors flex items-center justify-center gap-2"
@@ -250,7 +247,6 @@ export default function Events() {
           )}
         </div>
 
-        {/* Right Column: Upcoming Events List */}
         <div className="flex-1">
           <div className="rounded-sm p-4 sm:p-0">
             <h3 className="text-white text-base sm:text-lg font-semibold mb-4">Próximos eventos</h3>
@@ -281,7 +277,6 @@ export default function Events() {
         </div>
       </div>
 
-      {/* Create Event Modal */}
       <EventForm
         isOpen={showModal}
         isEditing={!!editingEventId}
@@ -300,7 +295,6 @@ export default function Events() {
         onClose={handleCloseModal}
       />
 
-      {/* Delete Confirmation Modal */}
       <DeleteConfirmModal
         isOpen={showDeleteModal}
         title="¿Eliminar evento?"
