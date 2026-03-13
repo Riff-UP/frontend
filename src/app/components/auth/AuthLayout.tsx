@@ -7,16 +7,11 @@ interface AuthLayoutProps {
 export default function AuthLayout({ children }: AuthLayoutProps) {
   return (
     <div className="min-h-screen flex relative">
-      <div className="absolute inset-0 z-0 overflow-hidden auth-bg-canvas">
-        <div className="auth-bg-motion absolute inset-0" />
-        <div className="auth-wave auth-wave-a" />
-        <div className="auth-wave auth-wave-b" />
-        <div className="auth-wave auth-wave-c" />
-        <div className="auth-orb auth-orb-a" />
-        <div className="auth-orb auth-orb-b" />
-        <div className="auth-orb auth-orb-c" />
-        <div className="auth-light-sweep absolute inset-0" />
-        <div className="absolute inset-0 bg-riff-overlay/30" />
+      <div 
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: 'url(/images/fondo_n.jpg)' }}
+      >
+        <div className="absolute inset-0 bg-riff-overlay/40"></div>
       </div>
 
       <div className="w-full lg:w-[35%] bg-white/60 backdrop-blur-md flex flex-col min-h-screen relative z-10">
