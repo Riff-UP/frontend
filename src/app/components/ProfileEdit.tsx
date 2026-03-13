@@ -163,6 +163,7 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
     // Guardar datos del perfil
     const profileSuccess = await updateUser({
       name: profileData.name,
+      email: profileData.email.trim(),
       biography: profileData.description,
     });
 
