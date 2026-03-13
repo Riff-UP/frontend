@@ -8,10 +8,11 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
   return (
     <div className="min-h-screen flex relative">
       <div 
-        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+        className="auth-bg-motion absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: 'url(/images/fondo_n.jpg)' }}
       >
         <div className="absolute inset-0 bg-riff-overlay/40"></div>
+        <div className="auth-light-sweep absolute inset-0"></div>
       </div>
 
       <div className="w-full lg:w-[35%] bg-white/60 backdrop-blur-md flex flex-col min-h-screen relative z-10">

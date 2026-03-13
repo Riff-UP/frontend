@@ -72,6 +72,43 @@ body {
   display: none;  /* Chrome, Safari and Opera */
 }
 
+@keyframes authBgPan {
+  0% {
+    transform: scale(1.05) translate3d(0, 0, 0);
+  }
+  50% {
+    transform: scale(1.08) translate3d(-1.5%, -1%, 0);
+  }
+  100% {
+    transform: scale(1.05) translate3d(0, 0, 0);
+  }
+}
+
+@keyframes authLightSweep {
+  0% {
+    transform: translateX(-18%);
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 0.2;
+  }
+  100% {
+    transform: translateX(18%);
+    opacity: 0.12;
+  }
+}
+
+.auth-bg-motion {
+  animation: authBgPan 18s ease-in-out infinite;
+  will-change: transform;
+}
+
+.auth-light-sweep {
+  background: linear-gradient(100deg, transparent 15%, rgba(255, 255, 255, 0.08) 50%, transparent 85%);
+  animation: authLightSweep 14s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+}
+
 @keyframes riffFloat {
   0%,
   100% {
@@ -100,7 +137,9 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .reveal-on-scroll,
-  .anim-float {
+  .anim-float,
+  .auth-bg-motion,
+  .auth-light-sweep {
     animation: none !important;
     transition: none !important;
     opacity: 1 !important;
