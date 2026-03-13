@@ -85,6 +85,26 @@ function randomId(length = 8): string {
   return Math.random().toString(36).slice(2, 2 + length);
 }
 
+function buildCloudinaryTransformedUrl(publicId: string, resourceType: MediaResourceType): {
+  transformedUrl: string;
+  transformedExtension: string;
+  transformedContentType: string;
+} {
+  const { extension: transformedExtension, contentType: transformedContentType } = getTransformedFileMeta(resourceType);
+
+  const transformedUrl = cloudinary.url(publicId, {
+    resource_type: resourceType,
+    secure: true,
+    format: transformedExtension,
+    sign_url: false,
+    transformation: resourceType === 'video'
+      ? [{ video_codec: 'h264', audio_codec: 'aac' }]
+      : [{ quality: 'auto:good' }],
+  });
+
+  return { transformedUrl, transformedExtension, transformedContentType };
+}
+
 async function uploadBufferToCloudinary(
   buffer: Buffer,
   file: File,
@@ -153,6 +173,51 @@ export async function POST(request: Request) {
   try {
     const { client, bucket, publicUrl } = getR2Config();
     getCloudinaryConfig();
+
+    const requestContentType = request.headers.get('content-type') || '';
+
+    if (requestContentType.includes('application/json')) {
+      const body = (await request.json()) as {
+        cloudinaryPublicId?: string;
+        resourceType?: MediaResourceType;
+        filename?: string;
+      };
+
+      if (!body.cloudinaryPublicId || !body.resourceType) {
+        return NextResponse.json(
+          { message: 'Faltan cloudinaryPublicId o resourceType para procesar el archivo.' },
+          { status: 400 }
+        );
+      }
+
+      const resourceType = body.resourceType === 'video' ? 'video' : 'image';
+      const { transformedUrl, transformedExtension, transformedContentType } = buildCloudinaryTransformedUrl(
+        body.cloudinaryPublicId,
+        resourceType,
+      );
+
+      const transformedBuffer = await fetchTransformedBuffer(transformedUrl);
+      const baseFilename = body.filename || `${Date.now()}-${randomId()}.${transformedExtension}`;
+      const filename = replaceFileExtension(baseFilename, transformedExtension);
+
+      try {
+        await client.send(
+          new PutObjectCommand({
+            Bucket: bucket,
+            Key: filename,
+            Body: transformedBuffer,
+            ContentType: transformedContentType,
+          })
+        );
+      } finally {
+        await cloudinary.uploader
+          .destroy(body.cloudinaryPublicId, { resource_type: resourceType, invalidate: false })
+          .catch(() => undefined);
+      }
+
+      const url = `${publicUrl.replace(/\/$/, '')}/${filename}`;
+      return NextResponse.json({ url });
+    }
 
     const formData = await request.formData();
 

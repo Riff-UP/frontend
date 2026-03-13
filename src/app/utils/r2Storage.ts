@@ -3,7 +3,9 @@
  * Usa la API S3-compatible de R2 con CORS habilitado
  */
 
-const UPLOAD_TIMEOUT_MS = 20_000;
+const IMAGE_UPLOAD_TIMEOUT_MS = 120_000;
+const VIDEO_CLOUDINARY_UPLOAD_TIMEOUT_MS = 600_000;
+const VIDEO_R2_PROCESSING_TIMEOUT_MS = 480_000;
 
 /**
  * Genera un nombre de archivo único
@@ -18,7 +20,7 @@ function generateUniqueFilename(originalName: string): string {
 /**
  * Función auxiliar para fetch con timeout
  */
-async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = UPLOAD_TIMEOUT_MS): Promise<Response> {
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = IMAGE_UPLOAD_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
 
@@ -29,13 +31,51 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('La subida del archivo tardó demasiado. Intenta de nuevo.');
+      const seconds = Math.ceil(timeoutMs / 1000);
+      throw new Error(`La subida del archivo tardó demasiado (${seconds}s). Intenta con un archivo más liviano o reintenta.`);
     }
 
     throw error;
   } finally {
     window.clearTimeout(timeoutId);
   }
+}
+
+async function uploadVideoDirectlyToCloudinary(file: File, filename: string): Promise<{ publicId: string; resourceType: 'video' }> {
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+  if (!cloudName || !uploadPreset) {
+    throw new Error('Faltan variables NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME o NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET para subida de video.');
+  }
+
+  const formData = new FormData();
+  formData.append('file', file, filename);
+  formData.append('upload_preset', uploadPreset);
+  formData.append('resource_type', 'video');
+  formData.append('folder', 'riff-temp');
+
+  const response = await fetchWithTimeout(
+    `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`,
+    {
+      method: 'POST',
+      body: formData,
+    },
+    VIDEO_CLOUDINARY_UPLOAD_TIMEOUT_MS,
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'No se pudo subir el video a Cloudinary');
+  }
+
+  const data = await response.json();
+  const publicId = data?.public_id as string | undefined;
+  if (!publicId) {
+    throw new Error('Cloudinary no devolvió public_id para el video.');
+  }
+
+  return { publicId, resourceType: 'video' };
 }
 
 /**
@@ -49,6 +89,43 @@ export async function uploadToR2(file: File): Promise<string> {
   }
 
   const filename = generateUniqueFilename(file.name);
+
+  if (file.type.startsWith('video/')) {
+    const cloudinaryAsset = await uploadVideoDirectlyToCloudinary(file, filename);
+
+    const jsonHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      if (token) jsonHeaders['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetchWithTimeout(
+      '/api/upload/r2',
+      {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          cloudinaryPublicId: cloudinaryAsset.publicId,
+          resourceType: cloudinaryAsset.resourceType,
+          filename,
+        }),
+      },
+      VIDEO_R2_PROCESSING_TIMEOUT_MS,
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `Error al transformar y subir video: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const url = data?.url || data?.data?.url || data?.result?.url;
+    if (!url) {
+      throw new Error('El backend no retornó una URL válida del video en R2');
+    }
+
+    return url;
+  }
 
   // Preparar FormData (mantener compatibilidad con backend)
   const formData = new FormData();
@@ -65,11 +142,15 @@ export async function uploadToR2(file: File): Promise<string> {
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetchWithTimeout('/api/upload/r2', {
-    method: 'POST',
-    headers,
-    body: formData,
-  });
+  const response = await fetchWithTimeout(
+    '/api/upload/r2',
+    {
+      method: 'POST',
+      headers,
+      body: formData,
+    },
+    IMAGE_UPLOAD_TIMEOUT_MS,
+  );
 
   if (!response.ok) {
     const errorText = await response.text();
