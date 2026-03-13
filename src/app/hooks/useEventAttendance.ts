@@ -42,15 +42,9 @@ function saveToStorage(userId: string | number, map: Map<string, string>) {
 }
 
 export function useEventAttendance(sqlUserId?: string | number): UseEventAttendanceReturn {
-  // Inicialización SINCRÓNICA: si sqlUserId ya está disponible al montar, carga localStorage
-  // en el mismo render — sin parpadeo de botón azul→verde
-  const [attendedEvents, setAttendedEvents] = useState<Map<string, string>>(() => {
-    if (!sqlUserId) return new Map();
-    return loadFromStorage(sqlUserId);
-  });
+  const [attendedEvents, setAttendedEvents] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
 
-  // Fallback: si sqlUserId llega async (undefined → valor), hidratar cuando esté listo
   useEffect(() => {
     if (!sqlUserId) return;
     setAttendedEvents(loadFromStorage(sqlUserId));
@@ -69,13 +63,21 @@ export function useEventAttendance(sqlUserId?: string | number): UseEventAttenda
     });
   };
 
-  const isAttending = (eventId: string) => attendedEvents.has(eventId);
+  // Fuente de verdad: localStorage primero, React state como fallback
+  // Evita cualquier race condition entre useEffect y el primer render
+  const isAttending = (eventId: string): boolean => {
+    if (sqlUserId) {
+      const stored = loadFromStorage(sqlUserId);
+      if (stored.has(eventId)) return true;
+    }
+    return attendedEvents.has(eventId);
+  };
 
   const attend = async (eventId: string, sqlUserId: string | number): Promise<boolean> => {
     const token = getToken();
     if (!token || !sqlUserId) return false;
 
-    // Leer localStorage directo — fuente de verdad ante cualquier race condition
+    // Si ya está en localStorage no hacer el POST
     const stored = loadFromStorage(sqlUserId);
     if (stored.has(eventId)) {
       setAttendedEvents(stored);
@@ -93,7 +95,6 @@ export function useEventAttendance(sqlUserId?: string | number): UseEventAttenda
       });
 
       if (res.status === 409) {
-        // Ya existe en BD — marcar como asistiendo y persistir
         update(sqlUserId, prev => { const next = new Map(prev); next.set(eventId, '__conflict__'); return next; });
         return true;
       }
@@ -116,7 +117,9 @@ export function useEventAttendance(sqlUserId?: string | number): UseEventAttenda
 
   const unattend = async (eventId: string): Promise<boolean> => {
     const token = getToken();
-    const attendanceId = attendedEvents.get(eventId);
+    const attendanceId = attendedEvents.get(eventId)
+      ?? (sqlUserId ? loadFromStorage(sqlUserId).get(eventId) : undefined);
+
     if (!token || !attendanceId || attendanceId === '__pending__') return false;
 
     const uid = sqlUserId ?? '';
