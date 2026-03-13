@@ -4,7 +4,8 @@ import { API_BASE_URL } from '../config/api';
 const API_URL = API_BASE_URL;
 
 export interface AttendanceRecord {
-  id: string;
+  _id?: string;
+  id?: string;
   event_id: string;
   userId: string;
   sql_user_id: string;
@@ -41,6 +42,11 @@ function saveToStorage(userId: string, map: Map<string, string>) {
   } catch { /* silencioso */ }
 }
 
+// Mongoose puede devolver _id en lugar de id — normalizar aquí
+function resolveId(record: AttendanceRecord): string {
+  return (record._id ?? record.id ?? '') as string;
+}
+
 export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn {
   const [attendedEvents, setAttendedEvents] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
@@ -50,7 +56,12 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
     return null;
   };
 
-  // Al montar: cargar desde el servidor (fuente de verdad) y cachear en localStorage
+  const persist = (userId: string, map: Map<string, string>) => {
+    saveToStorage(userId, map);
+    setAttendedEvents(new Map(map));
+  };
+
+  // Al montar: cargar del servidor (fuente de verdad), fallback a localStorage
   useEffect(() => {
     if (!sqlUserId) return;
     const token = getToken();
@@ -58,6 +69,7 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
 
     const load = async () => {
       try {
+        // El gateway filtra por userId (UUID de MongoDB), que es el mismo user.id del JWT
         const res = await fetch(`${API_URL}/events/attendance?userId=${sqlUserId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -65,9 +77,14 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
 
         const records: AttendanceRecord[] = await res.json();
         const map = new Map<string, string>();
-        records.forEach(r => { if (r.status !== 'cancelled') map.set(r.event_id, r.id); });
+        records.forEach(r => {
+          const id = resolveId(r);
+          // Solo agregar si tenemos un ID real para poder hacer DELETE después
+          if (r.status !== 'cancelled' && id) {
+            map.set(r.event_id, id);
+          }
+        });
 
-        // Guardar en localStorage y actualizar estado
         saveToStorage(sqlUserId, map);
         setAttendedEvents(map);
       } catch {
@@ -79,24 +96,17 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
     load();
   }, [sqlUserId]);
 
-  // Guardar estado React + localStorage de forma desacoplada
-  const persist = (userId: string, map: Map<string, string>) => {
-    saveToStorage(userId, map);  // sincrónico, no depende del ciclo de React
-    setAttendedEvents(new Map(map));
-  };
-
   const isAttending = (eventId: string): boolean => attendedEvents.has(eventId);
 
   const attend = async (eventId: string, sqlUserId: string): Promise<boolean> => {
     const token = getToken();
     if (!token || !sqlUserId) return false;
 
-    // Chequear estado actual — si ya asiste, no hacer nada
+    // Ya asiste — no hacer POST
     if (attendedEvents.has(eventId)) return true;
 
     setLoading(true);
 
-    // Optimista — persistir inmediatamente (no dentro de setAttendedEvents)
     const optimistic = new Map(attendedEvents);
     optimistic.set(eventId, '__pending__');
     persist(sqlUserId, optimistic);
@@ -109,7 +119,7 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
       });
 
       if (res.status === 409) {
-        // Ya existe en BD — marcar y persistir
+        // Ya existe en BD pero no lo teníamos localmente — marcar como conflicto
         const updated = new Map(attendedEvents);
         updated.set(eventId, '__conflict__');
         persist(sqlUserId, updated);
@@ -124,8 +134,9 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
       }
 
       const record: AttendanceRecord = await res.json();
+      const id = resolveId(record);
       const confirmed = new Map(attendedEvents);
-      confirmed.set(eventId, record.id);
+      confirmed.set(eventId, id || '__conflict__');
       persist(sqlUserId, confirmed);
       return true;
     } catch {
@@ -145,6 +156,7 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
 
     const uid = sqlUserId ?? '';
 
+    // Sin ID real — solo limpiar localmente (caso __conflict__)
     if (attendanceId === '__conflict__') {
       const updated = new Map(attendedEvents);
       updated.delete(eventId);
