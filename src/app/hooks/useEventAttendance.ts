@@ -21,13 +21,48 @@ interface UseEventAttendanceReturn {
   loading: boolean;
 }
 
+// ── localStorage helpers ──────────────────────────────────────────────────────
+const STORAGE_KEY = (userId: string) => `riff_attendance_${userId}`;
+
+function loadFromStorage(userId: string): Map<string, string> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY(userId));
+    if (!raw) return new Map();
+    const obj: Record<string, string> = JSON.parse(raw);
+    return new Map(Object.entries(obj));
+  } catch {
+    return new Map();
+  }
+}
+
+function saveToStorage(userId: string, map: Map<string, string>) {
+  try {
+    const obj = Object.fromEntries(map.entries());
+    localStorage.setItem(STORAGE_KEY(userId), JSON.stringify(obj));
+  } catch {
+    // si localStorage no está disponible no bloqueamos
+  }
+}
+
+// ── Hook ─────────────────────────────────────────────────────────────────────
 export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn {
-  const [attendedEvents, setAttendedEvents] = useState<Map<string, string>>(new Map());
+  const [attendedEvents, setAttendedEvents] = useState<Map<string, string>>(() =>
+    sqlUserId ? loadFromStorage(sqlUserId) : new Map()
+  );
   const [loading, setLoading] = useState(false);
 
   const getToken = (): string | null => {
     if (typeof window !== 'undefined') return localStorage.getItem('token');
     return null;
+  };
+
+  // Actualiza estado + localStorage en una sola operación
+  const update = (fn: (prev: Map<string, string>) => Map<string, string>) => {
+    setAttendedEvents(prev => {
+      const next = fn(prev);
+      if (sqlUserId) saveToStorage(sqlUserId, next);
+      return next;
+    });
   };
 
   const isAttending = (eventId: string) => attendedEvents.has(eventId);
@@ -38,12 +73,8 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
 
     setLoading(true);
 
-    // Actualización optimista
-    setAttendedEvents(prev => {
-      const next = new Map(prev);
-      next.set(eventId, '__pending__');
-      return next;
-    });
+    // Optimista
+    update(prev => { const next = new Map(prev); next.set(eventId, '__pending__'); return next; });
 
     try {
       const res = await fetch(`${API_URL}/events/attendance`, {
@@ -53,27 +84,15 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
       });
 
       if (!res.ok) {
-        setAttendedEvents(prev => {
-          const next = new Map(prev);
-          next.delete(eventId);
-          return next;
-        });
+        update(prev => { const next = new Map(prev); next.delete(eventId); return next; });
         return false;
       }
 
       const record: AttendanceRecord = await res.json();
-      setAttendedEvents(prev => {
-        const next = new Map(prev);
-        next.set(eventId, record.id);
-        return next;
-      });
+      update(prev => { const next = new Map(prev); next.set(eventId, record.id); return next; });
       return true;
     } catch {
-      setAttendedEvents(prev => {
-        const next = new Map(prev);
-        next.delete(eventId);
-        return next;
-      });
+      update(prev => { const next = new Map(prev); next.delete(eventId); return next; });
       return false;
     } finally {
       setLoading(false);
@@ -87,12 +106,8 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
 
     setLoading(true);
 
-    // Actualización optimista
-    setAttendedEvents(prev => {
-      const next = new Map(prev);
-      next.delete(eventId);
-      return next;
-    });
+    // Optimista
+    update(prev => { const next = new Map(prev); next.delete(eventId); return next; });
 
     try {
       const res = await fetch(`${API_URL}/events/attendance/${attendanceId}`, {
@@ -101,20 +116,12 @@ export function useEventAttendance(sqlUserId?: string): UseEventAttendanceReturn
       });
 
       if (!res.ok) {
-        setAttendedEvents(prev => {
-          const next = new Map(prev);
-          next.set(eventId, attendanceId);
-          return next;
-        });
+        update(prev => { const next = new Map(prev); next.set(eventId, attendanceId); return next; });
         return false;
       }
       return true;
     } catch {
-      setAttendedEvents(prev => {
-        const next = new Map(prev);
-        next.set(eventId, attendanceId);
-        return next;
-      });
+      update(prev => { const next = new Map(prev); next.set(eventId, attendanceId); return next; });
       return false;
     } finally {
       setLoading(false);
