@@ -153,14 +153,10 @@ function HomeContent() {
     loadHeroPosts();
   }, []);
 
-  // Eventos a los que el usuario ha asistido (ejemplo)
-  // En producción, esto vendría de una API
-  const attendedEvents: Array<{ id: number; title: string; date: string; time: string }> = [
-    // Agrega eventos aquí para probar el modal de valoración
-  ];
-
-  // Hook para manejar la valoración de eventos
-  const { eventToRate, handleRatingSubmit, handleRatingClose } = useEventRating(attendedEvents);
+  // 👇 AQUÍ ESTÁ EL CAMBIO MAGISTRAL
+  // Ya no le pasamos el arreglo falso 'attendedEvents', 
+  // el hook se encarga solito de llamar a nuestro nuevo endpoint del backend
+  const { eventToRate, handleRatingSubmit, handleRatingClose } = useEventRating();
 
   return (
     <div className="min-h-screen bg-riff-background-b">

@@ -1,70 +1,85 @@
 'use client';
 
-import { useMemo } from 'react';
-
-interface AttendedEvent {
-  id: number;
-  title: string;
-  date: string;
-  time: string;
-}
+import { useState, useEffect } from 'react';
+import { API_BASE_URL, getAuthHeaders } from '@/app/config/api'; // Ajusta la ruta si es diferente
 
 interface EventToRate {
-  id: number;
+  id: string; // Cambiado a string porque usamos UUIDs o Mongo IDs
   title: string;
   date: string;
 }
 
-export function useEventRating(attendedEvents: AttendedEvent[]) {
-  const eventToRate = useMemo<EventToRate | null>(() => {
-    const getRatedEvents = (): number[] => {
-      if (typeof window === 'undefined') return [];
-      const stored = localStorage.getItem('ratedEvents');
-      return stored ? JSON.parse(stored) : [];
+export function useEventRating() {
+  const [eventToRate, setEventToRate] = useState<EventToRate | null>(null);
+
+  useEffect(() => {
+    const fetchPendingReviews = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/events/reviews/pending`, {
+          headers: getAuthHeaders(true), // true para que envíe el token
+        });
+        
+        if (!response.ok) return;
+
+        const pendingEvents = await response.json();
+
+        // Si el backend nos devuelve eventos pendientes, tomamos el primero para el pop-up
+        if (pendingEvents && pendingEvents.length > 0) {
+          const firstEvent = pendingEvents[0];
+          
+          // Formateamos la fecha (asumiendo que viene como YYYY-MM-DD o ISO)
+          const eventDateStr = firstEvent.event_date || firstEvent.date;
+          const [year, month, day] = eventDateStr.split('T')[0].split('-');
+
+          setEventToRate({
+            id: firstEvent._id || firstEvent.id, // Maneja tanto Mongo _id como UUID normal
+            title: firstEvent.title,
+            date: `${day}/${month}/${year}`,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching pending reviews:', error);
+      }
     };
 
-    const ratedEventIds = getRatedEvents();
-    const now = new Date();
-
-    const eventNeedingRating = attendedEvents.find(event => {
-      if (ratedEventIds.includes(event.id)) return false;
-
-      const [year, month, day] = event.date.split('-').map(Number);
-      const eventDate = new Date(year, month - 1, day);
-      const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const yesterdayDate = new Date(todayDate.getTime() - 24 * 60 * 60 * 1000);
-
-      return eventDate.getTime() === yesterdayDate.getTime();
-    });
-
-    if (!eventNeedingRating) {
-      return null;
+    // Solo buscamos si el usuario está logueado (tiene token)
+    if (typeof window !== 'undefined' && localStorage.getItem('token')) {
+      fetchPendingReviews();
     }
+  }, []);
 
-    const [year, month, day] = eventNeedingRating.date.split('-');
-    return {
-      id: eventNeedingRating.id,
-      title: eventNeedingRating.title,
-      date: `${day}/${month}/${year}`,
-    };
-  }, [attendedEvents]);
+  const handleRatingSubmit = async (eventId: string, rating: number, comment?: string) => {
+    try {
+      // Aquí enviamos la calificación real al backend!
+      const response = await fetch(`${API_BASE_URL}/events/reviews`, {
+        method: 'POST',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({
+          event_id: eventId,
+          rating: rating,
+          // Si tu backend soporta el campo 'comment', descomenta la siguiente línea:
+          // comment: comment 
+        }),
+      });
 
-  const handleRatingSubmit = (eventId: number, rating: number, comment: string) => {
-    void rating;
-    void comment;
-
-    if (typeof window !== 'undefined') {
-      const ratedEvents = localStorage.getItem('ratedEvents');
-      const currentRated = ratedEvents ? JSON.parse(ratedEvents) : [];
-      localStorage.setItem('ratedEvents', JSON.stringify([...currentRated, eventId]));
+      if (response.ok) {
+        // Cerramos el modal si todo salió bien
+        setEventToRate(null);
+      } else {
+        console.error('Error al enviar la reseña');
+      }
+    } catch (error) {
+      console.error('Network error:', error);
     }
   };
 
-  const handleRatingClose = () => {};
+  const handleRatingClose = () => {
+    setEventToRate(null);
+  };
 
   return {
     eventToRate,
     handleRatingSubmit,
-    handleRatingClose
+    handleRatingClose,
   };
 }
