@@ -14,6 +14,7 @@ import { useUser } from '@/app/hooks/useUser';
 import { useFollow } from '@/app/hooks/useFollow';
 import { usePublicArtistData } from '@/app/hooks/usePublicArtistData';
 import { usePostReactions } from '@/app/hooks/usePostReactions';
+import { useEventAttendance } from '@/app/hooks/useEventAttendance';
 import MusicPlayer from './music/MusicPlayer';
 
 interface ArtistProfileProps {
@@ -29,6 +30,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [bannerIndex, setBannerIndex] = useState(0);
   const [activeMusicPost, setActiveMusicPost] = useState<Publication | null>(null);
+  const [localFollowersCount, setLocalFollowersCount] = useState<number | undefined>(undefined);
 
   const artistData = artist;
   const { user } = useUser();
@@ -44,19 +46,17 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
   } = usePublicArtistData(artistData?.id);
   const { isLiked, toggleLike, reactedPosts, fetchPostReactionCounts, postReactionCounts, getReactionCount } =
     usePostReactions(user?.id);
+  const { isAttending, attend, unattend } = useEventAttendance(user?.id);
 
-  // Forzar re-render cuando savedPosts cambia
   const [, forceUpdate] = useState({});
   useEffect(() => { forceUpdate({}); }, [savedPosts]);
 
-  // Cargar conteo de reacciones cuando llegan los posts
   useEffect(() => {
     const ids = rawPosts.map(p => String(p.id)).filter(Boolean);
     if (ids.length > 0) fetchPostReactionCounts(ids);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawPosts]);
 
-  // Imágenes del banner: coverImage primero, luego imágenes de publicaciones
   const bannerImages = useMemo(() => {
     const imgs: string[] = [];
     if (artistData?.coverImage) imgs.push(artistData.coverImage);
@@ -64,22 +64,21 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
     return imgs;
   }, [artistData?.coverImage, rawPosts]);
 
-  // Slideshow automático cada 4 segundos
   const advanceBanner = useCallback(() => {
-    if (bannerImages.length > 1) {
-      setBannerIndex(prev => (prev + 1) % bannerImages.length);
-    }
+    if (bannerImages.length > 1) setBannerIndex(prev => (prev + 1) % bannerImages.length);
   }, [bannerImages.length]);
 
-  useEffect(() => {
-    setBannerIndex(0); // resetear al entrar al perfil
-  }, [artistData?.id]);
+  useEffect(() => { setBannerIndex(0); }, [artistData?.id]);
 
   useEffect(() => {
     if (bannerImages.length <= 1) return;
     const timer = setInterval(advanceBanner, 4000);
     return () => clearInterval(timer);
   }, [advanceBanner, bannerImages.length]);
+
+  useEffect(() => {
+    if (followersCount !== undefined) setLocalFollowersCount(followersCount);
+  }, [followersCount]);
 
   if (!artistData) {
     return (
@@ -89,7 +88,6 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
     );
   }
 
-  // Enriquecer posts con estado de like/save real — useMemo para re-renderizar al cambiar likes/saves
   const publications: Publication[] = useMemo(() => rawPosts.map(p => {
     const postId = String(p.id);
     const hasServerCount = postReactionCounts.has(postId);
@@ -109,7 +107,6 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
     await toggleLike(String(publicationId));
   };
 
-  // selectedPublication siempre refleja el estado actualizado de likes/saves
   const liveSelectedPublication = useMemo(() => {
     if (!selectedPublication) return null;
     return publications.find(p => String(p.id) === String(selectedPublication.id)) ?? selectedPublication;
@@ -138,6 +135,15 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
     }
   };
 
+  const handleAttend = async (eventId: string) => {
+    if (!user) { alert('Debes iniciar sesión para registrar tu asistencia'); return; }
+    if (isAttending(eventId)) {
+      await unattend(eventId);
+    } else {
+      await attend(eventId, user.id);
+    }
+  };
+
   const handlePrevMonth = () => {
     if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(currentYear - 1); }
     else setCurrentMonth(currentMonth - 1);
@@ -154,32 +160,19 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
       return dayOfMonth === day && month - 1 === currentMonth && year === currentYear;
     });
 
-  // Contador local de seguidores para actualizar optimísticamente
-  const [localFollowersCount, setLocalFollowersCount] = useState<number | undefined>(undefined);
-
-  // Sincronizar con el valor real del backend cuando llega
-  useEffect(() => {
-    if (followersCount !== undefined) {
-      setLocalFollowersCount(followersCount);
-    }
-  }, [followersCount]);
-
   const handleToggleFollow = async () => {
     const alreadyFollowing = isFollowing(artistData.id);
-    // Actualización optimista del contador
     setLocalFollowersCount(prev => {
       const current = prev ?? 0;
       return alreadyFollowing ? Math.max(0, current - 1) : current + 1;
     });
     const ok = await toggleFollow(artistData.id);
     if (!ok) {
-      // Revertir si falló
       setLocalFollowersCount(prev => {
         const current = prev ?? 0;
         return alreadyFollowing ? current + 1 : Math.max(0, current - 1);
       });
     } else {
-      // Refrescar el conteo real desde el backend
       await refreshFollowers();
     }
   };
@@ -201,7 +194,6 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
     return dateString;
   };
 
-  // Mostrar el contador real de seguidores si está disponible
   const artistWithFollowers: ArtistData = {
     ...artistData,
     followers: localFollowersCount ?? followersCount ?? artistData.followers,
@@ -221,24 +213,18 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
       {/* Cover Image Header */}
       <div className="relative h-64 sm:h-80 lg:h-96 overflow-hidden">
 
-        {/* Slideshow de fondo: imágenes de publicaciones */}
         {bannerImages.length > 0 ? (
           bannerImages.map((img, i) => (
             <div
               key={img}
               className="absolute inset-0 w-full h-full bg-cover bg-center transition-opacity duration-1000"
-              style={{
-                backgroundImage: `url('${img}')`,
-                opacity: i === bannerIndex ? 1 : 0,
-                zIndex: 0,
-              }}
+              style={{ backgroundImage: `url('${img}')`, opacity: i === bannerIndex ? 1 : 0, zIndex: 0 }}
             />
           ))
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-riff-primary/20 to-riff-text-primary" />
         )}
 
-        {/* Gradiente izquierda + oscurecimiento general */}
         <div
           className="absolute inset-0 z-10"
           style={{
@@ -246,7 +232,6 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
           }}
         />
 
-        {/* Indicadores del slideshow */}
         {bannerImages.length > 1 && (
           <div className="absolute bottom-12 right-4 z-20 flex gap-1.5">
             {bannerImages.map((_, i) => (
@@ -278,7 +263,6 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
               </button>
             ) : null}
           />
-          {/* Bio y redes sociales — dentro del cover, bajo ArtistInfo */}
           {(() => {
             const instagram = artistWithFollowers.socialMedia?.find(sm => sm.url.startsWith('instagram:'))?.url.slice('instagram:'.length) ?? null;
             const facebook = artistWithFollowers.socialMedia?.find(sm => sm.url.startsWith('facebook:'))?.url.slice('facebook:'.length) ?? null;
@@ -287,19 +271,12 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
             const hasSocial = instagram || facebook || whatsapp || email;
             if (!artistWithFollowers.biography && !hasSocial) return null;
 
-            const toInstagramUrl = (val: string) => {
-              const user = val.startsWith('@') ? val.slice(1) : val;
-              return `https://instagram.com/${user}`;
-            };
+            const toInstagramUrl = (val: string) => `https://instagram.com/${val.startsWith('@') ? val.slice(1) : val}`;
             const toFacebookUrl = (val: string) => {
               if (val.startsWith('http')) return val;
-              const user = val.startsWith('@') ? val.slice(1) : val;
-              return `https://facebook.com/${user}`;
+              return `https://facebook.com/${val.startsWith('@') ? val.slice(1) : val}`;
             };
-            const toWhatsappUrl = (val: string) => {
-              const num = val.replace(/\D/g, '');
-              return `https://wa.me/${num}`;
-            };
+            const toWhatsappUrl = (val: string) => `https://wa.me/${val.replace(/\D/g, '')}`;
             const formatWhatsappDisplay = (val: string) => {
               const hasPlus = val.startsWith('+');
               const digits = val.replace(/\D/g, '');
@@ -377,88 +354,82 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
 
       {/* Content */}
       <div className="p-4 sm:p-6 lg:p-8">
+
+        {/* ── TAB: CANCIONES ── */}
         {activeTab === 'canciones' && (
-      <div>
-        {loadingPosts ? (
-          <div className="flex justify-center py-16">
-            <svg className="animate-spin h-7 w-7 text-riff-primary" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
+          <div>
+            {loadingPosts ? (
+              <div className="flex justify-center py-16">
+                <svg className="animate-spin h-7 w-7 text-riff-primary" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              </div>
+            ) : (() => {
+              const musicPosts = publications.filter(p => p.type === 'audio');
+              if (musicPosts.length === 0) {
+                return (
+                  <div className="text-center py-20">
+                    <FaMusic className="w-12 h-12 text-riff-text-secondary mx-auto mb-4" />
+                    <p className="text-riff-text-secondary text-sm">Este artista no ha publicado canciones aún.</p>
+                  </div>
+                );
+              }
+              return (
+                <div className="max-w-7xl mx-auto">
+                  <div className="flex flex-col lg:flex-row gap-6">
+                    {/* Panel izquierdo: portada + player activo */}
+                    <div className="w-full lg:w-72 flex-shrink-0">
+                      {activeMusicPost ? (
+                        <div className="bg-riff-card rounded-xl p-4 space-y-3 border border-riff-border sticky top-4">
+                          <div className="w-full aspect-square rounded-lg overflow-hidden bg-riff-header flex items-center justify-center">
+                            {artistData.profileImage ? (
+                              <img src={artistData.profileImage} alt={activeMusicPost.title} className="w-full h-full object-cover" />
+                            ) : (
+                              <FaMusic className="w-12 h-12 text-white/20" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-white text-sm font-semibold truncate">{activeMusicPost.title}</p>
+                            <p className="text-riff-text-secondary text-xs truncate">{artistData.name}</p>
+                          </div>
+                          <MusicPlayer
+                            provider={activeMusicPost.provider ?? 'soundcloud'}
+                            embedUrl={activeMusicPost.content}
+                            originalUrl={activeMusicPost.provider_meta?.provider_url}
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-full aspect-square rounded-xl bg-riff-card border border-riff-border flex flex-col items-center justify-center gap-3">
+                          <FaMusic className="w-10 h-10 text-white/20" />
+                          <p className="text-white/30 text-xs text-center px-4">Selecciona una canción para reproducirla</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Lista de canciones */}
+                    <div className="flex-1 space-y-2">
+                      {musicPosts.map(post => (
+                        <MusicCard
+                          key={post.id}
+                          post={post}
+                          artistName={artistData.name}
+                          artistImage={artistData.profileImage}
+                          isActive={activeMusicPost?.id === post.id}
+                          isSaved={isPostSaved(String(post.id))}
+                          onSelect={p => setActiveMusicPost(prev => prev?.id === p.id ? null : p)}
+                          onSave={handleSave}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
-        ) : (() => {
-          const musicPosts = publications.filter(p => p.type === 'audio');
-          if (musicPosts.length === 0) {
-            return (
-              <div className="text-center py-20">
-                <FaMusic className="w-12 h-12 text-riff-text-secondary mx-auto mb-4" />
-                <p className="text-riff-text-secondary text-sm">
-                  Este artista no ha publicado canciones aún.
-                </p>
-              </div>
-            );
-          }
-          return (
-            <div className="max-w-7xl mx-auto">
-              <div className="flex flex-col lg:flex-row gap-6">
+        )}
 
-                {/* Panel izquierdo: portada + player activo */}
-                <div className="w-full lg:w-72 flex-shrink-0">
-                  {activeMusicPost ? (
-                    <div className="bg-white/5 rounded-xl p-4 space-y-3 border border-white/5 sticky top-4">
-                      {/* Portada */}
-                      <div className="w-full aspect-square rounded-lg overflow-hidden bg-white/10 flex items-center justify-center">
-                        {artistData.profileImage ? (
-                          <img src={artistData.profileImage} alt={activeMusicPost.title} className="w-full h-full object-cover" />
-                        ) : (
-                          <FaMusic className="w-12 h-12 text-white/20" />
-                        )}
-                      </div>
-                      {/* Título y artista */}
-                      <div>
-                        <p className="text-white text-sm font-semibold truncate">{activeMusicPost.title}</p>
-                        <p className="text-white/50 text-xs truncate">{artistData.name}</p>
-                      </div>
-                      {/* Player embed */}
-                      <MusicPlayer
-                        provider={activeMusicPost.provider ?? 'soundcloud'}
-                        embedUrl={activeMusicPost.content}
-                        originalUrl={activeMusicPost.provider_meta?.provider_url}
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-full aspect-square rounded-xl bg-white/5 border border-white/5 flex flex-col items-center justify-center gap-3">
-                      <FaMusic className="w-10 h-10 text-white/20" />
-                      <p className="text-white/30 text-xs text-center px-4">
-                        Selecciona una canción para reproducirla
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Lista de canciones */}
-                <div className="flex-1 space-y-2">
-                  {musicPosts.map(post => (
-                    <MusicCard
-                      key={post.id}
-                      post={post}
-                      artistName={artistData.name}
-                      artistImage={artistData.profileImage}
-                      isActive={activeMusicPost?.id === post.id}
-                      isSaved={isPostSaved(String(post.id))}
-                      onSelect={p => setActiveMusicPost(prev => prev?.id === p.id ? null : p)}
-                      onSave={handleSave}
-                    />
-                  ))}
-                </div>
-
-              </div>
-            </div>
-          );
-        })()}
-      </div>
-    )}
-
+        {/* ── TAB: PUBLICACIONES ── */}
         {activeTab === 'publicaciones' && (
           <div>
             {loadingPosts ? (
@@ -469,9 +440,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
                 </svg>
               </div>
             ) : publications.length === 0 ? (
-              <p className="text-riff-text-secondary text-sm text-center py-12">
-                Este artista no tiene publicaciones aún.
-              </p>
+              <p className="text-riff-text-secondary text-sm text-center py-12">Este artista no tiene publicaciones aún.</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-7xl mx-auto">
                 {publications.map(publication => {
@@ -495,6 +464,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
           </div>
         )}
 
+        {/* ── TAB: EVENTOS ── */}
         {activeTab === 'eventos' && (
           <div className="max-w-7xl mx-auto">
             <div className="flex flex-col lg:flex-row gap-8">
@@ -520,17 +490,16 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
                     </svg>
                   </div>
                 ) : events.length === 0 ? (
-                  <p className="text-riff-text-secondary text-sm text-center py-8">
-                    Este artista no tiene eventos próximos.
-                  </p>
+                  <p className="text-riff-text-secondary text-sm text-center py-8">Este artista no tiene eventos próximos.</p>
                 ) : (
                   <div className="space-y-4">
                     {events.map(event => (
                       <EventCard
                         key={event.id}
-                        event={event}
+                        event={{ ...event, isAttending: isAttending(event.id) }}
                         formatDate={formatEventDate}
-                        showAttendButton={false}
+                        showAttendButton={!isSelf}
+                        onAttend={handleAttend}
                       />
                     ))}
                   </div>
