@@ -301,11 +301,12 @@ async function uploadVideoDirectlyToR2(
         resolve();
         return;
       }
-      reject(new Error(`R2 rechazó la subida directa (${xhr.status}).`));
+      const responseText = xhr.responseText || '';
+      reject(new Error(`R2 rechazó la subida directa (${xhr.status}). ${responseText}`.trim()));
     };
 
     xhr.onerror = () => {
-      reject(new Error('No se pudo completar la subida directa a R2. Revisa tu red e inténtalo de nuevo.'));
+      reject(new Error('No se pudo completar la subida directa a R2. Usualmente esto indica CORS del bucket o bloqueo de red (VPN/adblock/firewall).'));
     };
 
     xhr.ontimeout = () => {
