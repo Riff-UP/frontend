@@ -8,6 +8,7 @@ import ArtistCard from "@/app/components/cards/ArtistCard";
 import EventRatingModal from "@/app/components/common/EventRatingModal";
 import { useEventRating } from "@/app/hooks/useEventRating";
 import { FaCircleChevronLeft, FaCircleChevronRight } from "react-icons/fa6";
+import { BsBookmark, BsChat, BsHeart, BsThreeDots } from "react-icons/bs";
 import { useArtists, ArtistData } from "@/app/hooks/useArtists";
 import { useUser } from "@/app/hooks/useUser";
 import { useFollow } from "@/app/hooks/useFollow";
@@ -24,6 +25,10 @@ interface RawPost {
   description?: string;
   content?: string;
   mediaUrl?: string;
+  likesCount?: number;
+  likes_count?: number;
+  commentsCount?: number;
+  comments_count?: number;
   createdAt?: string;
   created_at?: string;
 }
@@ -35,6 +40,8 @@ interface HeroPublication {
   authorImage?: string;
   imageUrl: string | undefined;
   caption: string;
+  likesCount: number;
+  commentsCount: number;
   createdAt: string;
 }
 
@@ -61,6 +68,15 @@ function getPostImageUrl(post: RawPost): string | undefined {
     return post.content;
   }
   return undefined;
+}
+
+function getPostCaption(post: RawPost): string {
+  const rawContent = post.content?.trim() ?? "";
+  const contentLooksLikeUrl = rawContent.startsWith("http") || rawContent.startsWith("/");
+  return post.description?.trim()
+    || post.title?.trim()
+    || (!contentLooksLikeUrl ? rawContent : "")
+    || "Sin descripción";
 }
 
 function HomeContent() {
@@ -144,7 +160,9 @@ function HomeContent() {
           authorName: artistMap.get(authorId)?.name ?? "Artista Riff",
           authorImage: artistMap.get(authorId)?.profileImage ?? undefined,
           imageUrl,
-          caption: post.description || post.title || post.content || "Nueva publicación",
+          caption: getPostCaption(post),
+          likesCount: Number(post.likesCount ?? post.likes_count ?? 0),
+          commentsCount: Number(post.commentsCount ?? post.comments_count ?? 0),
           createdAt,
         };
       })
@@ -359,45 +377,72 @@ function HomeContent() {
               <h2 className="text-xl sm:text-2xl font-bold text-white">Publicaciones recientes</h2>
             </div>
 
-            <div className="max-w-5xl mx-auto px-4 sm:px-0 space-y-4">
+            <div className="max-w-xl mx-auto px-4 sm:px-0 space-y-6">
               {heroPublications.map((post) => (
                 <article
                   key={post.id}
-                  className="rounded-sm bg-riff-header border border-white/10 overflow-hidden"
+                  className="rounded-sm bg-riff-header border border-white/10 overflow-hidden shadow-[0_18px_60px_rgba(0,0,0,0.22)]"
                 >
-                  <div className="p-4 border-b border-white/10">
-                    <div className="flex items-start gap-3">
-                      <div className="w-12 h-12 rounded-full overflow-hidden bg-riff-background-b shrink-0">
-                        {post.authorImage ? (
-                          <img src={post.authorImage} alt={post.authorName} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-sm font-semibold text-white/80">
-                            {post.authorName.charAt(0).toUpperCase()}
-                          </div>
-                        )}
+                  <div className="px-4 py-3 border-b border-white/10">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-11 h-11 rounded-full overflow-hidden bg-riff-background-b shrink-0 ring-1 ring-white/10">
+                          {post.authorImage ? (
+                            <img src={post.authorImage} alt={post.authorName} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-sm font-semibold text-white/80">
+                              {post.authorName.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-white text-base sm:text-lg font-semibold leading-none truncate">{post.authorName}</p>
+                          <p className="text-riff-text-secondary text-xs mt-1">{formatPostDate(post.createdAt)}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-white text-2xl sm:text-3xl font-bold leading-none truncate">{post.authorName}</p>
-                        <p className="text-riff-text-secondary text-sm mt-1">{formatPostDate(post.createdAt)}</p>
-                      </div>
+                      <button className="text-white/70 hover:text-white transition-colors" aria-label="Opciones de publicación">
+                        <BsThreeDots className="w-5 h-5" />
+                      </button>
                     </div>
-                  </div>
-
-                  <div className="p-4 sm:p-5">
-                    <p className="text-white text-2xl sm:text-4xl leading-tight">{post.caption || 'Sin descripción'}</p>
                   </div>
 
                   {post.imageUrl ? (
                     <img
                       src={post.imageUrl}
                       alt={post.caption}
-                      className="w-full max-h-[520px] object-cover"
+                      className="w-full max-h-[520px] object-cover bg-riff-background-b"
                     />
                   ) : (
-                    <div className="w-full h-40 bg-riff-background-b flex items-center justify-center px-4 text-center text-riff-text-secondary text-sm">
+                    <div className="w-full h-72 bg-riff-background-b flex items-center justify-center px-6 text-center text-riff-text-secondary text-sm">
                       Sin imagen
                     </div>
                   )}
+
+                  <div className="px-4 pt-3 pb-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-4">
+                        <button className="text-white/90 hover:text-white transition-colors" aria-label="Me gusta">
+                          <BsHeart className="w-6 h-6" />
+                        </button>
+                        <button className="text-white/90 hover:text-white transition-colors" aria-label="Comentarios">
+                          <BsChat className="w-5 h-5" />
+                        </button>
+                      </div>
+                      <button className="text-white/90 hover:text-white transition-colors" aria-label="Guardar">
+                        <BsBookmark className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      <p className="text-white text-sm font-semibold">
+                        {post.likesCount} me gusta{post.commentsCount > 0 ? ` · ${post.commentsCount} comentarios` : ''}
+                      </p>
+                      <p className="text-white text-sm leading-relaxed break-words">
+                        <span className="font-semibold mr-2">{post.authorName}</span>
+                        {post.caption}
+                      </p>
+                    </div>
+                  </div>
                 </article>
               ))}
             </div>
