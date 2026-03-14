@@ -158,7 +158,50 @@ export async function uploadToR2(
 
   if (file.type.startsWith('video/')) {
     const onProgress = options?.onProgress;
-    const cloudinaryAsset = await uploadVideoDirectlyToCloudinary(file, filename, onProgress);
+    let cloudinaryAsset: { publicId: string; resourceType: 'video' } | null = null;
+
+    try {
+      cloudinaryAsset = await uploadVideoDirectlyToCloudinary(file, filename, onProgress);
+    } catch {
+      // Fallback: si falla la subida directa navegador -> Cloudinary,
+      // enviamos el archivo al backend para que procese toda la cadena.
+      onProgress?.(8, 'Conexión directa no disponible, intentando vía servidor...');
+
+      const fallbackFormData = new FormData();
+      fallbackFormData.append('file', file, filename);
+      fallbackFormData.append('image', file, filename);
+      fallbackFormData.append('filename', filename);
+
+      const fallbackHeaders: Record<string, string> = {};
+      if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('token');
+        if (token) fallbackHeaders['Authorization'] = `Bearer ${token}`;
+      }
+
+      const fallbackResponse = await fetchWithTimeout(
+        '/api/upload/r2',
+        {
+          method: 'POST',
+          headers: fallbackHeaders,
+          body: fallbackFormData,
+        },
+        VIDEO_R2_PROCESSING_TIMEOUT_MS,
+      );
+
+      if (!fallbackResponse.ok) {
+        const errorText = await fallbackResponse.text();
+        throw new Error(errorText || `Error al subir video vía servidor: ${fallbackResponse.status} ${fallbackResponse.statusText}`);
+      }
+
+      const fallbackData = await fallbackResponse.json();
+      const fallbackUrl = fallbackData?.url || fallbackData?.data?.url || fallbackData?.result?.url;
+      if (!fallbackUrl) {
+        throw new Error('El backend no retornó una URL válida del video en R2 (fallback).');
+      }
+
+      onProgress?.(100, 'Subida completada');
+      return fallbackUrl;
+    }
 
     const jsonHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
     if (typeof window !== 'undefined') {
