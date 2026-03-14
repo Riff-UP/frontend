@@ -136,7 +136,7 @@ export default function Publications() {
     setIsProcessing(true);
     setSavingPostId(postIdStr);
     try {
-      const savedPost = savedPosts.find(sp => sp.postId === postIdStr);
+      const savedPost = savedPosts.find(sp => String(sp.postId) === String(postIdStr));
       if (savedPost) {
         await unsavePost(savedPost.id);
       } else {

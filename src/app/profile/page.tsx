@@ -23,12 +23,15 @@ function ProfilePageContent({ activeSection, setActiveSection, userState }: { ac
       case 'eventos': return <Events />;
       case 'musica':
         return (
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-white text-xl sm:text-2xl font-bold">Música</h2>
-            <p className="text-white/80 text-sm sm:text-base mt-2">
-              Esta sección se implementará próximamente.
-            </p>
+          <div className='w-full'>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-white text-xl sm:text-2xl font-bold">Música</h2>
+              <p className="text-white/80 text-xs sm:text-sm mt-1">
+                Esta sección se implementará próximamente.
+              </p>
+            </div>
           </div>
+          
         );
       case 'guardados': return <Saved />;
       case 'estadisticas': return <Analytics />;

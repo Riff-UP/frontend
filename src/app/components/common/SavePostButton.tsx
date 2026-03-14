@@ -23,7 +23,7 @@ export default function SavePostButton({
   const [isLoading, setIsLoading] = useState(false);
 
   const isSaved = isPostSaved(postId);
-  const savedPost = savedPosts.find(sp => sp.postId === postId);
+  const savedPost = savedPosts.find(sp => String(sp.postId) === String(postId));
 
   const sizeClasses = {
     sm: 'w-4 h-4',
@@ -67,7 +67,7 @@ export default function SavePostButton({
         <MdBookmarkBorder className={sizeClasses[size]} />
       )}
       {showCount && (
-        <span className="text-xs">{savedPosts.filter(sp => sp.postId === postId).length}</span>
+        <span className="text-xs">{savedPosts.filter(sp => String(sp.postId) === String(postId)).length}</span>
       )}
     </button>
   );
