@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { FiMapPin } from 'react-icons/fi';
 import { BsCalendarEventFill } from 'react-icons/bs';
+import { MdEdit, MdDelete } from 'react-icons/md';
 import { MdCheck } from 'react-icons/md';
 import { LiaUserCheckSolid } from 'react-icons/lia';
 import { FaStar, FaRegStar } from 'react-icons/fa';
@@ -13,7 +14,10 @@ interface EventCardProps {
   formatDate: (date: string, time?: string) => string;
   onAttend?: (id: string) => void;
   onClick?: (event: Event) => void;
+  onEdit?: (event: Event) => void;
+  onDelete?: (id: string) => void;
   showAttendButton?: boolean;
+  showEventActions?: boolean;
   isSelected?: boolean;
   // Reviews
   avgRating?: number;
@@ -67,7 +71,10 @@ export default function EventCard({
   formatDate,
   onAttend,
   onClick,
+  onEdit,
+  onDelete,
   showAttendButton = true,
+  showEventActions = false,
   isSelected = false,
   avgRating = 0,
   totalReviews = 0,
@@ -152,6 +159,29 @@ export default function EventCard({
         </div>
 
         <div className="flex flex-col gap-2 w-full sm:w-auto items-stretch sm:items-end">
+          {showEventActions && (onEdit || onDelete) && (
+            <div className="flex gap-2 w-full sm:w-auto" onClick={e => e.stopPropagation()}>
+              {onEdit && (
+                <button
+                  onClick={() => onEdit(event)}
+                  className="flex-1 sm:flex-none px-4 py-2 rounded-sm text-xs text-riff-primary hover:text-riff-primary/90 transition-colors border border-riff-primary/30 hover:border-riff-primary/50 flex items-center justify-center gap-1.5"
+                >
+                  <MdEdit className="w-3.5 h-3.5" />
+                  <span>Editar</span>
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={() => onDelete(event.id)}
+                  className="flex-1 sm:flex-none px-4 py-2 rounded-sm text-xs text-red-400 hover:text-red-300 transition-colors border border-red-400/30 hover:border-red-400/50 flex items-center justify-center gap-1.5"
+                >
+                  <MdDelete className="w-3.5 h-3.5" />
+                  <span>Eliminar</span>
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Botón asistir */}
           {showAttendButton && onAttend && (
             <button
