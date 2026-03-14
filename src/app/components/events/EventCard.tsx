@@ -18,6 +18,7 @@ interface EventCardProps {
   onDelete?: (id: string) => void;
   showAttendButton?: boolean;
   showEventActions?: boolean;
+  isGlowHighlighted?: boolean;
   isSelected?: boolean;
   // Reviews
   avgRating?: number;
@@ -75,6 +76,7 @@ export default function EventCard({
   onDelete,
   showAttendButton = true,
   showEventActions = false,
+  isGlowHighlighted = false,
   isSelected = false,
   avgRating = 0,
   totalReviews = 0,
@@ -120,15 +122,13 @@ export default function EventCard({
   return (
     <div
       onClick={() => onClick?.(event)}
-      className={`bg-riff-header rounded-sm p-4 ${
-        onClick
-          ? `border cursor-pointer transition-all ${
-              isSelected
-                ? 'border-riff-primary bg-riff-primary/10'
-                : 'border-white/10 hover:border-riff-primary/50 bg-riff-text-primary/30'
-            }`
-          : ''
-      }`}
+      className={`bg-riff-header rounded-sm p-4 border transition-all duration-300 ${
+        isGlowHighlighted
+          ? 'border-riff-primary shadow-[0_0_0_1px_rgba(0,122,255,0.65),0_0_22px_rgba(0,122,255,0.35)] bg-riff-primary/10'
+          : onClick
+            ? `${isSelected ? 'border-riff-primary bg-riff-primary/10' : 'border-white/10 hover:border-riff-primary/50 bg-riff-text-primary/30'}`
+            : 'border-white/10'
+      } ${onClick ? 'cursor-pointer' : ''}`}
     >
       <div className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-4">
         <div className="flex-1 w-full sm:w-auto">

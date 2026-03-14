@@ -24,6 +24,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
   const [activeTab, setActiveTab] = useState<'canciones' | 'publicaciones' | 'eventos'>('publicaciones');
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
   const [selectedPublication, setSelectedPublication] = useState<Publication | null>(null);
   const [savingPostId, setSavingPostId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -181,6 +182,23 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
       const [year, month, dayOfMonth] = event.date.split('-').map(Number);
       return dayOfMonth === day && month - 1 === currentMonth && year === currentYear;
     });
+
+  const handleDateSelect = (day: number) => {
+    if (!hasEventOnDate(day)) return;
+
+    const month = String(currentMonth + 1).padStart(2, '0');
+    const date = String(day).padStart(2, '0');
+    const fullDate = `${currentYear}-${month}-${date}`;
+
+    setSelectedCalendarDate(prev => (prev === fullDate ? null : fullDate));
+  };
+
+  const selectedDayInCurrentView = (() => {
+    if (!selectedCalendarDate) return null;
+    const [year, month, day] = selectedCalendarDate.split('-').map(Number);
+    if (year !== currentYear || month - 1 !== currentMonth) return null;
+    return day;
+  })();
 
   const handleToggleFollow = async () => {
     const alreadyFollowing = isFollowing(artistData.id);
@@ -447,6 +465,8 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
                   onMonthChange={setCurrentMonth}
                   onYearChange={setCurrentYear}
                   hasEventOnDate={hasEventOnDate}
+                  selectedDay={selectedDayInCurrentView}
+                  onDateSelect={handleDateSelect}
                 />
               </div>
 
@@ -470,6 +490,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
                           key={event.id}
                           event={{ ...event, isAttending: isAttending(event.id) }}
                           formatDate={formatEventDate}
+                          isGlowHighlighted={selectedCalendarDate === event.date}
                           showAttendButton={!isSelf}
                           onAttend={handleAttend}
                           avgRating={avgRating}

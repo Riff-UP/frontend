@@ -8,6 +8,8 @@ interface CalendarProps {
   onMonthChange: (month: number) => void;
   onYearChange: (year: number) => void;
   hasEventOnDate?: (day: number) => boolean;
+  selectedDay?: number | null;
+  onDateSelect?: (day: number) => void;
 }
 
 export default function Calendar({
@@ -17,7 +19,9 @@ export default function Calendar({
   onNextMonth,
   onMonthChange,
   onYearChange,
-  hasEventOnDate
+  hasEventOnDate,
+  selectedDay,
+  onDateSelect
 }: CalendarProps) {
   const months = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -55,14 +59,18 @@ export default function Calendar({
     for (let day = 1; day <= daysInMonth; day++) {
       const isToday = day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
       const hasEvent = hasEventOnDate ? hasEventOnDate(day) : false;
+      const isSelected = selectedDay === day;
       
       days.push(
         <div
           key={day}
+          onClick={() => onDateSelect?.(day)}
           className={`text-center py-2 text-sm cursor-pointer rounded-sm transition-colors relative ${
-            isToday
-              ? 'bg-riff-primary text-white font-semibold'
-              : 'text-white hover:bg-riff-primary/20'
+            isSelected
+              ? 'bg-riff-primary/25 text-white font-semibold ring-1 ring-riff-primary shadow-[0_0_16px_rgba(0,122,255,0.35)]'
+              : isToday
+                ? 'bg-riff-primary text-white font-semibold'
+                : 'text-white hover:bg-riff-primary/20'
           }`}
         >
           {day}

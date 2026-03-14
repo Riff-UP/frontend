@@ -18,6 +18,7 @@ export default function Events() {
   const [eventToDelete, setEventToDelete] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [originalEditDate, setOriginalEditDate] = useState<string>('');
@@ -164,6 +165,23 @@ export default function Events() {
     });
   };
 
+  const handleDateSelect = (day: number) => {
+    if (!hasEventOnDate(day)) return;
+
+    const month = String(currentMonth + 1).padStart(2, '0');
+    const date = String(day).padStart(2, '0');
+    const fullDate = `${currentYear}-${month}-${date}`;
+
+    setSelectedCalendarDate(prev => (prev === fullDate ? null : fullDate));
+  };
+
+  const selectedDayInCurrentView = (() => {
+    if (!selectedCalendarDate) return null;
+    const [year, month, day] = selectedCalendarDate.split('-').map(Number);
+    if (year !== currentYear || month - 1 !== currentMonth) return null;
+    return day;
+  })();
+
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-6">
@@ -190,6 +208,8 @@ export default function Events() {
             onMonthChange={setCurrentMonth}
             onYearChange={setCurrentYear}
             hasEventOnDate={hasEventOnDate}
+            selectedDay={selectedDayInCurrentView}
+            onDateSelect={handleDateSelect}
           />
         </div>
 
@@ -212,6 +232,7 @@ export default function Events() {
                     key={event.id}
                     event={event}
                     formatDate={formatEventDate}
+                    isGlowHighlighted={selectedCalendarDate === event.date}
                     onEdit={handleEditEvent}
                     onDelete={handleDeleteClick}
                     showAttendButton={false}
