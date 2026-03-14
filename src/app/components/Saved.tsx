@@ -17,6 +17,7 @@ interface SavedEventItem {
   title: string;
   location: string;
   eventDate: string;
+  description: string;
 }
 
 function resolveEventId(event: Record<string, unknown>): string {
@@ -32,11 +33,12 @@ function resolveEventId(event: Record<string, unknown>): string {
 export default function Saved() {
   const [activeTab, setActiveTab] = useState<'publicaciones' | 'eventos'>('publicaciones');
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [removingAttendanceId, setRemovingAttendanceId] = useState<string | null>(null);
   const [savedEvents, setSavedEvents] = useState<SavedEventItem[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
 
   const { user } = useUser();
-  const { attendedEvents } = useEventAttendance(user?.id);
+  const { attendedEvents, unattend, loading: attendanceLoading } = useEventAttendance(user?.id);
   const {
     savedPosts,
     loading: postsLoading,
@@ -50,6 +52,19 @@ export default function Saved() {
       await unsavePost(savedPostId);
     } finally {
       setRemovingId(null);
+    }
+  };
+
+  const handleRemoveAttendance = async (eventId: string) => {
+    if (!eventId || removingAttendanceId || attendanceLoading) return;
+    setRemovingAttendanceId(eventId);
+    try {
+      const success = await unattend(eventId);
+      if (success) {
+        setSavedEvents((prev) => prev.filter((event) => event.id !== eventId));
+      }
+    } finally {
+      setRemovingAttendanceId(null);
     }
   };
 
@@ -109,6 +124,7 @@ export default function Saved() {
               title: String(event.title ?? 'Evento sin título'),
               location: String(event.location ?? 'Sin ubicación'),
               eventDate: String(event.event_date ?? event.eventDate ?? ''),
+              description: String(event.description ?? event.details ?? ''),
             };
           })
           .filter((event) => event.id && attendedIds.has(event.id));
@@ -267,21 +283,45 @@ export default function Saved() {
               </div>
             ) : (
               <div className="space-y-4">
-                {savedEvents.map((event) => (
-                  <div key={event.id} className="bg-riff-header rounded-sm p-4">
-                    <h4 className="text-white font-semibold text-sm sm:text-base">{event.title}</h4>
-                    <div className="mt-2 space-y-1.5 text-riff-text-secondary text-xs sm:text-sm">
-                      <p className="flex items-center gap-2">
-                        <FiCalendar className="w-4 h-4" />
-                        {formatEventDate(event.eventDate)}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <FiMapPin className="w-4 h-4" />
-                        {event.location}
-                      </p>
+                {savedEvents.map((event) => {
+                  const isRemovingAttendance = removingAttendanceId === event.id;
+
+                  return (
+                    <div key={event.id} className={`bg-riff-header rounded-sm p-4 transition-opacity ${isRemovingAttendance ? 'opacity-60' : ''}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-white font-semibold text-sm sm:text-base">{event.title}</h4>
+
+                          {event.description && (
+                            <p className="mt-2 text-white/85 text-xs sm:text-sm leading-relaxed">
+                              {event.description}
+                            </p>
+                          )}
+
+                          <div className="mt-3 space-y-1.5 text-riff-text-secondary text-xs sm:text-sm">
+                            <p className="flex items-center gap-2">
+                              <FiCalendar className="w-4 h-4" />
+                              {formatEventDate(event.eventDate)}
+                            </p>
+                            <p className="flex items-center gap-2">
+                              <FiMapPin className="w-4 h-4" />
+                              {event.location}
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleRemoveAttendance(event.id)}
+                          disabled={isRemovingAttendance || attendanceLoading}
+                          className="rounded-sm border border-white/20 px-3 py-1.5 text-xs sm:text-sm text-white/90 hover:bg-white/10 transition-colors disabled:opacity-50"
+                          title="Quitar asistencia"
+                        >
+                          {isRemovingAttendance ? 'Quitando...' : 'Quitar asistencia'}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
