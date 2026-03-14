@@ -389,7 +389,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
         {/* ── TAB: CANCIONES ── */}
         {activeTab === 'canciones' && (
           <div className="max-w-7xl mx-auto">
-            <div className="w-full rounded-sm border border-white/10 bg-riff-header p-6 sm:p-8 text-center">
+            <div className=" p-6 sm:p-8 text-center">
               <FaMusic className="w-12 h-12 text-riff-text-secondary mx-auto mb-4" />
               <h3 className="text-white text-lg sm:text-xl font-semibold">Música</h3>
               <p className="text-riff-text-secondary text-sm sm:text-base mt-2">

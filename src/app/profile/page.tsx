@@ -23,7 +23,7 @@ function ProfilePageContent({ activeSection, setActiveSection, userState }: { ac
       case 'eventos': return <Events />;
       case 'musica':
         return (
-          <div className="w-full rounded-sm border border-white/10 bg-riff-header p-6 sm:p-8">
+          <div className="p-6 sm:p-8">
             <h2 className="text-white text-xl sm:text-2xl font-bold">Música</h2>
             <p className="text-white/80 text-sm sm:text-base mt-2">
               Esta sección se implementará próximamente.
