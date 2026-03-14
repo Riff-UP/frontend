@@ -4,8 +4,31 @@
  */
 
 const IMAGE_UPLOAD_TIMEOUT_MS = 120_000;
-const VIDEO_CLOUDINARY_UPLOAD_TIMEOUT_MS = 600_000;
-const VIDEO_R2_PROCESSING_TIMEOUT_MS = 480_000;
+const VIDEO_CLOUDINARY_UPLOAD_TIMEOUT_MS = 1_800_000;
+const VIDEO_R2_PROCESSING_TIMEOUT_MS = 1_800_000;
+
+const MB_IN_BYTES = 1024 * 1024;
+const FREE_TIER_VIDEO_MAX_MB = 100;
+const ABSOLUTE_VIDEO_MAX_MB = 1024;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getMaxVideoUploadMb(): number {
+  // Si está en true, fuerza el límite gratis típico (100MB).
+  const freeTierOnly = process.env.NEXT_PUBLIC_CLOUDINARY_FREE_TIER_ONLY === 'true';
+  if (freeTierOnly) return FREE_TIER_VIDEO_MAX_MB;
+
+  // Permite configurar el límite hasta 1GB. Si no existe, usar 1GB por defecto.
+  const raw = process.env.NEXT_PUBLIC_MAX_VIDEO_UPLOAD_MB;
+  if (!raw) return ABSOLUTE_VIDEO_MAX_MB;
+
+  const parsed = Number(raw);
+  if (Number.isNaN(parsed) || parsed <= 0) return ABSOLUTE_VIDEO_MAX_MB;
+
+  return clamp(Math.floor(parsed), 1, ABSOLUTE_VIDEO_MAX_MB);
+}
 
 /**
  * Genera un nombre de archivo único
@@ -66,6 +89,11 @@ async function uploadVideoDirectlyToCloudinary(file: File, filename: string): Pr
 
   if (!response.ok) {
     const errorText = await response.text();
+    if (/file size too large|too large|max/i.test(errorText)) {
+      throw new Error(
+        'Cloudinary rechazó el video por tamaño. Si usas plan/límite gratis, activa NEXT_PUBLIC_CLOUDINARY_FREE_TIER_ONLY=true (100MB) o revisa el límite de tu preset/plan.'
+      );
+    }
     throw new Error(errorText || 'No se pudo subir el video a Cloudinary');
   }
 
@@ -173,7 +201,8 @@ export async function uploadToR2(file: File): Promise<string> {
  */
 export function validateMediaFile(file: File): { valid: boolean; error?: string } {
   const isVideo = file.type.startsWith('video/');
-  const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+  const maxVideoUploadMb = getMaxVideoUploadMb();
+  const maxSize = isVideo ? maxVideoUploadMb * MB_IN_BYTES : 10 * MB_IN_BYTES;
 
   const allowedTypes = [
     'image/jpeg',
@@ -199,7 +228,7 @@ export function validateMediaFile(file: File): { valid: boolean; error?: string 
     return {
       valid: false,
       error: isVideo
-        ? 'El video es muy grande. Tamaño máximo: 100MB'
+        ? `El video es muy grande. Tamaño máximo: ${maxVideoUploadMb}MB`
         : 'La imagen es muy grande. Tamaño máximo: 10MB',
     };
   }
