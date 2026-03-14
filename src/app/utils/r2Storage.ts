@@ -10,6 +10,7 @@ const VIDEO_R2_PROCESSING_TIMEOUT_MS = 1_800_000;
 const MB_IN_BYTES = 1024 * 1024;
 const FREE_TIER_VIDEO_MAX_MB = 100;
 const ABSOLUTE_VIDEO_MAX_MB = 1024;
+const DEFAULT_BACKEND_VIDEO_FALLBACK_MAX_MB = 40;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -28,6 +29,23 @@ function getMaxVideoUploadMb(): number {
   if (Number.isNaN(parsed) || parsed <= 0) return ABSOLUTE_VIDEO_MAX_MB;
 
   return clamp(Math.floor(parsed), 1, ABSOLUTE_VIDEO_MAX_MB);
+}
+
+function getBackendVideoFallbackMaxMb(): number {
+  const raw = process.env.NEXT_PUBLIC_BACKEND_VIDEO_FALLBACK_MAX_MB;
+  if (!raw) return DEFAULT_BACKEND_VIDEO_FALLBACK_MAX_MB;
+
+  const parsed = Number(raw);
+  if (Number.isNaN(parsed) || parsed <= 0) return DEFAULT_BACKEND_VIDEO_FALLBACK_MAX_MB;
+
+  return clamp(Math.floor(parsed), 1, ABSOLUTE_VIDEO_MAX_MB);
+}
+
+class CloudinaryNetworkError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CloudinaryNetworkError';
+  }
 }
 
 /**
@@ -122,12 +140,12 @@ async function uploadVideoDirectlyToCloudinary(
     };
 
     xhr.onerror = () => {
-      reject(new Error('No se pudo conectar con Cloudinary. Revisa tu internet e inténtalo de nuevo.'));
+      reject(new CloudinaryNetworkError('No se pudo conectar con Cloudinary. Revisa tu internet, VPN, adblock o firewall e inténtalo de nuevo.'));
     };
 
     xhr.ontimeout = () => {
       const seconds = Math.ceil(VIDEO_CLOUDINARY_UPLOAD_TIMEOUT_MS / 1000);
-      reject(new Error(`La subida del video tardó demasiado (${seconds}s). Intenta con un archivo más liviano o reintenta.`));
+      reject(new CloudinaryNetworkError(`La conexión con Cloudinary tardó demasiado (${seconds}s). Reintenta y verifica tu red.`));
     };
 
     xhr.send(formData);
@@ -159,48 +177,79 @@ export async function uploadToR2(
   if (file.type.startsWith('video/')) {
     const onProgress = options?.onProgress;
     let cloudinaryAsset: { publicId: string; resourceType: 'video' } | null = null;
+    const backendFallbackMaxMb = getBackendVideoFallbackMaxMb();
+    const backendFallbackMaxBytes = backendFallbackMaxMb * MB_IN_BYTES;
 
     try {
       cloudinaryAsset = await uploadVideoDirectlyToCloudinary(file, filename, onProgress);
-    } catch {
-      // Fallback: si falla la subida directa navegador -> Cloudinary,
-      // enviamos el archivo al backend para que procese toda la cadena.
-      onProgress?.(8, 'Conexión directa no disponible, intentando vía servidor...');
+    } catch (error) {
+      const isNetworkError = error instanceof CloudinaryNetworkError;
 
-      const fallbackFormData = new FormData();
-      fallbackFormData.append('file', file, filename);
-      fallbackFormData.append('image', file, filename);
-      fallbackFormData.append('filename', filename);
-
-      const fallbackHeaders: Record<string, string> = {};
-      if (typeof window !== 'undefined') {
-        const token = localStorage.getItem('token');
-        if (token) fallbackHeaders['Authorization'] = `Bearer ${token}`;
+      // Reintento único para cortes transitorios en navegador.
+      if (isNetworkError) {
+        onProgress?.(5, 'Reintentando conexión con Cloudinary...');
+        try {
+          cloudinaryAsset = await uploadVideoDirectlyToCloudinary(file, filename, onProgress);
+        } catch (retryError) {
+          if (!(retryError instanceof CloudinaryNetworkError)) {
+            throw retryError;
+          }
+        }
+      } else {
+        // Errores de configuración/preset/tamaño de Cloudinary no deben disfrazarse como fallback.
+        throw error;
       }
 
-      const fallbackResponse = await fetchWithTimeout(
-        '/api/upload/r2',
-        {
-          method: 'POST',
-          headers: fallbackHeaders,
-          body: fallbackFormData,
-        },
-        VIDEO_R2_PROCESSING_TIMEOUT_MS,
-      );
+      if (!cloudinaryAsset) {
+        if (file.size > backendFallbackMaxBytes) {
+          throw new Error(
+            `No se pudo conectar con Cloudinary desde el navegador y este hosting no permite fallback por servidor para videos grandes (>${backendFallbackMaxMb}MB). Reintenta sin VPN/adblock o usa una red diferente.`
+          );
+        }
 
-      if (!fallbackResponse.ok) {
-        const errorText = await fallbackResponse.text();
-        throw new Error(errorText || `Error al subir video vía servidor: ${fallbackResponse.status} ${fallbackResponse.statusText}`);
+        // Fallback solo para archivos que el serverless puede aceptar.
+        onProgress?.(8, 'Conexión directa no disponible, intentando vía servidor...');
+
+        const fallbackFormData = new FormData();
+        fallbackFormData.append('file', file, filename);
+        fallbackFormData.append('image', file, filename);
+        fallbackFormData.append('filename', filename);
+
+        const fallbackHeaders: Record<string, string> = {};
+        if (typeof window !== 'undefined') {
+          const token = localStorage.getItem('token');
+          if (token) fallbackHeaders['Authorization'] = `Bearer ${token}`;
+        }
+
+        const fallbackResponse = await fetchWithTimeout(
+          '/api/upload/r2',
+          {
+            method: 'POST',
+            headers: fallbackHeaders,
+            body: fallbackFormData,
+          },
+          VIDEO_R2_PROCESSING_TIMEOUT_MS,
+        );
+
+        if (!fallbackResponse.ok) {
+          const errorText = await fallbackResponse.text();
+          if (fallbackResponse.status === 413 || /payload too large|function_payload_too_large/i.test(errorText)) {
+            throw new Error(
+              `El servidor rechazó el video por tamaño al usar fallback. Límite práctico actual del servidor: ~${backendFallbackMaxMb}MB.`
+            );
+          }
+          throw new Error(errorText || `Error al subir video vía servidor: ${fallbackResponse.status} ${fallbackResponse.statusText}`);
+        }
+
+        const fallbackData = await fallbackResponse.json();
+        const fallbackUrl = fallbackData?.url || fallbackData?.data?.url || fallbackData?.result?.url;
+        if (!fallbackUrl) {
+          throw new Error('El backend no retornó una URL válida del video en R2 (fallback).');
+        }
+
+        onProgress?.(100, 'Subida completada');
+        return fallbackUrl;
       }
-
-      const fallbackData = await fallbackResponse.json();
-      const fallbackUrl = fallbackData?.url || fallbackData?.data?.url || fallbackData?.result?.url;
-      if (!fallbackUrl) {
-        throw new Error('El backend no retornó una URL válida del video en R2 (fallback).');
-      }
-
-      onProgress?.(100, 'Subida completada');
-      return fallbackUrl;
     }
 
     const jsonHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
