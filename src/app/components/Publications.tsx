@@ -12,7 +12,17 @@ import { usePostReactions } from '../hooks/usePostReactions';
 
 export default function Publications() {
   const { user } = useUser();
-  const { posts, uploading, error, createPost, updatePost, deletePost, fetchPosts } = usePosts(user?.id);
+  const {
+    posts,
+    uploading,
+    uploadProgress,
+    uploadStage,
+    error,
+    createPost,
+    updatePost,
+    deletePost,
+    fetchPosts,
+  } = usePosts(user?.id);
   const { savedPosts, savePost, unsavePost, isPostSaved } = useSavedPostsContext();
   const { isLiked, toggleLike, processingPostId: likingPostId, reactedPosts, postReactionCounts, fetchPostReactionCounts, getReactionCount } = usePostReactions(user?.id);
 
@@ -247,6 +257,8 @@ export default function Publications() {
           onPublish={handlePublish}
           onCancel={handleCancel}
           isUploading={uploading}
+          uploadProgress={uploadProgress}
+          uploadStage={uploadStage}
         />
 
         {error && (

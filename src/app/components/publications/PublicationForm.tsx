@@ -9,6 +9,8 @@ interface PublicationFormProps {
   onPublish: () => void;
   onCancel: () => void;
   isUploading?: boolean;
+  uploadProgress?: number | null;
+  uploadStage?: string;
 }
 
 export default function PublicationForm({
@@ -20,7 +22,11 @@ export default function PublicationForm({
   onPublish,
   onCancel,
   isUploading = false,
+  uploadProgress = null,
+  uploadStage = '',
 }: PublicationFormProps) {
+  const showProgress = isUploading && typeof uploadProgress === 'number';
+
   return (
     <div className="w-full lg:max-w-2xl mb-6">
       <div className="bg-riff-header rounded-sm p-4 sm:p-5">
@@ -64,6 +70,21 @@ export default function PublicationForm({
             className="hidden"
           />
         </label>
+
+        {showProgress && (
+          <div className="mb-3 rounded-sm border border-white/10 bg-riff-text-primary/30 p-3">
+            <div className="mb-1.5 flex items-center justify-between text-xs text-white/80">
+              <span>{uploadStage || 'Subiendo archivo...'}</span>
+              <span>{uploadProgress}%</span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-riff-primary-dark to-riff-primary transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-2 pt-4">
           <button

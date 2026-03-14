@@ -48,6 +48,7 @@ export interface CreatePostData {
   title?: string;
   description?: string;
   url?: string;          // URL de la canción (audio posts)
+  onUploadProgress?: (progressPercent: number, stage: string) => void;
 }
 
 async function fetchWithTimeout(
@@ -62,6 +63,9 @@ async function fetchWithTimeout(
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       throw new Error('La solicitud tardó demasiado. Verifica tu conexión e inténtalo de nuevo.');
+    }
+    if (error instanceof TypeError) {
+      throw new Error('No se pudo conectar con el servidor. Revisa tu internet o intenta de nuevo en unos segundos.');
     }
     throw error;
   } finally {
@@ -84,6 +88,8 @@ export function usePosts(userId?: string) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadStage, setUploadStage] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
   const getToken = (): string | null => {
@@ -131,6 +137,8 @@ export function usePosts(userId?: string) {
     if (!userId) { setError('Usuario no autenticado'); return null; }
 
     setUploading(true);
+    setUploadProgress(null);
+    setUploadStage('');
     setError(null);
 
     try {
@@ -223,6 +231,39 @@ export function usePosts(userId?: string) {
       const titleValue = (postData.content ?? '').substring(0, 100) || 'Nueva publicación';
       const descriptionValue = postData.content || 'Sin descripción';
 
+      // Para videos subimos primero a R2 (vía Cloudinary) con progreso visible.
+      if (mediaFile && mediaType === 'video') {
+        const mediaUrl = await uploadToR2(mediaFile, {
+          onProgress: (progressPercent, stage) => {
+            setUploadProgress(progressPercent);
+            setUploadStage(stage);
+            postData.onUploadProgress?.(progressPercent, stage);
+          },
+        });
+
+        const payload: Record<string, unknown> = {
+          sql_user_id: userId,
+          type: mediaType,
+          title: titleValue,
+          description: descriptionValue,
+          content: mediaUrl,
+          mediaUrl,
+        };
+
+        const response = await fetchWithTimeout(`${API_URL}/posts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) throw new Error(await extractErrorMessage(response));
+
+        const newPost = await response.json();
+        const normalized: Post = { ...newPost, id: extractId(newPost._id ?? newPost.id) };
+        setPosts(prev => [normalized, ...(Array.isArray(prev) ? prev : [])]);
+        return normalized;
+      }
+
       const formData = new FormData();
       formData.append('sql_user_id', userId);
       formData.append('type', mediaType);
@@ -234,13 +275,18 @@ export function usePosts(userId?: string) {
       }
       if (postData.tags && postData.tags.length > 0) formData.append('tags', JSON.stringify(postData.tags));
 
-      let response = await fetchWithTimeout(`${API_URL}/posts`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
+      let response: Response | null = null;
+      try {
+        response = await fetchWithTimeout(`${API_URL}/posts`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+      } catch {
+        response = null;
+      }
 
-      if (!response.ok && (response.status === 404 || response.status === 415 || response.status === 400)) {
+      if (!response || (!response.ok && (response.status === 404 || response.status === 415 || response.status === 400))) {
         let mediaUrl: string | undefined;
         if (mediaFile) mediaUrl = await uploadToR2(mediaFile);
 
@@ -277,6 +323,8 @@ export function usePosts(userId?: string) {
       return null;
     } finally {
       setUploading(false);
+      setUploadProgress(null);
+      setUploadStage('');
     }
   };
 
@@ -331,5 +379,16 @@ export function usePosts(userId?: string) {
     }
   };
 
-  return { posts, loading, uploading, error, fetchPosts, createPost, updatePost, deletePost };
+  return {
+    posts,
+    loading,
+    uploading,
+    uploadProgress,
+    uploadStage,
+    error,
+    fetchPosts,
+    createPost,
+    updatePost,
+    deletePost,
+  };
 }

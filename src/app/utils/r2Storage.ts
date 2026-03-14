@@ -58,13 +58,23 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
       throw new Error(`La subida del archivo tardó demasiado (${seconds}s). Intenta con un archivo más liviano o reintenta.`);
     }
 
+    if (error instanceof TypeError) {
+      throw new Error('No se pudo conectar con el servicio de subida. Revisa tu internet e inténtalo de nuevo.');
+    }
+
     throw error;
   } finally {
     window.clearTimeout(timeoutId);
   }
 }
 
-async function uploadVideoDirectlyToCloudinary(file: File, filename: string): Promise<{ publicId: string; resourceType: 'video' }> {
+type UploadProgressCallback = (progressPercent: number, stage: string) => void;
+
+async function uploadVideoDirectlyToCloudinary(
+  file: File,
+  filename: string,
+  onProgress?: UploadProgressCallback,
+): Promise<{ publicId: string; resourceType: 'video' }> {
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
@@ -78,26 +88,51 @@ async function uploadVideoDirectlyToCloudinary(file: File, filename: string): Pr
   formData.append('resource_type', 'video');
   formData.append('folder', 'riff-temp');
 
-  const response = await fetchWithTimeout(
-    `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`,
-    {
-      method: 'POST',
-      body: formData,
-    },
-    VIDEO_CLOUDINARY_UPLOAD_TIMEOUT_MS,
-  );
+  onProgress?.(1, 'Preparando subida...');
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    if (/file size too large|too large|max/i.test(errorText)) {
-      throw new Error(
-        'Cloudinary rechazó el video por tamaño. Si usas plan/límite gratis, activa NEXT_PUBLIC_CLOUDINARY_FREE_TIER_ONLY=true (100MB) o revisa el límite de tu preset/plan.'
-      );
-    }
-    throw new Error(errorText || 'No se pudo subir el video a Cloudinary');
-  }
+  const data = await new Promise<Record<string, unknown>>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`);
+    xhr.timeout = VIDEO_CLOUDINARY_UPLOAD_TIMEOUT_MS;
 
-  const data = await response.json();
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+      const ratio = event.loaded / event.total;
+      const progress = Math.min(90, Math.max(1, Math.round(ratio * 90)));
+      onProgress?.(progress, 'Subiendo video...');
+    };
+
+    xhr.onload = () => {
+      const responseText = xhr.responseText || '';
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(responseText) as Record<string, unknown>);
+        } catch {
+          reject(new Error('Cloudinary devolvió una respuesta inválida.'));
+        }
+        return;
+      }
+
+      if (/file size too large|too large|max/i.test(responseText)) {
+        reject(new Error('Cloudinary rechazó el video por tamaño. Si usas plan/límite gratis, activa NEXT_PUBLIC_CLOUDINARY_FREE_TIER_ONLY=true (100MB) o revisa el límite de tu preset/plan.'));
+        return;
+      }
+
+      reject(new Error(responseText || `No se pudo subir el video a Cloudinary (${xhr.status}).`));
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('No se pudo conectar con Cloudinary. Revisa tu internet e inténtalo de nuevo.'));
+    };
+
+    xhr.ontimeout = () => {
+      const seconds = Math.ceil(VIDEO_CLOUDINARY_UPLOAD_TIMEOUT_MS / 1000);
+      reject(new Error(`La subida del video tardó demasiado (${seconds}s). Intenta con un archivo más liviano o reintenta.`));
+    };
+
+    xhr.send(formData);
+  });
+
   const publicId = data?.public_id as string | undefined;
   if (!publicId) {
     throw new Error('Cloudinary no devolvió public_id para el video.');
@@ -109,7 +144,10 @@ async function uploadVideoDirectlyToCloudinary(file: File, filename: string): Pr
 /**
  * Sube un archivo a R2 usando el backend como proxy (multipart/form-data)
  */
-export async function uploadToR2(file: File): Promise<string> {
+export async function uploadToR2(
+  file: File,
+  options?: { onProgress?: UploadProgressCallback },
+): Promise<string> {
   // Validar archivo
   const validation = validateMediaFile(file);
   if (!validation.valid) {
@@ -119,13 +157,16 @@ export async function uploadToR2(file: File): Promise<string> {
   const filename = generateUniqueFilename(file.name);
 
   if (file.type.startsWith('video/')) {
-    const cloudinaryAsset = await uploadVideoDirectlyToCloudinary(file, filename);
+    const onProgress = options?.onProgress;
+    const cloudinaryAsset = await uploadVideoDirectlyToCloudinary(file, filename, onProgress);
 
     const jsonHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('token');
       if (token) jsonHeaders['Authorization'] = `Bearer ${token}`;
     }
+
+    onProgress?.(94, 'Procesando video...');
 
     const response = await fetchWithTimeout(
       '/api/upload/r2',
@@ -151,6 +192,8 @@ export async function uploadToR2(file: File): Promise<string> {
     if (!url) {
       throw new Error('El backend no retornó una URL válida del video en R2');
     }
+
+    onProgress?.(100, 'Subida completada');
 
     return url;
   }
