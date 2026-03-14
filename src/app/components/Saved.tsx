@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MdBookmark } from 'react-icons/md';
 import { FiCalendar, FiMapPin } from 'react-icons/fi';
 import TabNavigation from './common/TabNavigation';
 import { useSavedPostsContext } from '../context/SavedPostsContext';
 import { useUser } from '../hooks/useUser';
 import { useEventAttendance } from '../hooks/useEventAttendance';
+import { useArtists } from '../hooks/useArtists';
 import { API_BASE_URL } from '../config/api';
 import Image from 'next/image';
 
@@ -38,6 +39,7 @@ export default function Saved() {
   const [eventsLoading, setEventsLoading] = useState(false);
 
   const { user } = useUser();
+  const { artists } = useArtists();
   const { attendedEvents, unattend, loading: attendanceLoading } = useEventAttendance(user?.id);
   const {
     savedPosts,
@@ -79,6 +81,17 @@ export default function Saved() {
     { id: 'publicaciones' as const, label: 'Publicaciones'},
     { id: 'eventos' as const, label: 'Eventos'},
   ];
+
+  const artistsById = useMemo(() => {
+    const map = new Map<string, { name: string; profileImage?: string | null }>();
+    artists.forEach((artist) => {
+      map.set(String(artist.id), {
+        name: artist.name,
+        profileImage: artist.profileImage,
+      });
+    });
+    return map;
+  }, [artists]);
 
   useEffect(() => {
     const loadAttendedEvents = async () => {
@@ -193,6 +206,11 @@ export default function Saved() {
                   const key = savedPost.id || savedPost.postId || `saved-${index}`;
                   const post = savedPost.post;
                   const isRemoving = removingId === savedPost.id;
+                  const authorId = String(post?.authorId ?? '');
+                  const authorFromLookup = authorId ? artistsById.get(authorId) : undefined;
+                  const authorName = post?.authorName || authorFromLookup?.name || 'Artista Riff';
+                  const authorImage = post?.authorImage || authorFromLookup?.profileImage || '';
+                  const authorInitial = authorName.charAt(0).toUpperCase();
 
                   // Detectar si el content es una URL de imagen
                   const isContentUrl = post?.content && (
@@ -211,15 +229,23 @@ export default function Saved() {
                     >
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div className="flex items-start gap-3 flex-1">
-                          <div className="w-8 h-8 bg-gradient-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center flex-shrink-0">
-                            <span className="text-white text-xs font-medium">
-                              {(user?.name || 'U').charAt(0).toUpperCase()}
-                            </span>
+                          <div className="w-8 h-8 bg-gradient-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            {authorImage ? (
+                              <Image
+                                src={authorImage}
+                                alt={authorName}
+                                width={32}
+                                height={32}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-white text-xs font-medium">{authorInitial}</span>
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-white font-semibold text-sm">
-                                {user?.name || 'Usuario'}
+                                {authorName}
                               </span>
                               <span className="text-riff-text-secondary text-xs">
                                 {formatDate(post?.createdAt || savedPost.createdAt)}

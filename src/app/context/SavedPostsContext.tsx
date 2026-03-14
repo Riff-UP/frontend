@@ -9,6 +9,8 @@ export interface SavedPostContent {
   id?: string;
   _id?: string;
   authorId?: string;
+  authorName?: string;
+  authorImage?: string;
   sql_user_id?: string;
   content?: string;
   mediaUrl?: string;
@@ -46,6 +48,7 @@ function extractId(id: MongoId): string {
 function normalizeSavedPost(raw: Record<string, unknown>): SavedPost {
   const rawPost = (raw.post ?? raw.postData ?? raw.publication) as Record<string, unknown> | undefined;
   const rawPostAsId = typeof raw.post === 'string' ? raw.post : undefined;
+  const rawAuthor = rawPost?.author as Record<string, unknown> | undefined;
 
   // El campo "savedPostId" es el identificador del documento savedPost
   // Puede venir como savedPostId, _id, id
@@ -75,6 +78,8 @@ function normalizeSavedPost(raw: Record<string, unknown>): SavedPost {
     post: rawPost ? {
       id: extractId(rawPost._id ?? rawPost.id),
       authorId: String(rawPost.sql_user_id ?? rawPost.authorId ?? rawPost.author_id ?? ''),
+      authorName: String(rawAuthor?.name ?? rawPost.authorName ?? rawPost.author_name ?? ''),
+      authorImage: String(rawAuthor?.profileImage ?? rawAuthor?.avatar ?? rawPost.authorImage ?? rawPost.author_image ?? ''),
       content: textContent,
       mediaUrl: mediaUrl || undefined,
       mediaType: (rawPost.type ?? rawPost.mediaType) as 'image' | 'video' | 'audio' | undefined,
