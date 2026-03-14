@@ -32,6 +32,7 @@ interface HeroPublication {
   id: string;
   authorId: string;
   authorName: string;
+  authorImage?: string;
   imageUrl: string | undefined;
   caption: string;
   createdAt: string;
@@ -116,8 +117,19 @@ function HomeContent() {
     window.setTimeout(updateDiscoverControls, 250);
   };
 
+  const formatPostDate = (dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
   const heroPublications = useMemo<HeroPublication[]>(() => {
-    const artistNameMap = new Map(artists.map((artist) => [artist.id, artist.name]));
+    const artistMap = new Map(artists.map((artist) => [artist.id, artist]));
     const artistIds = new Set(artists.map((artist) => artist.id));
 
     const normalized = heroPosts
@@ -129,7 +141,8 @@ function HomeContent() {
         return {
           id: extractId(post._id ?? post.id),
           authorId,
-          authorName: artistNameMap.get(authorId) ?? "Artista Riff",
+          authorName: artistMap.get(authorId)?.name ?? "Artista Riff",
+          authorImage: artistMap.get(authorId)?.profileImage ?? undefined,
           imageUrl,
           caption: post.description || post.title || post.content || "Nueva publicación",
           createdAt,
@@ -273,7 +286,7 @@ function HomeContent() {
             <div
               ref={carouselRef}
               onScroll={updateDiscoverControls}
-              className="flex gap-4 overflow-x-auto sm:overflow-x-hidden scroll-smooth px-4 sm:px-0 pb-2 snap-x snap-mandatory touch-pan-x"
+              className="flex gap-4 overflow-x-auto sm:overflow-x-hidden scroll-smooth px-4 sm:px-0 pb-2 snap-x snap-proximity overscroll-x-contain"
             >
               {artists.map((artist: ArtistData) => (
                 <div
@@ -322,7 +335,7 @@ function HomeContent() {
             <div
               ref={followedCarouselRef}
               onScroll={updateFollowedControls}
-              className="flex gap-4 overflow-x-auto sm:overflow-x-hidden scroll-smooth px-4 sm:px-0 pb-2 snap-x snap-mandatory touch-pan-x"
+              className="flex gap-4 overflow-x-auto sm:overflow-x-hidden scroll-smooth px-4 sm:px-0 pb-2 snap-x snap-proximity overscroll-x-contain"
             >
               {followedArtists.map((artist: ArtistData) => (
                 <div key={artist.id} className="w-[85%] sm:w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)] xl:w-[calc(25%-12px)] flex-shrink-0 snap-start">
@@ -346,54 +359,45 @@ function HomeContent() {
               <h2 className="text-xl sm:text-2xl font-bold text-white">Publicaciones recientes</h2>
             </div>
 
-            {/* Móvil: carrusel touch */}
-            <div className="md:hidden flex gap-4 overflow-x-auto px-4 pb-2 snap-x snap-mandatory touch-pan-x">
-              {heroPublications.map((post) => (
-                <article
-                  key={post.id}
-                  className="w-[90%] flex-shrink-0 snap-start rounded-sm bg-riff-header border border-white/10 overflow-hidden"
-                >
-                  {post.imageUrl ? (
-                    <img
-                      src={post.imageUrl}
-                      alt={post.caption}
-                      className="w-full h-44 object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-44 bg-riff-background-b flex items-center justify-center px-4 text-center text-riff-text-secondary text-sm">
-                      Publicación sin imagen
-                    </div>
-                  )}
-                  <div className="p-4">
-                    <p className="text-riff-primary text-xs font-medium">{post.authorName}</p>
-                    <p className="text-white text-sm mt-1 line-clamp-3">{post.caption}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-
-            {/* Desktop/tablet: grid */}
-            <div className="hidden md:grid grid-cols-2 xl:grid-cols-3 gap-4 px-4 sm:px-0">
+            <div className="max-w-5xl mx-auto px-4 sm:px-0 space-y-4">
               {heroPublications.map((post) => (
                 <article
                   key={post.id}
                   className="rounded-sm bg-riff-header border border-white/10 overflow-hidden"
                 >
+                  <div className="p-4 border-b border-white/10">
+                    <div className="flex items-start gap-3">
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-riff-background-b shrink-0">
+                        {post.authorImage ? (
+                          <img src={post.authorImage} alt={post.authorName} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-sm font-semibold text-white/80">
+                            {post.authorName.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-white text-2xl sm:text-3xl font-bold leading-none truncate">{post.authorName}</p>
+                        <p className="text-riff-text-secondary text-sm mt-1">{formatPostDate(post.createdAt)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 sm:p-5">
+                    <p className="text-white text-2xl sm:text-4xl leading-tight">{post.caption || 'Sin descripción'}</p>
+                  </div>
+
                   {post.imageUrl ? (
                     <img
                       src={post.imageUrl}
                       alt={post.caption}
-                      className="w-full h-48 object-cover"
+                      className="w-full max-h-[520px] object-cover"
                     />
                   ) : (
-                    <div className="w-full h-48 bg-riff-background-b flex items-center justify-center px-4 text-center text-riff-text-secondary text-sm">
-                      Publicación sin imagen
+                    <div className="w-full h-40 bg-riff-background-b flex items-center justify-center px-4 text-center text-riff-text-secondary text-sm">
+                      Sin imagen
                     </div>
                   )}
-                  <div className="p-4">
-                    <p className="text-riff-primary text-xs font-medium">{post.authorName}</p>
-                    <p className="text-white text-sm mt-1 line-clamp-2">{post.caption}</p>
-                  </div>
                 </article>
               ))}
             </div>
