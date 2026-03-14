@@ -12,6 +12,7 @@ const FREE_TIER_VIDEO_MAX_MB = 100;
 const ABSOLUTE_VIDEO_MAX_MB = 1024;
 const DEFAULT_BACKEND_VIDEO_FALLBACK_MAX_MB = 40;
 const DEFAULT_CLOUDINARY_CHUNK_SIZE_MB = 20;
+const DEFAULT_DIRECT_R2_VIDEO_THRESHOLD_MB = 120;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -50,6 +51,16 @@ function getCloudinaryChunkSizeMb(): number {
   if (Number.isNaN(parsed) || parsed <= 0) return DEFAULT_CLOUDINARY_CHUNK_SIZE_MB;
 
   return clamp(Math.floor(parsed), 5, 100);
+}
+
+function getDirectR2VideoThresholdMb(): number {
+  const raw = process.env.NEXT_PUBLIC_DIRECT_R2_VIDEO_THRESHOLD_MB;
+  if (!raw) return DEFAULT_DIRECT_R2_VIDEO_THRESHOLD_MB;
+
+  const parsed = Number(raw);
+  if (Number.isNaN(parsed) || parsed <= 0) return DEFAULT_DIRECT_R2_VIDEO_THRESHOLD_MB;
+
+  return clamp(Math.floor(parsed), 1, ABSOLUTE_VIDEO_MAX_MB);
 }
 
 class CloudinaryNetworkError extends Error {
@@ -104,6 +115,12 @@ interface CloudinarySignedUploadPayload {
   timestamp: number;
   apiKey: string;
   cloudName: string;
+}
+
+interface DirectR2SignedUploadPayload {
+  uploadUrl: string;
+  url: string;
+  contentType?: string;
 }
 
 function createUploadId(): string {
@@ -229,6 +246,76 @@ async function uploadVideoDirectlyToCloudinary(
   return { publicId: finalPublicId, resourceType: 'video' };
 }
 
+async function uploadVideoDirectlyToR2(
+  file: File,
+  filename: string,
+  onProgress?: UploadProgressCallback,
+): Promise<string> {
+  onProgress?.(1, 'Solicitando URL segura de R2...');
+
+  const signedResponse = await fetchWithTimeout(
+    '/api/upload/r2',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        directUpload: true,
+        filename,
+        contentType: file.type || 'application/octet-stream',
+      }),
+    },
+    30_000,
+  );
+
+  if (!signedResponse.ok) {
+    const errorText = await signedResponse.text();
+    throw new Error(errorText || 'No se pudo obtener URL firmada para subir a R2.');
+  }
+
+  const signedPayload = await signedResponse.json() as DirectR2SignedUploadPayload;
+  if (!signedPayload.uploadUrl || !signedPayload.url) {
+    throw new Error('R2 no devolvió datos válidos para la subida directa.');
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', signedPayload.uploadUrl);
+    xhr.timeout = VIDEO_R2_PROCESSING_TIMEOUT_MS;
+
+    const contentType = signedPayload.contentType || file.type || 'application/octet-stream';
+    xhr.setRequestHeader('Content-Type', contentType);
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+      const ratio = event.loaded / event.total;
+      const progress = Math.min(98, Math.max(2, Math.round(ratio * 98)));
+      onProgress?.(progress, 'Subiendo video directo a R2...');
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+        return;
+      }
+      reject(new Error(`R2 rechazó la subida directa (${xhr.status}).`));
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('No se pudo completar la subida directa a R2. Revisa tu red e inténtalo de nuevo.'));
+    };
+
+    xhr.ontimeout = () => {
+      const seconds = Math.ceil(VIDEO_R2_PROCESSING_TIMEOUT_MS / 1000);
+      reject(new Error(`La subida directa a R2 tardó demasiado (${seconds}s).`));
+    };
+
+    xhr.send(file);
+  });
+
+  onProgress?.(100, 'Subida completada');
+  return signedPayload.url;
+}
+
 /**
  * Sube un archivo a R2 usando el backend como proxy (multipart/form-data)
  */
@@ -246,6 +333,13 @@ export async function uploadToR2(
 
   if (file.type.startsWith('video/')) {
     const onProgress = options?.onProgress;
+    const directR2ThresholdMb = getDirectR2VideoThresholdMb();
+    const directR2ThresholdBytes = directR2ThresholdMb * MB_IN_BYTES;
+
+    if (file.size > directR2ThresholdBytes) {
+      return uploadVideoDirectlyToR2(file, filename, onProgress);
+    }
+
     let cloudinaryAsset: { publicId: string; resourceType: 'video' } | null = null;
     const backendFallbackMaxMb = getBackendVideoFallbackMaxMb();
     const backendFallbackMaxBytes = backendFallbackMaxMb * MB_IN_BYTES;

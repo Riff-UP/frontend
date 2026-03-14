@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v2 as cloudinary, type UploadApiOptions, type UploadApiResponse } from 'cloudinary';
 
 export const runtime = 'nodejs';
@@ -83,6 +84,16 @@ function replaceFileExtension(filename: string, extension: string): string {
 
 function randomId(length = 8): string {
   return Math.random().toString(36).slice(2, 2 + length);
+}
+
+function normalizeFilename(filename?: string): string {
+  const fallback = `${Date.now()}-${randomId()}.bin`;
+  if (!filename) return fallback;
+
+  return filename
+    .replace(/[^a-zA-Z0-9._-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '') || fallback;
 }
 
 function buildCloudinaryTransformedUrl(publicId: string, resourceType: MediaResourceType): {
@@ -172,16 +183,41 @@ async function fetchTransformedBuffer(url: string): Promise<Buffer> {
 export async function POST(request: Request) {
   try {
     const { client, bucket, publicUrl } = getR2Config();
-    getCloudinaryConfig();
 
     const requestContentType = request.headers.get('content-type') || '';
 
     if (requestContentType.includes('application/json')) {
       const body = (await request.json()) as {
+        directUpload?: boolean;
         cloudinaryPublicId?: string;
         resourceType?: MediaResourceType;
         filename?: string;
+        contentType?: string;
       };
+
+      if (body.directUpload) {
+        const safeFilename = normalizeFilename(body.filename);
+        const contentType = body.contentType || 'application/octet-stream';
+
+        const command = new PutObjectCommand({
+          Bucket: bucket,
+          Key: safeFilename,
+          ContentType: contentType,
+        });
+
+        const uploadUrl = await getSignedUrl(client, command, { expiresIn: 60 * 15 });
+        const url = `${publicUrl.replace(/\/$/, '')}/${safeFilename}`;
+
+        return NextResponse.json({
+          uploadUrl,
+          url,
+          key: safeFilename,
+          contentType,
+          expiresIn: 60 * 15,
+        });
+      }
+
+      getCloudinaryConfig();
 
       if (!body.cloudinaryPublicId || !body.resourceType) {
         return NextResponse.json(
@@ -218,6 +254,8 @@ export async function POST(request: Request) {
       const url = `${publicUrl.replace(/\/$/, '')}/${filename}`;
       return NextResponse.json({ url });
     }
+
+    getCloudinaryConfig();
 
     const formData = await request.formData();
 
