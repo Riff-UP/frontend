@@ -45,15 +45,17 @@ function extractId(id: MongoId): string {
 // O también puede devolver: { _id, post_id, sql_user_id, saved_at, post: {...} }
 function normalizeSavedPost(raw: Record<string, unknown>): SavedPost {
   const rawPost = (raw.post ?? raw.postData ?? raw.publication) as Record<string, unknown> | undefined;
+  const rawPostAsId = typeof raw.post === 'string' ? raw.post : undefined;
 
   // El campo "savedPostId" es el identificador del documento savedPost
   // Puede venir como savedPostId, _id, id
   const rawId = raw.savedPostId ?? raw._id ?? raw.id ?? raw.savedId;
   // El campo del post puede venir como post_id, postId, o dentro del objeto post como _id
   const rawPostId = raw.post_id ?? raw.postId ?? raw.postID
-    ?? (rawPost ? (rawPost._id ?? rawPost.id) : undefined);
+    ?? (rawPost ? (rawPost._id ?? rawPost.id) : undefined)
+    ?? rawPostAsId;
 
-  const resolvedId = extractId(rawId);
+  const resolvedId = extractId(rawId) || extractId(raw.saved_post_id ?? raw.savedPostID);
   const resolvedPostId = extractId(rawPostId);
 
   const postContent = rawPost ? String(rawPost.content ?? rawPost.description ?? rawPost.text ?? '') : '';
@@ -118,12 +120,12 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
       setLoading(true);
       // El backend tiene la ruta GET /posts/saved/user/:sqlUserId
       // que devuelve los posts guardados del usuario populados con el post
-      const res = await fetch(`${API_URL}/posts/saved/user/${userId}`, {
+      const res = await fetch(`${API_URL}/posts/saved?userId=${userId}`, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
 
       if (!res.ok) {
-        setSavedPosts([]);
+        // No limpiar el estado en caso de error para preservar actualizaciones optimistas
         return;
       }
 
@@ -193,9 +195,6 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
         if (prev.some(sp => String(sp.postId) === String(postId))) return prev;
         return [...prev, basicNormalized];
       });
-
-      // Refrescar para obtener el post populado completo
-      await fetchSavedPosts();
 
       return basicNormalized;
     } catch {
