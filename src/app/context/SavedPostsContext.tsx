@@ -154,19 +154,35 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
   const savePost = async (postId: string, userId: string): Promise<SavedPost | null> => {
     const token = getToken();
     if (!token) return null;
+    if (!postId || postId === 'undefined' || postId === 'null') return null;
+    if (!userId || userId === 'undefined' || userId === 'null') return null;
 
     try {
-      const res = await fetch(`${API_URL}/posts/saved`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          postId,
-          userId,
-          post_id: postId,
-          sql_user_id: userId,
-          user_id: userId,
-        }),
-      });
+      const payloads: Record<string, string>[] = [
+        { postId, userId },
+        { post_id: postId, sql_user_id: userId },
+        { postId, userId, post_id: postId, sql_user_id: userId, user_id: userId },
+      ];
+
+      let res: Response | null = null;
+
+      for (const payload of payloads) {
+        const attempt = await fetch(`${API_URL}/posts/saved`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        res = attempt;
+
+        // Si hay conflicto, ya existe guardado; si fue exitoso, parar.
+        if (attempt.status === 409 || attempt.ok) break;
+
+        // Reintentar solo para errores típicos de validación de payload.
+        if (attempt.status !== 400 && attempt.status !== 415 && attempt.status !== 422) break;
+      }
+
+      if (!res) return null;
 
       if (res.status === 409) {
         // Ya guardado — buscar en estado actual o refrescar
@@ -184,7 +200,8 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
 
       // El POST devuelve: { _id, post_id, sql_user_id, saved_at, __v }
       // (sin el post populado)
-      const rawSaved = await res.json() as Record<string, unknown>;
+      const created = await res.json().catch(() => ({})) as Record<string, unknown>;
+      const rawSaved = (created.data ?? created.savedPost ?? created.result ?? created) as Record<string, unknown>;
 
       // Normalizar la respuesta básica
       const basicNormalized = normalizeSavedPost(rawSaved);
