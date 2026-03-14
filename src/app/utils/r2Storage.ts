@@ -11,6 +11,7 @@ const MB_IN_BYTES = 1024 * 1024;
 const FREE_TIER_VIDEO_MAX_MB = 100;
 const ABSOLUTE_VIDEO_MAX_MB = 1024;
 const DEFAULT_BACKEND_VIDEO_FALLBACK_MAX_MB = 40;
+const DEFAULT_CLOUDINARY_CHUNK_SIZE_MB = 20;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -39,6 +40,16 @@ function getBackendVideoFallbackMaxMb(): number {
   if (Number.isNaN(parsed) || parsed <= 0) return DEFAULT_BACKEND_VIDEO_FALLBACK_MAX_MB;
 
   return clamp(Math.floor(parsed), 1, ABSOLUTE_VIDEO_MAX_MB);
+}
+
+function getCloudinaryChunkSizeMb(): number {
+  const raw = process.env.NEXT_PUBLIC_CLOUDINARY_CHUNK_SIZE_MB;
+  if (!raw) return DEFAULT_CLOUDINARY_CHUNK_SIZE_MB;
+
+  const parsed = Number(raw);
+  if (Number.isNaN(parsed) || parsed <= 0) return DEFAULT_CLOUDINARY_CHUNK_SIZE_MB;
+
+  return clamp(Math.floor(parsed), 5, 100);
 }
 
 class CloudinaryNetworkError extends Error {
@@ -88,75 +99,134 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
 
 type UploadProgressCallback = (progressPercent: number, stage: string) => void;
 
+interface CloudinarySignedUploadPayload {
+  signature: string;
+  timestamp: number;
+  apiKey: string;
+  cloudName: string;
+}
+
+function createUploadId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function getCloudinarySignedPayload(publicId: string): Promise<CloudinarySignedUploadPayload> {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const response = await fetchWithTimeout(
+    '/api/upload/cloudinary/sign',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        paramsToSign: {
+          timestamp,
+          folder: 'riff-temp',
+          public_id: publicId,
+        },
+      }),
+    },
+    30_000,
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'No se pudo firmar la subida en Cloudinary.');
+  }
+
+  const payload = await response.json() as CloudinarySignedUploadPayload;
+  if (!payload.signature || !payload.timestamp || !payload.apiKey || !payload.cloudName) {
+    throw new Error('La firma de Cloudinary es inválida o incompleta.');
+  }
+
+  return payload;
+}
+
 async function uploadVideoDirectlyToCloudinary(
   file: File,
   filename: string,
   onProgress?: UploadProgressCallback,
 ): Promise<{ publicId: string; resourceType: 'video' }> {
-  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-
-  if (!cloudName || !uploadPreset) {
-    throw new Error('Faltan variables NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME o NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET para subida de video.');
-  }
-
-  const formData = new FormData();
-  formData.append('file', file, filename);
-  formData.append('upload_preset', uploadPreset);
-  formData.append('resource_type', 'video');
-  formData.append('folder', 'riff-temp');
-
   onProgress?.(1, 'Preparando subida...');
 
-  const data = await new Promise<Record<string, unknown>>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`);
-    xhr.timeout = VIDEO_CLOUDINARY_UPLOAD_TIMEOUT_MS;
+  const baseName = filename.replace(/\.[^/.]+$/, '');
+  const publicId = `riff-temp/${baseName}`;
+  const signedPayload = await getCloudinarySignedPayload(publicId);
+  const chunkSizeBytes = getCloudinaryChunkSizeMb() * MB_IN_BYTES;
+  const totalBytes = file.size;
+  const uploadId = createUploadId();
 
-    xhr.upload.onprogress = (event) => {
-      if (!event.lengthComputable) return;
-      const ratio = event.loaded / event.total;
-      const progress = Math.min(90, Math.max(1, Math.round(ratio * 90)));
-      onProgress?.(progress, 'Subiendo video...');
-    };
+  let offset = 0;
+  let lastChunkResponse: Record<string, unknown> | null = null;
 
-    xhr.onload = () => {
-      const responseText = xhr.responseText || '';
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(JSON.parse(responseText) as Record<string, unknown>);
-        } catch {
-          reject(new Error('Cloudinary devolvió una respuesta inválida.'));
+  while (offset < totalBytes) {
+    const chunkEnd = Math.min(offset + chunkSizeBytes, totalBytes);
+    const chunk = file.slice(offset, chunkEnd);
+    const chunkNumber = Math.floor(offset / chunkSizeBytes) + 1;
+    const totalChunks = Math.ceil(totalBytes / chunkSizeBytes);
+
+    const formData = new FormData();
+    formData.append('file', chunk, filename);
+    formData.append('api_key', signedPayload.apiKey);
+    formData.append('timestamp', String(signedPayload.timestamp));
+    formData.append('signature', signedPayload.signature);
+    formData.append('folder', 'riff-temp');
+    formData.append('public_id', publicId);
+
+    const response = await new Promise<Record<string, unknown>>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `https://api.cloudinary.com/v1_1/${signedPayload.cloudName}/video/upload`);
+      xhr.timeout = VIDEO_CLOUDINARY_UPLOAD_TIMEOUT_MS;
+      xhr.setRequestHeader('X-Unique-Upload-Id', uploadId);
+      xhr.setRequestHeader('Content-Range', `bytes ${offset}-${chunkEnd - 1}/${totalBytes}`);
+
+      xhr.onload = () => {
+        const responseText = xhr.responseText || '';
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(responseText) as Record<string, unknown>);
+          } catch {
+            reject(new Error('Cloudinary devolvió una respuesta inválida.'));
+          }
+          return;
         }
-        return;
-      }
 
-      if (/file size too large|too large|max/i.test(responseText)) {
-        reject(new Error('Cloudinary rechazó el video por tamaño. Si usas plan/límite gratis, activa NEXT_PUBLIC_CLOUDINARY_FREE_TIER_ONLY=true (100MB) o revisa el límite de tu preset/plan.'));
-        return;
-      }
+        if (/file size too large|too large|max/i.test(responseText)) {
+          reject(new Error('Cloudinary rechazó el video por tamaño. Si usas plan/límite gratis, activa NEXT_PUBLIC_CLOUDINARY_FREE_TIER_ONLY=true (100MB) o revisa el límite de tu preset/plan.'));
+          return;
+        }
 
-      reject(new Error(responseText || `No se pudo subir el video a Cloudinary (${xhr.status}).`));
-    };
+        reject(new Error(responseText || `No se pudo subir el fragmento ${chunkNumber}/${totalChunks} a Cloudinary (${xhr.status}).`));
+      };
 
-    xhr.onerror = () => {
-      reject(new CloudinaryNetworkError('No se pudo conectar con Cloudinary. Revisa tu internet, VPN, adblock o firewall e inténtalo de nuevo.'));
-    };
+      xhr.onerror = () => {
+        reject(new CloudinaryNetworkError('No se pudo conectar con Cloudinary. Revisa tu internet, VPN, adblock o firewall e inténtalo de nuevo.'));
+      };
 
-    xhr.ontimeout = () => {
-      const seconds = Math.ceil(VIDEO_CLOUDINARY_UPLOAD_TIMEOUT_MS / 1000);
-      reject(new CloudinaryNetworkError(`La conexión con Cloudinary tardó demasiado (${seconds}s). Reintenta y verifica tu red.`));
-    };
+      xhr.ontimeout = () => {
+        const seconds = Math.ceil(VIDEO_CLOUDINARY_UPLOAD_TIMEOUT_MS / 1000);
+        reject(new CloudinaryNetworkError(`La conexión con Cloudinary tardó demasiado (${seconds}s). Reintenta y verifica tu red.`));
+      };
 
-    xhr.send(formData);
-  });
+      xhr.send(formData);
+    });
 
-  const publicId = data?.public_id as string | undefined;
-  if (!publicId) {
+    lastChunkResponse = response;
+    offset = chunkEnd;
+
+    const progress = Math.min(90, Math.max(1, Math.round((offset / totalBytes) * 90)));
+    onProgress?.(progress, `Subiendo fragmentos ${chunkNumber}/${totalChunks}...`);
+  }
+
+  const responsePublicId = lastChunkResponse?.public_id as string | undefined;
+  const finalPublicId = responsePublicId || publicId;
+  if (!finalPublicId) {
     throw new Error('Cloudinary no devolvió public_id para el video.');
   }
 
-  return { publicId, resourceType: 'video' };
+  return { publicId: finalPublicId, resourceType: 'video' };
 }
 
 /**
