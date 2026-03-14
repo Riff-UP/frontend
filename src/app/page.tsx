@@ -32,9 +32,14 @@ interface HeroPublication {
   id: string;
   authorId: string;
   authorName: string;
-  imageUrl: string;
+  imageUrl: string | undefined;
   caption: string;
   createdAt: string;
+}
+
+interface CarouselControls {
+  canScrollLeft: boolean;
+  canScrollRight: boolean;
 }
 
 function extractId(raw: unknown): string {
@@ -68,12 +73,39 @@ function HomeContent() {
   const followedArtists = artists.filter(a => isFollowing(a.id));
   const carouselRef = useRef<HTMLDivElement>(null);
   const followedCarouselRef = useRef<HTMLDivElement>(null);
+  const [discoverControls, setDiscoverControls] = useState<CarouselControls>({
+    canScrollLeft: false,
+    canScrollRight: false,
+  });
+  const [followedControls, setFollowedControls] = useState<CarouselControls>({
+    canScrollLeft: false,
+    canScrollRight: false,
+  });
+
+  const getControlsState = (element: HTMLDivElement | null): CarouselControls => {
+    if (!element) return { canScrollLeft: false, canScrollRight: false };
+    const epsilon = 2;
+    const maxScrollLeft = element.scrollWidth - element.clientWidth;
+    return {
+      canScrollLeft: element.scrollLeft > epsilon,
+      canScrollRight: element.scrollLeft < maxScrollLeft - epsilon,
+    };
+  };
+
+  const updateDiscoverControls = () => {
+    setDiscoverControls(getControlsState(carouselRef.current));
+  };
+
+  const updateFollowedControls = () => {
+    setFollowedControls(getControlsState(followedCarouselRef.current));
+  };
 
   const scrollFollowedCarousel = (dir: 'left' | 'right') => {
     if (!followedCarouselRef.current) return;
     const card = followedCarouselRef.current.querySelector('article') as HTMLElement | null;
     const cardWidth = card ? card.offsetWidth + 16 : 280;
     followedCarouselRef.current.scrollBy({ left: dir === 'right' ? cardWidth : -cardWidth, behavior: 'smooth' });
+    window.setTimeout(updateFollowedControls, 250);
   };
 
   const scrollCarousel = (dir: 'left' | 'right') => {
@@ -81,6 +113,7 @@ function HomeContent() {
     const card = carouselRef.current.querySelector('article') as HTMLElement | null;
     const cardWidth = card ? card.offsetWidth + 16 : 280;
     carouselRef.current.scrollBy({ left: dir === 'right' ? cardWidth : -cardWidth, behavior: 'smooth' });
+    window.setTimeout(updateDiscoverControls, 250);
   };
 
   const heroPublications = useMemo<HeroPublication[]>(() => {
@@ -93,24 +126,22 @@ function HomeContent() {
         const authorId = String(post.sql_user_id ?? post.authorId ?? "");
         const createdAt = post.createdAt ?? post.created_at ?? "";
 
-        if (!imageUrl) return null;
-
         return {
           id: extractId(post._id ?? post.id),
           authorId,
           authorName: artistNameMap.get(authorId) ?? "Artista Riff",
           imageUrl,
-          caption: post.description || post.title || "Nueva publicación",
+          caption: post.description || post.title || post.content || "Nueva publicación",
           createdAt,
         };
       })
-      .filter((post): post is HeroPublication => Boolean(post?.id && post.imageUrl));
+      .filter((post) => Boolean(post.id)) as HeroPublication[];
 
-    const uniqueByImage = normalized.filter(
-      (post, index, arr) => arr.findIndex((item) => item.imageUrl === post.imageUrl) === index
+    const uniqueById = normalized.filter(
+      (post, index, arr) => arr.findIndex((item) => item.id === post.id) === index
     );
 
-    const sorted = [...uniqueByImage].sort((a, b) => {
+    const sorted = [...uniqueById].sort((a, b) => {
       const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return dateB - dateA;
@@ -134,6 +165,19 @@ function HomeContent() {
   useEffect(() => {
     setSearch(searchQuery);
   }, [searchQuery, setSearch]);
+
+  useEffect(() => {
+    updateDiscoverControls();
+    updateFollowedControls();
+
+    const onResize = () => {
+      updateDiscoverControls();
+      updateFollowedControls();
+    };
+
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [artists.length, followedArtists.length, loading]);
 
   // Cargar publicaciones para animar visualmente el hero
   useEffect(() => {
@@ -192,11 +236,23 @@ function HomeContent() {
             <h2 className="text-xl sm:text-2xl font-bold text-white">
               {searchQuery ? `Resultados para "${searchQuery}"` : 'Descubre Nuevos Artistas'}
             </h2>
-            <div className="flex gap-2">
-              <button onClick={() => scrollCarousel('left')} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group">
+            <div className="hidden sm:flex gap-2">
+              <button
+                onClick={() => scrollCarousel('left')}
+                disabled={!discoverControls.canScrollLeft}
+                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group ${
+                  discoverControls.canScrollLeft ? '' : 'opacity-40 cursor-not-allowed'
+                }`}
+              >
                 <FaCircleChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-riff-primary group-hover:text-riff-primary-dark transition-colors" />
               </button>
-              <button onClick={() => scrollCarousel('right')} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group">
+              <button
+                onClick={() => scrollCarousel('right')}
+                disabled={!discoverControls.canScrollRight}
+                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group ${
+                  discoverControls.canScrollRight ? '' : 'opacity-40 cursor-not-allowed'
+                }`}
+              >
                 <FaCircleChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-riff-primary group-hover:text-riff-primary-dark transition-colors" />
               </button>
             </div>
@@ -216,12 +272,14 @@ function HomeContent() {
           ) : (
             <div
               ref={carouselRef}
-              className="flex gap-4 overflow-x-hidden scroll-smooth px-4 sm:px-0"
+              onScroll={updateDiscoverControls}
+              className="flex gap-4 overflow-x-auto sm:overflow-x-hidden scroll-smooth px-4 sm:px-0 pb-2 snap-x snap-mandatory touch-pan-x"
             >
               {artists.map((artist: ArtistData) => (
                 <div
                   key={artist.id}
-                  className="w-full sm:w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)] xl:w-[calc(25%-12px)] flex-shrink-0"                >
+                  className="w-[85%] sm:w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)] xl:w-[calc(25%-12px)] flex-shrink-0 snap-start"
+                >
                   <ArtistCard
                     id={artist.id}
                     name={artist.name}
@@ -240,18 +298,34 @@ function HomeContent() {
           <section className="max-w-8xl mx-auto px-0 sm:px-4 lg:px-0 py-6 sm:py-8">
             <div className="flex items-center justify-between mb-6 sm:mb-8 px-4 sm:px-0">
               <h2 className="text-xl sm:text-2xl font-bold text-white">Tus Artistas</h2>
-              <div className="flex gap-2">
-                <button onClick={() => scrollFollowedCarousel('left')} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group">
+              <div className="hidden sm:flex gap-2">
+                <button
+                  onClick={() => scrollFollowedCarousel('left')}
+                  disabled={!followedControls.canScrollLeft}
+                  className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group ${
+                    followedControls.canScrollLeft ? '' : 'opacity-40 cursor-not-allowed'
+                  }`}
+                >
                   <FaCircleChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-riff-primary group-hover:text-riff-primary-dark transition-colors" />
                 </button>
-                <button onClick={() => scrollFollowedCarousel('right')} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group">
+                <button
+                  onClick={() => scrollFollowedCarousel('right')}
+                  disabled={!followedControls.canScrollRight}
+                  className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group ${
+                    followedControls.canScrollRight ? '' : 'opacity-40 cursor-not-allowed'
+                  }`}
+                >
                   <FaCircleChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-riff-primary group-hover:text-riff-primary-dark transition-colors" />
                 </button>
               </div>
             </div>
-            <div ref={followedCarouselRef} className="flex gap-4 overflow-x-hidden scroll-smooth px-4 sm:px-0">
+            <div
+              ref={followedCarouselRef}
+              onScroll={updateFollowedControls}
+              className="flex gap-4 overflow-x-auto sm:overflow-x-hidden scroll-smooth px-4 sm:px-0 pb-2 snap-x snap-mandatory touch-pan-x"
+            >
               {followedArtists.map((artist: ArtistData) => (
-                <div key={artist.id} className="w-full sm:w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)] xl:w-[calc(25%-12px)] flex-shrink-0">
+                <div key={artist.id} className="w-[85%] sm:w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)] xl:w-[calc(25%-12px)] flex-shrink-0 snap-start">
                   <ArtistCard
                     id={artist.id}
                     name={artist.name}
@@ -260,6 +334,67 @@ function HomeContent() {
                     description={artist.biography ?? undefined}
                   />
                 </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Publicaciones de usuarios */}
+        {heroPublications.length > 0 && (
+          <section className="max-w-8xl mx-auto px-0 sm:px-4 lg:px-0 py-6 sm:py-8">
+            <div className="mb-6 sm:mb-8 px-4 sm:px-0">
+              <h2 className="text-xl sm:text-2xl font-bold text-white">Publicaciones recientes</h2>
+            </div>
+
+            {/* Móvil: carrusel touch */}
+            <div className="md:hidden flex gap-4 overflow-x-auto px-4 pb-2 snap-x snap-mandatory touch-pan-x">
+              {heroPublications.map((post) => (
+                <article
+                  key={post.id}
+                  className="w-[90%] flex-shrink-0 snap-start rounded-sm bg-riff-header border border-white/10 overflow-hidden"
+                >
+                  {post.imageUrl ? (
+                    <img
+                      src={post.imageUrl}
+                      alt={post.caption}
+                      className="w-full h-44 object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-44 bg-riff-background-b flex items-center justify-center px-4 text-center text-riff-text-secondary text-sm">
+                      Publicación sin imagen
+                    </div>
+                  )}
+                  <div className="p-4">
+                    <p className="text-riff-primary text-xs font-medium">{post.authorName}</p>
+                    <p className="text-white text-sm mt-1 line-clamp-3">{post.caption}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            {/* Desktop/tablet: grid */}
+            <div className="hidden md:grid grid-cols-2 xl:grid-cols-3 gap-4 px-4 sm:px-0">
+              {heroPublications.map((post) => (
+                <article
+                  key={post.id}
+                  className="rounded-sm bg-riff-header border border-white/10 overflow-hidden"
+                >
+                  {post.imageUrl ? (
+                    <img
+                      src={post.imageUrl}
+                      alt={post.caption}
+                      className="w-full h-48 object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-48 bg-riff-background-b flex items-center justify-center px-4 text-center text-riff-text-secondary text-sm">
+                      Publicación sin imagen
+                    </div>
+                  )}
+                  <div className="p-4">
+                    <p className="text-riff-primary text-xs font-medium">{post.authorName}</p>
+                    <p className="text-white text-sm mt-1 line-clamp-2">{post.caption}</p>
+                  </div>
+                </article>
               ))}
             </div>
           </section>
