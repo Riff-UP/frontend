@@ -19,11 +19,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function getMaxVideoUploadMb(): number {
-  // Si está en true, fuerza el límite gratis típico (100MB).
-  const freeTierOnly = process.env.NEXT_PUBLIC_CLOUDINARY_FREE_TIER_ONLY === 'true';
-  if (freeTierOnly) return FREE_TIER_VIDEO_MAX_MB;
-
-  // Permite configurar el límite hasta 1GB. Si no existe, usar 1GB por defecto.
+  // Límite global permitido por frontend (hasta 1GB).
   const raw = process.env.NEXT_PUBLIC_MAX_VIDEO_UPLOAD_MB;
   if (!raw) return ABSOLUTE_VIDEO_MAX_MB;
 
@@ -31,6 +27,14 @@ function getMaxVideoUploadMb(): number {
   if (Number.isNaN(parsed) || parsed <= 0) return ABSOLUTE_VIDEO_MAX_MB;
 
   return clamp(Math.floor(parsed), 1, ABSOLUTE_VIDEO_MAX_MB);
+}
+
+function getCloudinaryVideoMaxMb(): number {
+  const freeTierOnly = process.env.NEXT_PUBLIC_CLOUDINARY_FREE_TIER_ONLY === 'true';
+  if (freeTierOnly) return FREE_TIER_VIDEO_MAX_MB;
+
+  // Si no está en modo free forzado, dejamos que Cloudinary determine su límite real.
+  return ABSOLUTE_VIDEO_MAX_MB;
 }
 
 function getBackendVideoFallbackMaxMb(): number {
@@ -335,8 +339,11 @@ export async function uploadToR2(
     const onProgress = options?.onProgress;
     const directR2ThresholdMb = getDirectR2VideoThresholdMb();
     const directR2ThresholdBytes = directR2ThresholdMb * MB_IN_BYTES;
+    const cloudinaryMaxMb = getCloudinaryVideoMaxMb();
+    const cloudinaryMaxBytes = cloudinaryMaxMb * MB_IN_BYTES;
 
-    if (file.size > directR2ThresholdBytes) {
+    // Para videos grandes (o por encima del límite de Cloudinary) usar R2 directo.
+    if (file.size > directR2ThresholdBytes || file.size > cloudinaryMaxBytes) {
       return uploadVideoDirectlyToR2(file, filename, onProgress);
     }
 
