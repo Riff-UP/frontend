@@ -132,6 +132,8 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
         ? data
         : Array.isArray(data?.data)
         ? data.data
+        : Array.isArray((data as { savedPosts?: Record<string, unknown>[] })?.savedPosts)
+        ? (data as { savedPosts: Record<string, unknown>[] }).savedPosts
         : [];
 
       const normalized = postsArray.map(normalizeSavedPost);
@@ -155,12 +157,18 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
       const res = await fetch(`${API_URL}/posts/saved`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postId, userId }),
+        body: JSON.stringify({
+          postId,
+          userId,
+          post_id: postId,
+          sql_user_id: userId,
+          user_id: userId,
+        }),
       });
 
       if (res.status === 409) {
         // Ya guardado — buscar en estado actual o refrescar
-        const existing = savedPosts.find(sp => sp.postId === postId);
+        const existing = savedPosts.find(sp => String(sp.postId) === String(postId));
         if (existing) return existing;
         // Refrescar y retornar nulo (el estado se actualizará y isPostSaved devolverá true)
         await fetchSavedPosts();
@@ -182,7 +190,7 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
       // Agregar al estado inmediatamente
       setSavedPosts(prev => {
         // Evitar duplicados
-        if (prev.some(sp => sp.postId === postId)) return prev;
+        if (prev.some(sp => String(sp.postId) === String(postId))) return prev;
         return [...prev, basicNormalized];
       });
 
@@ -227,7 +235,7 @@ export function SavedPostsProvider({ userId, children }: { userId?: string; chil
   };
 
   const isPostSaved = (postId: string): boolean => {
-    return savedPosts.some(sp => sp.postId === postId);
+    return savedPosts.some(sp => String(sp.postId) === String(postId));
   };
 
   return (

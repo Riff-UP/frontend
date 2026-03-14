@@ -1,18 +1,42 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MdBookmark } from 'react-icons/md';
-import { FaMusic } from "react-icons/fa";
+import { FiCalendar, FiMapPin } from 'react-icons/fi';
 import TabNavigation from './common/TabNavigation';
 import { useSavedPostsContext } from '../context/SavedPostsContext';
 import { useUser } from '../hooks/useUser';
+import { useEventAttendance } from '../hooks/useEventAttendance';
+import { API_BASE_URL } from '../config/api';
 import Image from 'next/image';
 
+const API_URL = API_BASE_URL;
+
+interface SavedEventItem {
+  id: string;
+  title: string;
+  location: string;
+  eventDate: string;
+}
+
+function resolveEventId(event: Record<string, unknown>): string {
+  const raw = event._id ?? event.id;
+  if (!raw) return '';
+  if (typeof raw === 'string') return raw;
+  if (typeof raw === 'object' && raw !== null && '$oid' in raw) {
+    return String((raw as { $oid: string }).$oid);
+  }
+  return String(raw);
+}
+
 export default function Saved() {
-  const [activeTab, setActiveTab] = useState<'publicaciones' | 'canciones'>('publicaciones');
+  const [activeTab, setActiveTab] = useState<'publicaciones' | 'eventos'>('publicaciones');
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [savedEvents, setSavedEvents] = useState<SavedEventItem[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
 
   const { user } = useUser();
+  const { attendedEvents } = useEventAttendance(user?.id);
   const {
     savedPosts,
     loading: postsLoading,
@@ -38,8 +62,80 @@ export default function Saved() {
 
   const tabs = [
     { id: 'publicaciones' as const, label: 'Publicaciones'},
-    { id: 'canciones' as const, label: 'Canciones'},
+    { id: 'eventos' as const, label: 'Eventos'},
   ];
+
+  useEffect(() => {
+    const loadAttendedEvents = async () => {
+      if (!user?.id) {
+        setSavedEvents([]);
+        return;
+      }
+
+      const attendedIds = new Set(Array.from(attendedEvents.keys()));
+      if (attendedIds.size === 0) {
+        setSavedEvents([]);
+        return;
+      }
+
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setSavedEvents([]);
+        return;
+      }
+
+      setEventsLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/events`, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) {
+          setSavedEvents([]);
+          return;
+        }
+
+        const data = await res.json();
+        const allEvents: Record<string, unknown>[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+          ? data.data
+          : [];
+
+        const mapped = allEvents
+          .map((event) => {
+            const id = resolveEventId(event);
+            return {
+              id,
+              title: String(event.title ?? 'Evento sin título'),
+              location: String(event.location ?? 'Sin ubicación'),
+              eventDate: String(event.event_date ?? event.eventDate ?? ''),
+            };
+          })
+          .filter((event) => event.id && attendedIds.has(event.id));
+
+        setSavedEvents(mapped);
+      } catch {
+        setSavedEvents([]);
+      } finally {
+        setEventsLoading(false);
+      }
+    };
+
+    void loadAttendedEvents();
+  }, [attendedEvents, user?.id]);
+
+  const formatEventDate = (dateString?: string) => {
+    if (!dateString) return 'Sin fecha';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -47,7 +143,7 @@ export default function Saved() {
       <div className="mb-6">
         <h2 className="text-white text-xl sm:text-2xl font-bold">Guardados</h2>
         <p className="text-white/80 text-xs sm:text-sm mt-1">
-          Accede a tus publicaciones y canciones guardadas.
+          Accede a tus publicaciones y eventos con asistencia marcada.
         </p>
       </div>
 
@@ -56,7 +152,7 @@ export default function Saved() {
         <TabNavigation
           tabs={tabs}
           activeTab={activeTab}
-          onTabChange={(tabId) => setActiveTab(tabId as 'publicaciones' | 'canciones')}
+          onTabChange={(tabId) => setActiveTab(tabId as 'publicaciones' | 'eventos')}
         />
       </div>
 
@@ -156,14 +252,38 @@ export default function Saved() {
           </div>
         )}
 
-        {activeTab === 'canciones' && (
+        {activeTab === 'eventos' && (
           <div className="p-0 sm:p-0">
-            <h3 className="text-white text-base sm:text-lg font-semibold mb-4">Canciones guardadas</h3>
-            <div className="text-center py-12">
-              <FaMusic className="w-12 h-12 text-riff-text-secondary mx-auto mb-4" />
-              <p className="text-riff-text-secondary text-sm">No tienes canciones guardadas</p>
-              <p className="text-riff-text-secondary text-xs mt-2">Próximamente podrás guardar tus canciones favoritas</p>
-            </div>
+            <h3 className="text-white text-base sm:text-lg font-semibold mb-4">Eventos con asistencia</h3>
+
+            {eventsLoading ? (
+              <div className="text-center py-12">
+                <p className="text-riff-text-secondary text-sm">Cargando eventos...</p>
+              </div>
+            ) : savedEvents.length === 0 ? (
+              <div className="text-center py-12">
+                <FiCalendar className="w-12 h-12 text-riff-text-secondary mx-auto mb-4" />
+                <p className="text-riff-text-secondary text-sm">No tienes eventos con asistencia marcada</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {savedEvents.map((event) => (
+                  <div key={event.id} className="bg-riff-header rounded-sm p-4">
+                    <h4 className="text-white font-semibold text-sm sm:text-base">{event.title}</h4>
+                    <div className="mt-2 space-y-1.5 text-riff-text-secondary text-xs sm:text-sm">
+                      <p className="flex items-center gap-2">
+                        <FiCalendar className="w-4 h-4" />
+                        {formatEventDate(event.eventDate)}
+                      </p>
+                      <p className="flex items-center gap-2">
+                        <FiMapPin className="w-4 h-4" />
+                        {event.location}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

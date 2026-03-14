@@ -391,7 +391,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
           <div className="max-w-7xl mx-auto">
             <div className=" p-6 sm:p-8 text-center">
               <FaMusic className="w-12 h-12 text-riff-text-secondary mx-auto mb-4" />
-              <h3 className="text-white text-lg sm:text-xl font-semibold">Música</h3>
+              <h3 className="text-riff-text-secondary text-lg sm:text-xl font-semibold">Música</h3>
               <p className="text-riff-text-secondary text-sm sm:text-base mt-2">
                 Esta sección se implementará próximamente.
               </p>
