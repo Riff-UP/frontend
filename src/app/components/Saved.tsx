@@ -313,7 +313,7 @@ export default function Saved() {
                         <button
                           onClick={() => handleRemoveAttendance(event.id)}
                           disabled={isRemovingAttendance || attendanceLoading}
-                          className="rounded-sm border border-white/20 px-3 py-1.5 text-xs sm:text-sm text-white/90 hover:bg-white/10 transition-colors disabled:opacity-50"
+                          className="self-center rounded-sm border border-white/20 px-3 py-1.5 text-xs sm:text-sm text-white/90 hover:bg-white/10 transition-colors disabled:opacity-50"
                           title="Quitar asistencia"
                         >
                           {isRemovingAttendance ? 'Quitando...' : 'Quitar asistencia'}
