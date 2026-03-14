@@ -1,6 +1,5 @@
 'use client';
 
-import MusicCard from './music/MusicCard';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { FaMusic } from "react-icons/fa";
 import Calendar from './common/Calendar';
@@ -16,7 +15,6 @@ import { usePublicArtistData } from '@/app/hooks/usePublicArtistData';
 import { usePostReactions } from '@/app/hooks/usePostReactions';
 import { useEventAttendance } from '@/app/hooks/useEventAttendance';
 import { useEventReviews } from '@/app/hooks/useEventReviews';
-import MusicPlayer from './music/MusicPlayer';
 
 interface ArtistProfileProps {
   artist?: ArtistData;
@@ -30,7 +28,6 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
   const [savingPostId, setSavingPostId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [bannerIndex, setBannerIndex] = useState(0);
-  const [activeMusicPost, setActiveMusicPost] = useState<Publication | null>(null);
   const [localFollowersCount, setLocalFollowersCount] = useState<number | undefined>(undefined);
 
   const artistData = artist;
@@ -391,75 +388,14 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
 
         {/* ── TAB: CANCIONES ── */}
         {activeTab === 'canciones' && (
-          <div>
-            {loadingPosts ? (
-              <div className="flex justify-center py-16">
-                <svg className="animate-spin h-7 w-7 text-riff-primary" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-              </div>
-            ) : (() => {
-              const musicPosts = publications.filter(p => p.type === 'audio');
-              if (musicPosts.length === 0) {
-                return (
-                  <div className="text-center py-20">
-                    <FaMusic className="w-12 h-12 text-riff-text-secondary mx-auto mb-4" />
-                    <p className="text-riff-text-secondary text-sm">Este artista no ha publicado canciones aún.</p>
-                  </div>
-                );
-              }
-              return (
-                <div className="max-w-7xl mx-auto">
-                  <div className="flex flex-col lg:flex-row gap-6">
-                    {/* Panel izquierdo: portada + player activo */}
-                    <div className="w-full lg:w-72 flex-shrink-0">
-                      {activeMusicPost ? (
-                        <div className="bg-riff-card rounded-xl p-4 space-y-3 border border-riff-border sticky top-4">
-                          <div className="w-full aspect-square rounded-lg overflow-hidden bg-riff-header flex items-center justify-center">
-                            {artistData.profileImage ? (
-                              <img src={artistData.profileImage} alt={activeMusicPost.title} className="w-full h-full object-cover" />
-                            ) : (
-                              <FaMusic className="w-12 h-12 text-white/20" />
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-white text-sm font-semibold truncate">{activeMusicPost.title}</p>
-                            <p className="text-riff-text-secondary text-xs truncate">{artistData.name}</p>
-                          </div>
-                          <MusicPlayer
-                            provider={activeMusicPost.provider ?? 'soundcloud'}
-                            embedUrl={activeMusicPost.content}
-                            originalUrl={activeMusicPost.provider_meta?.provider_url}
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-full aspect-square rounded-xl bg-riff-card border border-riff-border flex flex-col items-center justify-center gap-3">
-                          <FaMusic className="w-10 h-10 text-white/20" />
-                          <p className="text-white/30 text-xs text-center px-4">Selecciona una canción para reproducirla</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Lista de canciones */}
-                    <div className="flex-1 space-y-2">
-                      {musicPosts.map(post => (
-                        <MusicCard
-                          key={post.id}
-                          post={post}
-                          artistName={artistData.name}
-                          artistImage={artistData.profileImage}
-                          isActive={activeMusicPost?.id === post.id}
-                          isSaved={isPostSaved(String(post.id))}
-                          onSelect={p => setActiveMusicPost(prev => prev?.id === p.id ? null : p)}
-                          onSave={handleSave}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
+          <div className="max-w-7xl mx-auto">
+            <div className="w-full rounded-sm border border-white/10 bg-riff-header p-6 sm:p-8 text-center">
+              <FaMusic className="w-12 h-12 text-riff-text-secondary mx-auto mb-4" />
+              <h3 className="text-white text-lg sm:text-xl font-semibold">Música</h3>
+              <p className="text-riff-text-secondary text-sm sm:text-base mt-2">
+                Esta sección se implementará próximamente.
+              </p>
+            </div>
           </div>
         )}
 
