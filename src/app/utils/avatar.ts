@@ -6,12 +6,19 @@ export function getDicebearAvatarUrl(seed?: string): string {
 
 function isInvalidImageValue(value: string): boolean {
   const normalized = value.trim().toLowerCase();
+  const hasValidUrlShape =
+    normalized.startsWith('http://') ||
+    normalized.startsWith('https://') ||
+    normalized.startsWith('/') ||
+    normalized.startsWith('data:image/');
+
   return (
     !normalized ||
     normalized === 'undefined' ||
     normalized === 'null' ||
     normalized === 'nan' ||
-    normalized === '[object object]'
+    normalized === '[object object]' ||
+    !hasValidUrlShape
   );
 }
 
