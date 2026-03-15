@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getValidToken, getUserFromToken } from '../utils/jwt';
 import { API_BASE_URL } from '../config/api';
+import { resolveProfileImage } from '../utils/avatar';
 
 const API_URL = API_BASE_URL;
 const REQUEST_TIMEOUT_MS = 12000;
@@ -128,6 +129,11 @@ export function useUser(): UseUserReturn {
       const userData = await res.json();
       const userId = userData.id || tokenData.id;
 
+      userData.profileImage = resolveProfileImage(
+        userData.profileImage,
+        userData.email || userData.name || userId,
+      );
+
       // Si el usuario previamente estableció contraseña, restaurar el flag aunque el backend no lo refleje
       if (!userData.hasPassword && localStorage.getItem(`riff_hp_${userId}`) === '1') {
         userData.hasPassword = true;
@@ -230,7 +236,10 @@ export function useUser(): UseUserReturn {
         name: String(updatedUser?.name ?? data.name ?? prev?.name ?? ''),
         email: String(updatedUser?.email ?? data.email ?? prev?.email ?? ''),
         biography: String(updatedUser?.biography ?? data.biography ?? prev?.biography ?? '') || null,
-        profileImage: String(updatedUser?.profileImage ?? data.profileImage ?? prev?.profileImage ?? '') || null,
+        profileImage: resolveProfileImage(
+          String(updatedUser?.profileImage ?? data.profileImage ?? prev?.profileImage ?? ''),
+          String(updatedUser?.email ?? data.email ?? prev?.email ?? updatedUser?.name ?? data.name ?? prev?.name ?? prev?.id ?? ''),
+        ),
         // El role NUNCA debe cambiar como resultado de un PATCH de perfil.
         // El gateway envía role: USER por defecto, lo que puede contaminar la respuesta.
         role: prev?.role ?? updatedUser.role,

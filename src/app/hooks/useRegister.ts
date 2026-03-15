@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { API_BASE_URL } from '../config/api';
+import { getDicebearAvatarUrl } from '../utils/avatar';
 
 interface RegisterFormData {
   name: string;
@@ -81,6 +82,7 @@ export function useRegister() {
           email: formData.email,
           password: formData.password,
           role: 'USER',
+          profileImage: getDicebearAvatarUrl(formData.email || formData.name),
         }),
       });
 

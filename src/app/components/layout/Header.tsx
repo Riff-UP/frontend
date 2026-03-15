@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { FiSearch } from 'react-icons/fi';
 import { API_BASE_URL } from '@/app/config/api';
 import { getValidToken, getUserFromToken } from '@/app/utils/jwt';
+import { resolveProfileImage } from '@/app/utils/avatar';
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
@@ -23,6 +24,7 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
   // Sincronizar con valor externo si viene del padre
   useEffect(() => {
     if (searchValue !== undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInternalQuery(searchValue);
     }
   }, [searchValue]);
@@ -44,13 +46,16 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
       });
       if (res.ok) {
         const data = await res.json();
-        setProfileImage(data.profileImage ?? null);
-        setUserName(data.name ?? tokenData?.name ?? '');
+        const resolvedName = data.name ?? tokenData?.name ?? '';
+        const resolvedEmail = data.email ?? tokenData?.email ?? '';
+        setProfileImage(resolveProfileImage(data.profileImage, resolvedEmail || resolvedName));
+        setUserName(resolvedName);
       }
     } catch { /* silencioso */ }
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadUserData();
     window.addEventListener('storage', loadUserData);
     window.addEventListener('authChange', loadUserData);
@@ -60,7 +65,6 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
       window.removeEventListener('authChange', loadUserData);
       window.removeEventListener('profileChange', loadUserData);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
