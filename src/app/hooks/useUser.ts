@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getValidToken, getUserFromToken } from '../utils/jwt';
 import { API_BASE_URL } from '../config/api';
-import { resolveProfileImage } from '../utils/avatar';
+import { normalizeDisplayName, resolveProfileImage } from '../utils/avatar';
 
 const API_URL = API_BASE_URL;
 const REQUEST_TIMEOUT_MS = 12000;
@@ -129,6 +129,8 @@ export function useUser(): UseUserReturn {
       const userData = await res.json();
       const userId = userData.id || tokenData.id;
 
+      userData.name = normalizeDisplayName(userData.name ?? tokenData?.name, tokenData?.name || 'Usuario');
+
       userData.profileImage = resolveProfileImage(
         userData.profileImage,
         userData.email || userData.name || userId,
@@ -233,7 +235,10 @@ export function useUser(): UseUserReturn {
         ...(prev || {}),
         ...data,
         ...updatedUser,
-        name: String(updatedUser?.name ?? data.name ?? prev?.name ?? ''),
+        name: normalizeDisplayName(
+          String(updatedUser?.name ?? data.name ?? prev?.name ?? ''),
+          prev?.name || 'Usuario',
+        ),
         email: String(updatedUser?.email ?? data.email ?? prev?.email ?? ''),
         biography: String(updatedUser?.biography ?? data.biography ?? prev?.biography ?? '') || null,
         profileImage: resolveProfileImage(

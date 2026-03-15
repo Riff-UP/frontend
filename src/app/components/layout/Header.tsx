@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 import { FiSearch } from 'react-icons/fi';
 import { API_BASE_URL } from '@/app/config/api';
 import { getValidToken, getUserFromToken } from '@/app/utils/jwt';
-import { resolveProfileImage } from '@/app/utils/avatar';
+import { normalizeDisplayName, resolveProfileImage } from '@/app/utils/avatar';
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
@@ -46,7 +46,7 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
       });
       if (res.ok) {
         const data = await res.json();
-        const resolvedName = data.name ?? tokenData?.name ?? '';
+        const resolvedName = normalizeDisplayName(data.name ?? tokenData?.name, tokenData?.name || 'Usuario');
         const resolvedEmail = data.email ?? tokenData?.email ?? '';
         setProfileImage(resolveProfileImage(data.profileImage, resolvedEmail || resolvedName));
         setUserName(resolvedName);
