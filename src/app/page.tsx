@@ -8,8 +8,9 @@ import Footer from "@/app/components/layout/Footer";
 import ArtistCard from "@/app/components/cards/ArtistCard";
 import EventRatingModal from "@/app/components/common/EventRatingModal";
 import { useEventRating } from "@/app/hooks/useEventRating";
+import { usePostReactions } from "@/app/hooks/usePostReactions";
 import { FaCircleChevronLeft, FaCircleChevronRight } from "react-icons/fa6";
-import { BsBookmark, BsBookmarkFill, BsHeart } from "react-icons/bs";
+import { BsBookmark, BsBookmarkFill, BsHeart, BsHeartFill } from "react-icons/bs";
 import { useArtists, ArtistData } from "@/app/hooks/useArtists";
 import { useUser } from "@/app/hooks/useUser";
 import { useFollow } from "@/app/hooks/useFollow";
@@ -141,10 +142,19 @@ function HomeContent() {
   const { artists, loading, setSearch } = useArtists();
   const { user } = useUser();
   const { isFollowing } = useFollow(user?.id);
+  const {
+    isLiked,
+    toggleLike,
+    processingPostId: likingPostId,
+    postReactionCounts,
+    fetchPostReactionCounts,
+    getReactionCount,
+  } = usePostReactions(user?.id);
   const [savedPosts, setSavedPosts] = useState<SavedPostRow[]>([]);
   const [savingPostId, setSavingPostId] = useState<string | null>(null);
-  const [saveToast, setSaveToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
+  const [saveToast, setSaveToast] = useState<{ message: string; tone: 'success' | 'error'; visible: boolean } | null>(null);
   const saveToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveToastHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const followedArtists = artists.filter(a => isFollowing(a.id));
   const carouselRef = useRef<HTMLDivElement>(null);
   const followedCarouselRef = useRef<HTMLDivElement>(null);
@@ -176,14 +186,37 @@ function HomeContent() {
   };
 
   const showSaveToast = (message: string, tone: 'success' | 'error' = 'success') => {
-    setSaveToast({ message, tone });
+    setSaveToast({ message, tone, visible: true });
     if (saveToastTimerRef.current) {
       clearTimeout(saveToastTimerRef.current);
     }
+    if (saveToastHideTimerRef.current) {
+      clearTimeout(saveToastHideTimerRef.current);
+    }
     saveToastTimerRef.current = setTimeout(() => {
-      setSaveToast(null);
+      setSaveToast((prev) => (prev ? { ...prev, visible: false } : null));
       saveToastTimerRef.current = null;
-    }, 1800);
+    }, 1500);
+
+    saveToastHideTimerRef.current = setTimeout(() => {
+      setSaveToast(null);
+      saveToastHideTimerRef.current = null;
+    }, 1850);
+  };
+
+  const getLikeCountForPost = (postId: string, fallback: number): number => {
+    return postReactionCounts.has(postId) ? getReactionCount(postId) : fallback;
+  };
+
+  const handleToggleLike = async (postId: string) => {
+    if (!user?.id) {
+      alert('Debes iniciar sesión para reaccionar');
+      showSaveToast('Inicia sesión para reaccionar', 'error');
+      return;
+    }
+
+    const result = await toggleLike(postId);
+    showSaveToast(result.liked ? 'Te gusta esta publicación' : 'Ya no te gusta', 'success');
   };
 
   const scrollFollowedCarousel = (dir: 'left' | 'right') => {
@@ -496,9 +529,19 @@ function HomeContent() {
   }, [user?.id]);
 
   useEffect(() => {
+    const ids = allPublications.map((p) => p.id).filter(Boolean);
+    if (ids.length > 0) {
+      fetchPostReactionCounts(ids);
+    }
+  }, [allPublications, fetchPostReactionCounts]);
+
+  useEffect(() => {
     return () => {
       if (saveToastTimerRef.current) {
         clearTimeout(saveToastTimerRef.current);
+      }
+      if (saveToastHideTimerRef.current) {
+        clearTimeout(saveToastHideTimerRef.current);
       }
     };
   }, []);
@@ -663,7 +706,17 @@ function HomeContent() {
                     ) : null}
 
                     <div className="flex items-center justify-end gap-4 text-riff-text-secondary text-xs">
-                      <span className="flex items-center gap-1"><BsHeart className="w-4 h-4" />{publication.likesCount}</span>
+                      <button
+                        onClick={() => handleToggleLike(publication.id)}
+                        disabled={likingPostId === publication.id}
+                        className={`flex items-center gap-1 transition-colors disabled:opacity-50 ${
+                          isLiked(publication.id) ? 'text-red-400' : 'text-riff-text-secondary hover:text-red-400'
+                        }`}
+                        aria-label="Me gusta"
+                      >
+                        {isLiked(publication.id) ? <BsHeartFill className="w-4 h-4" /> : <BsHeart className="w-4 h-4" />}
+                        {getLikeCountForPost(publication.id, publication.likesCount)}
+                      </button>
                       <button
                         onClick={() => handleToggleSave(publication.id)}
                         disabled={savingPostId === publication.id}
@@ -792,7 +845,17 @@ function HomeContent() {
 
                     <div className="flex items-center justify-between text-riff-text-secondary text-xs">
                       <div className="flex items-center gap-3">
-                        <span className="flex items-center gap-1"><BsHeart className="w-4 h-4" />{publication.likesCount}</span>
+                        <button
+                          onClick={() => handleToggleLike(publication.id)}
+                          disabled={likingPostId === publication.id}
+                          className={`flex items-center gap-1 transition-colors disabled:opacity-50 ${
+                            isLiked(publication.id) ? 'text-red-400' : 'text-riff-text-secondary hover:text-red-400'
+                          }`}
+                          aria-label="Me gusta"
+                        >
+                          {isLiked(publication.id) ? <BsHeartFill className="w-4 h-4" /> : <BsHeart className="w-4 h-4" />}
+                          {getLikeCountForPost(publication.id, publication.likesCount)}
+                        </button>
                       </div>
                       <button
                         onClick={() => handleToggleSave(publication.id)}
@@ -831,7 +894,11 @@ function HomeContent() {
       )}
 
       {saveToast && (
-        <div className="fixed bottom-4 right-4 z-50 pointer-events-none">
+        <div
+          className={`fixed bottom-4 right-4 z-50 pointer-events-none transition-all duration-300 ${
+            saveToast.visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
+          }`}
+        >
           <div
             className={`rounded-sm border px-4 py-2 text-sm shadow-lg ${
               saveToast.tone === 'success'
