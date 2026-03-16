@@ -439,6 +439,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
                       publication={{ ...publication, isSaved: isPostSaved(postId) }}
                       authorName={artistData.name}
                       authorImage={artistData.profileImage}
+                      authorHref={`/artist/${artistData.id}`}
                       isSaving={savingPostId === postId}
                       onLike={handleLike}
                       onSave={handleSave}
@@ -518,6 +519,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
         } : null}
         authorName={artistData.name}
         authorImage={artistData.profileImage}
+        authorHref={`/artist/${artistData.id}`}
         isSaving={liveSelectedPublication ? savingPostId === String(liveSelectedPublication.id) : false}
         onClose={() => setSelectedPublication(null)}
         onLike={handleLike}

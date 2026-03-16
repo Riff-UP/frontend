@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import { FiHeart } from 'react-icons/fi';
 import { BsBookmark, BsBookmarkFill } from 'react-icons/bs';
 import { Publication } from '@/app/types';
@@ -7,6 +8,7 @@ interface PublicationCardProps {
   publication: Publication;
   authorName: string;
   authorImage?: string | null;
+  authorHref?: string;
   isSaving?: boolean;
   onLike: (id: string | number) => void;
   onSave: (id: string | number) => void;
@@ -30,6 +32,7 @@ export default function PublicationCard({
   publication,
   authorName,
   authorImage,
+  authorHref,
   isSaving = false,
   onLike,
   onSave,
@@ -38,6 +41,7 @@ export default function PublicationCard({
 }: PublicationCardProps) {
   const displayDate = formatDate ? formatDate(publication.date) : safeFormatDate(publication.date);
   const isVideoPublication = publication.mediaType === 'video' || publication.type === 'video';
+  const mediaIsInteractivePreview = Boolean(onClick);
 
   return (
     <div
@@ -49,16 +53,40 @@ export default function PublicationCard({
       <div className="p-4 flex-1 flex flex-col">
         {/* Author Header */}
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-            {authorImage ? (
-              <Image src={authorImage} alt={authorName} width={32} height={32} className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-white text-xs font-medium">{authorName.charAt(0)}</span>
-            )}
-          </div>
+          {authorHref ? (
+            <Link
+              href={authorHref}
+              onClick={(e) => e.stopPropagation()}
+              className="w-8 h-8 bg-gradient-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
+            >
+              {authorImage ? (
+                <Image src={authorImage} alt={authorName} width={32} height={32} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-white text-xs font-medium">{authorName.charAt(0)}</span>
+              )}
+            </Link>
+          ) : (
+            <div className="w-8 h-8 bg-gradient-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+              {authorImage ? (
+                <Image src={authorImage} alt={authorName} width={32} height={32} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-white text-xs font-medium">{authorName.charAt(0)}</span>
+              )}
+            </div>
+          )}
           <div className="flex-1">
             <div className="flex flex-col gap-1">
-              <span className="text-white font-semibold text-base">{authorName}</span>
+              {authorHref ? (
+                <Link
+                  href={authorHref}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-white font-semibold text-base hover:text-riff-primary transition-colors"
+                >
+                  {authorName}
+                </Link>
+              ) : (
+                <span className="text-white font-semibold text-base">{authorName}</span>
+              )}
               <span className="text-white text-xs">{displayDate}</span>
             </div>
           </div>
@@ -74,9 +102,11 @@ export default function PublicationCard({
             {isVideoPublication ? (
               <video
                 src={publication.image}
-                controls
+                controls={!mediaIsInteractivePreview}
+                muted={mediaIsInteractivePreview}
+                playsInline
                 preload="metadata"
-                className="w-full h-full object-cover"
+                className={`w-full h-full object-cover ${mediaIsInteractivePreview ? 'pointer-events-none' : ''}`}
               />
             ) : (
               <Image

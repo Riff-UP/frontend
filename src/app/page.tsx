@@ -723,7 +723,13 @@ function HomeContent() {
                     {publication.mediaUrl && publication.mediaType !== 'text' && (
                       <div className="overflow-hidden rounded-sm mb-3 bg-black/30 relative h-44">
                         {publication.mediaType === 'video' ? (
-                          <video src={publication.mediaUrl} controls preload="metadata" className="w-full h-44 object-cover" />
+                          <video
+                            src={publication.mediaUrl}
+                            muted
+                            playsInline
+                            preload="metadata"
+                            className="w-full h-44 object-cover pointer-events-none"
+                          />
                         ) : (
                           <Image
                             src={publication.mediaUrl}
@@ -856,15 +862,34 @@ function HomeContent() {
                 >
                   <div className="p-4">
                     <div className="flex items-center justify-between gap-2 mb-3">
-                      <div className="min-w-0">
+                      <div className="flex items-center gap-3 min-w-0">
                         <Link
                           href={`/artist/${publication.authorId}`}
-                          className="text-white font-semibold text-sm truncate hover:text-riff-primary transition-colors"
+                          className="w-9 h-9 rounded-full bg-riff-primary/20 overflow-hidden flex items-center justify-center text-riff-primary font-semibold shrink-0"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {publication.authorName}
+                          {publication.authorImage ? (
+                            <Image
+                              src={publication.authorImage}
+                              alt={publication.authorName}
+                              width={36}
+                              height={36}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            publication.authorName.charAt(0).toUpperCase()
+                          )}
                         </Link>
-                        <p className="text-riff-text-secondary text-xs">{formatPostDate(publication.createdAt)}</p>
+                        <div className="min-w-0">
+                          <Link
+                            href={`/artist/${publication.authorId}`}
+                            className="text-white font-semibold text-sm truncate hover:text-riff-primary transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {publication.authorName}
+                          </Link>
+                          <p className="text-riff-text-secondary text-xs">{formatPostDate(publication.createdAt)}</p>
+                        </div>
                       </div>
                       <span className="text-[10px] px-2 py-1 rounded-full border border-white/20 text-white/80 uppercase tracking-wide">
                         {publication.mediaType === 'video' ? 'Video' : publication.mediaType === 'image' ? 'Foto' : 'Texto'}
@@ -874,7 +899,13 @@ function HomeContent() {
                     {publication.mediaUrl && publication.mediaType !== 'text' ? (
                       <div className="overflow-hidden rounded-sm mb-3 bg-black/30 relative h-52">
                         {publication.mediaType === 'video' ? (
-                          <video src={publication.mediaUrl} controls preload="metadata" className="w-full h-52 object-cover" />
+                          <video
+                            src={publication.mediaUrl}
+                            muted
+                            playsInline
+                            preload="metadata"
+                            className="w-full h-52 object-cover pointer-events-none"
+                          />
                         ) : (
                           <Image
                             src={publication.mediaUrl}
@@ -958,6 +989,7 @@ function HomeContent() {
         publication={selectedPublicationForModal}
         authorName={selectedPublication?.authorName ?? 'Artista Riff'}
         authorImage={selectedPublication?.authorImage}
+        authorHref={selectedPublication ? `/artist/${selectedPublication.authorId}` : undefined}
         isSaving={savingPostId === selectedPublication?.id}
         onClose={() => setSelectedPublicationId(null)}
         onLike={(id) => void handleToggleLike(String(id))}

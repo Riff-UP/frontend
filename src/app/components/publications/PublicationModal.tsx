@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import { IoMdClose } from 'react-icons/io';
 import { FiHeart } from 'react-icons/fi';
 import { BsBookmark, BsBookmarkFill } from 'react-icons/bs';
@@ -8,6 +9,7 @@ interface PublicationModalProps {
   publication: Publication | null;
   authorName: string;
   authorImage?: string | null;
+  authorHref?: string;
   isSaving?: boolean;
   onClose: () => void;
   onLike: (id: string | number) => void;
@@ -19,6 +21,7 @@ export default function PublicationModal({
   publication,
   authorName,
   authorImage,
+  authorHref,
   isSaving = false,
   onClose,
   onLike,
@@ -42,15 +45,34 @@ export default function PublicationModal({
         {/* Header: solo visible en móvil (arriba de la imagen) */}
         <div className="md:hidden flex items-center justify-between p-4 border-b border-white/10 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-linear-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center shrink-0 overflow-hidden">
-              {authorImage ? (
-                <Image src={authorImage} alt={authorName} width={40} height={40} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-white text-sm font-medium">{authorName.charAt(0)}</span>
-              )}
-            </div>
+            {authorHref ? (
+              <Link
+                href={authorHref}
+                className="w-10 h-10 bg-linear-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center shrink-0 overflow-hidden"
+              >
+                {authorImage ? (
+                  <Image src={authorImage} alt={authorName} width={40} height={40} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-white text-sm font-medium">{authorName.charAt(0)}</span>
+                )}
+              </Link>
+            ) : (
+              <div className="w-10 h-10 bg-linear-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center shrink-0 overflow-hidden">
+                {authorImage ? (
+                  <Image src={authorImage} alt={authorName} width={40} height={40} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-white text-sm font-medium">{authorName.charAt(0)}</span>
+                )}
+              </div>
+            )}
             <div>
-              <h3 className="text-white font-semibold text-sm">{authorName}</h3>
+              {authorHref ? (
+                <Link href={authorHref} className="text-white font-semibold text-sm hover:text-riff-primary transition-colors">
+                  {authorName}
+                </Link>
+              ) : (
+                <h3 className="text-white font-semibold text-sm">{authorName}</h3>
+              )}
               <p className="text-white/60 text-xs">{formatDate(publication.date)}</p>
             </div>
           </div>
@@ -87,15 +109,34 @@ export default function PublicationModal({
           {/* Header: solo visible en desktop (dentro del panel derecho) */}
           <div className="hidden md:flex items-center justify-between p-4 border-b border-white/10 shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-linear-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center shrink-0 overflow-hidden">
-                {authorImage ? (
-                  <Image src={authorImage} alt={authorName} width={40} height={40} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-white text-sm font-medium">{authorName.charAt(0)}</span>
-                )}
-              </div>
+              {authorHref ? (
+                <Link
+                  href={authorHref}
+                  className="w-10 h-10 bg-linear-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center shrink-0 overflow-hidden"
+                >
+                  {authorImage ? (
+                    <Image src={authorImage} alt={authorName} width={40} height={40} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-white text-sm font-medium">{authorName.charAt(0)}</span>
+                  )}
+                </Link>
+              ) : (
+                <div className="w-10 h-10 bg-linear-to-br from-riff-primary-dark to-riff-primary rounded-full flex items-center justify-center shrink-0 overflow-hidden">
+                  {authorImage ? (
+                    <Image src={authorImage} alt={authorName} width={40} height={40} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-white text-sm font-medium">{authorName.charAt(0)}</span>
+                  )}
+                </div>
+              )}
               <div>
-                <h3 className="text-white font-semibold text-sm">{authorName}</h3>
+                {authorHref ? (
+                  <Link href={authorHref} className="text-white font-semibold text-sm hover:text-riff-primary transition-colors">
+                    {authorName}
+                  </Link>
+                ) : (
+                  <h3 className="text-white font-semibold text-sm">{authorName}</h3>
+                )}
                 <p className="text-white/60 text-xs">{formatDate(publication.date)}</p>
               </div>
             </div>
