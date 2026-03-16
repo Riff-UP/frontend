@@ -21,6 +21,18 @@ interface SavedEventItem {
   description: string;
 }
 
+function inferMediaTypeFromUrl(url?: string): 'image' | 'video' | 'audio' | undefined {
+  if (!url) return undefined;
+  const cleanUrl = url.split('?')[0].toLowerCase();
+
+  if (cleanUrl.includes('/video/upload/')) return 'video';
+  if (/\.(mp4|m4v|mov|webm|avi)$/i.test(cleanUrl)) return 'video';
+  if (/\.(mp3|wav|ogg|aac|m4a|flac)$/i.test(cleanUrl)) return 'audio';
+  if (/\.(jpg|jpeg|png|gif|webp|avif|bmp)$/i.test(cleanUrl)) return 'image';
+
+  return undefined;
+}
+
 function resolveEventId(event: Record<string, unknown>): string {
   const raw = event._id ?? event.id;
   if (!raw) return '';
@@ -216,7 +228,10 @@ export default function Saved() {
                   const isContentUrl = post?.content && (
                     post.content.startsWith('http') || post.content.startsWith('/')
                   );
-                  const imageUrl = post?.mediaUrl || (isContentUrl ? post?.content : undefined);
+                  const mediaUrl = post?.mediaUrl || (isContentUrl ? post?.content : undefined);
+                  const mediaType = post?.mediaType || post?.type || inferMediaTypeFromUrl(mediaUrl);
+                  const isVideo = mediaType === 'video';
+                  const showVisualMedia = Boolean(mediaUrl) && mediaType !== 'audio';
                   const textContent = post?.description
                     || post?.title
                     || (post?.content && !isContentUrl ? post.content : '')
@@ -275,15 +290,24 @@ export default function Saved() {
                       </div>
 
                       {/* Imagen */}
-                      {imageUrl && (
+                      {showVisualMedia && mediaUrl && (
                         <div className="mt-3 overflow-hidden rounded-sm">
-                          <Image
-                            src={imageUrl}
-                            alt="Post media"
-                            width={800}
-                            height={400}
-                            style={{ width: '100%', height: 'auto', maxHeight: '400px', objectFit: 'contain' }}
-                          />
+                          {isVideo ? (
+                            <video
+                              src={mediaUrl}
+                              controls
+                              preload="metadata"
+                              className="w-full max-h-[400px]"
+                            />
+                          ) : (
+                            <Image
+                              src={mediaUrl}
+                              alt="Post media"
+                              width={800}
+                              height={400}
+                              style={{ width: '100%', height: 'auto', maxHeight: '400px', objectFit: 'contain' }}
+                            />
+                          )}
                         </div>
                       )}
                     </div>
