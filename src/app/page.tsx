@@ -2,13 +2,14 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import Header from "@/app/components/layout/Header";
 import Footer from "@/app/components/layout/Footer";
 import ArtistCard from "@/app/components/cards/ArtistCard";
 import EventRatingModal from "@/app/components/common/EventRatingModal";
 import { useEventRating } from "@/app/hooks/useEventRating";
 import { FaCircleChevronLeft, FaCircleChevronRight } from "react-icons/fa6";
-import { BsBookmark, BsChat, BsHeart, BsThreeDots } from "react-icons/bs";
+import { BsBookmark, BsChat, BsHeart } from "react-icons/bs";
 import { useArtists, ArtistData } from "@/app/hooks/useArtists";
 import { useUser } from "@/app/hooks/useUser";
 import { useFollow } from "@/app/hooks/useFollow";
@@ -21,6 +22,8 @@ interface RawPost {
   id?: unknown;
   sql_user_id?: string;
   authorId?: string;
+  type?: string;
+  mediaType?: string;
   title?: string;
   description?: string;
   content?: string;
@@ -38,7 +41,8 @@ interface HeroPublication {
   authorId: string;
   authorName: string;
   authorImage?: string;
-  imageUrl: string | undefined;
+  mediaUrl: string | undefined;
+  mediaType: 'video' | 'image' | 'text';
   caption: string;
   likesCount: number;
   commentsCount: number;
@@ -68,6 +72,22 @@ function getPostImageUrl(post: RawPost): string | undefined {
     return post.content;
   }
   return undefined;
+}
+
+function inferMediaTypeFromUrl(url?: string): 'video' | 'image' | 'text' {
+  if (!url) return 'text';
+  const cleanUrl = url.split('?')[0].toLowerCase();
+  if (cleanUrl.includes('/video/upload/')) return 'video';
+  if (/\.(mp4|m4v|mov|webm|avi)$/i.test(cleanUrl)) return 'video';
+  if (/\.(jpg|jpeg|png|gif|webp|avif|bmp)$/i.test(cleanUrl)) return 'image';
+  return 'image';
+}
+
+function getPostMediaType(post: RawPost, mediaUrl?: string): 'video' | 'image' | 'text' {
+  if (post.type === 'video' || post.mediaType === 'video') return 'video';
+  if (post.type === 'image' || post.mediaType === 'image') return 'image';
+  if (!mediaUrl) return 'text';
+  return inferMediaTypeFromUrl(mediaUrl);
 }
 
 function getPostCaption(post: RawPost): string {
@@ -144,22 +164,24 @@ function HomeContent() {
     });
   };
 
-  const heroPublications = useMemo<HeroPublication[]>(() => {
+  const allPublications = useMemo<HeroPublication[]>(() => {
     const artistMap = new Map(artists.map((artist) => [artist.id, artist]));
     const artistIds = new Set(artists.map((artist) => artist.id));
 
     const normalized = heroPosts
       .map((post) => {
-        const imageUrl = getPostImageUrl(post);
+        const mediaUrl = getPostImageUrl(post);
         const authorId = String(post.sql_user_id ?? post.authorId ?? "");
         const createdAt = post.createdAt ?? post.created_at ?? "";
+        const mediaType = getPostMediaType(post, mediaUrl);
 
         return {
           id: extractId(post._id ?? post.id),
           authorId,
           authorName: artistMap.get(authorId)?.name ?? "Artista Riff",
           authorImage: artistMap.get(authorId)?.profileImage ?? undefined,
-          imageUrl,
+          mediaUrl,
+          mediaType,
           caption: getPostCaption(post),
           likesCount: Number(post.likesCount ?? post.likes_count ?? 0),
           commentsCount: Number(post.commentsCount ?? post.comments_count ?? 0),
@@ -179,8 +201,57 @@ function HomeContent() {
     });
 
     const artistPosts = sorted.filter((post) => artistIds.has(post.authorId));
-    return (artistPosts.length > 0 ? artistPosts : sorted).slice(0, 4);
+    return artistPosts.length > 0 ? artistPosts : sorted;
   }, [artists, heroPosts]);
+
+  const recentPublications = useMemo(() => allPublications.slice(0, 4), [allPublications]);
+
+  const mixedFeed = useMemo(() => {
+    if (allPublications.length === 0) return [] as HeroPublication[];
+
+    const followedArtistIds = new Set(followedArtists.map((artist) => artist.id));
+    const followedQueue = allPublications.filter((post) => followedArtistIds.has(post.authorId));
+    const rest = allPublications.filter((post) => !followedArtistIds.has(post.authorId));
+
+    const videos = rest.filter((post) => post.mediaType === 'video');
+    const images = rest.filter((post) => post.mediaType === 'image');
+    const texts = rest.filter((post) => post.mediaType === 'text');
+
+    const result: HeroPublication[] = [];
+    const pattern: Array<'video' | 'image' | 'text' | 'image'> = ['video', 'image', 'text', 'image'];
+    let index = 0;
+
+    const pickByType = (type: 'video' | 'image' | 'text'): HeroPublication | undefined => {
+      if (type === 'video' && videos.length > 0) return videos.shift();
+      if (type === 'image' && images.length > 0) return images.shift();
+      if (type === 'text' && texts.length > 0) return texts.shift();
+      return undefined;
+    };
+
+    while (videos.length > 0 || images.length > 0 || texts.length > 0) {
+      const desired = pattern[index % pattern.length];
+      const picked = pickByType(desired)
+        ?? videos.shift()
+        ?? images.shift()
+        ?? texts.shift();
+
+      if (!picked) break;
+      result.push(picked);
+
+      if (result.length % 4 === 0 && followedQueue.length > 0) {
+        const followedPost = followedQueue.shift();
+        if (followedPost) result.push(followedPost);
+      }
+
+      index += 1;
+    }
+
+    if (followedQueue.length > 0) {
+      result.push(...followedQueue);
+    }
+
+    return result;
+  }, [allPublications, followedArtists]);
 
   // Capturar token de Google OAuth
   useEffect(() => {
@@ -324,6 +395,75 @@ function HomeContent() {
           )}
         </section>
 
+        {/* Publicaciones Recientes */}
+        <section className="max-w-8xl mx-auto px-4 sm:px-4 lg:px-0 py-4 sm:py-6">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-white">Publicaciones recientes</h2>
+            {recentPublications.length > 0 && (
+              <span className="text-riff-text-secondary text-xs sm:text-sm">4 destacadas</span>
+            )}
+          </div>
+
+          {recentPublications.length === 0 ? (
+            <p className="text-riff-text-secondary py-8">Aún no hay publicaciones recientes.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              {recentPublications.map((publication) => (
+                <article key={`recent-${publication.id}`} className="bg-riff-header rounded-sm border border-white/5 overflow-hidden">
+                  <div className="p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-9 h-9 rounded-full bg-riff-primary/20 overflow-hidden flex items-center justify-center text-riff-primary font-semibold">
+                        {publication.authorImage ? (
+                          <Image
+                            src={publication.authorImage}
+                            alt={publication.authorName}
+                            width={36}
+                            height={36}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          publication.authorName.charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-white font-semibold text-sm truncate">{publication.authorName}</p>
+                        <p className="text-riff-text-secondary text-xs">{formatPostDate(publication.createdAt)}</p>
+                      </div>
+                    </div>
+
+                    {publication.caption && (
+                      <p className="text-white/90 text-sm leading-relaxed line-clamp-3 mb-3">{publication.caption}</p>
+                    )}
+
+                    {publication.mediaUrl && publication.mediaType !== 'text' && (
+                      <div className="overflow-hidden rounded-sm mb-3 bg-black/30 relative h-44">
+                        {publication.mediaType === 'video' ? (
+                          <video src={publication.mediaUrl} controls preload="metadata" className="w-full h-44 object-cover" />
+                        ) : (
+                          <Image
+                            src={publication.mediaUrl}
+                            alt="Post reciente"
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 25vw"
+                            unoptimized
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-end gap-4 text-riff-text-secondary text-xs">
+                      <span className="flex items-center gap-1"><BsHeart className="w-4 h-4" />{publication.likesCount}</span>
+                      <span className="flex items-center gap-1"><BsChat className="w-4 h-4" />{publication.commentsCount}</span>
+                      <BsBookmark className="w-4 h-4" />
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
         {/* Artistas que sigues */}
         {user && followedArtists.length > 0 && (
           <section className="max-w-8xl mx-auto px-0 sm:px-4 lg:px-0 py-6 sm:py-8">
@@ -369,6 +509,80 @@ function HomeContent() {
             </div>
           </section>
         )}
+
+        {/* Feed Mixto */}
+        <section className="max-w-8xl mx-auto px-4 sm:px-4 lg:px-0 py-6 sm:py-8">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-white">Feed mixto</h2>
+            <span className="text-riff-text-secondary text-xs sm:text-sm">Videos, fotos y texto</span>
+          </div>
+
+          {mixedFeed.length === 0 ? (
+            <p className="text-riff-text-secondary py-8">Sin contenido para mostrar en el feed.</p>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+              {mixedFeed.map((publication, index) => (
+                <article
+                  key={`mix-${publication.id}-${index}`}
+                  className={`rounded-sm border overflow-hidden ${
+                    publication.mediaType === 'video'
+                      ? 'bg-black/60 border-riff-primary/40'
+                      : publication.mediaType === 'image'
+                        ? 'bg-riff-header border-white/5'
+                        : 'bg-riff-card border-white/10'
+                  }`}
+                >
+                  <div className="p-4">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="min-w-0">
+                        <p className="text-white font-semibold text-sm truncate">{publication.authorName}</p>
+                        <p className="text-riff-text-secondary text-xs">{formatPostDate(publication.createdAt)}</p>
+                      </div>
+                      <span className="text-[10px] px-2 py-1 rounded-full border border-white/20 text-white/80 uppercase tracking-wide">
+                        {publication.mediaType === 'video' ? 'Video' : publication.mediaType === 'image' ? 'Foto' : 'Texto'}
+                      </span>
+                    </div>
+
+                    {publication.mediaUrl && publication.mediaType !== 'text' ? (
+                      <div className="overflow-hidden rounded-sm mb-3 bg-black/30 relative h-52">
+                        {publication.mediaType === 'video' ? (
+                          <video src={publication.mediaUrl} controls preload="metadata" className="w-full h-52 object-cover" />
+                        ) : (
+                          <Image
+                            src={publication.mediaUrl}
+                            alt="Publicación"
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 1024px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                            unoptimized
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <blockquote className="mb-3 p-3 rounded-sm bg-white/5 border-l-2 border-riff-primary text-white/90 text-sm leading-relaxed line-clamp-6">
+                        {publication.caption || 'Publicación sin texto.'}
+                      </blockquote>
+                    )}
+
+                    {publication.mediaType !== 'text' && publication.caption && (
+                      <p className="text-white/85 text-sm leading-relaxed line-clamp-3 mb-3">{publication.caption}</p>
+                    )}
+
+                    <div className="flex items-center justify-between text-riff-text-secondary text-xs">
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center gap-1"><BsHeart className="w-4 h-4" />{publication.likesCount}</span>
+                        <span className="flex items-center gap-1"><BsChat className="w-4 h-4" />{publication.commentsCount}</span>
+                      </div>
+                      <button className="text-riff-text-secondary hover:text-yellow-400 transition-colors" aria-label="Guardar publicación">
+                        <BsBookmark className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
 
         
 
