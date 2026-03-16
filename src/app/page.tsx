@@ -3,10 +3,12 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import Header from "@/app/components/layout/Header";
 import Footer from "@/app/components/layout/Footer";
 import ArtistCard from "@/app/components/cards/ArtistCard";
 import EventRatingModal from "@/app/components/common/EventRatingModal";
+import PublicationModal from "@/app/components/publications/PublicationModal";
 import { useEventRating } from "@/app/hooks/useEventRating";
 import { usePostReactions } from "@/app/hooks/usePostReactions";
 import { FaCircleChevronLeft, FaCircleChevronRight } from "react-icons/fa6";
@@ -15,6 +17,7 @@ import { useArtists, ArtistData } from "@/app/hooks/useArtists";
 import { useUser } from "@/app/hooks/useUser";
 import { useFollow } from "@/app/hooks/useFollow";
 import { API_BASE_URL, getAuthHeaders } from "@/app/config/api";
+import { Publication } from "@/app/types";
 
 const API_URL = API_BASE_URL;
 
@@ -152,6 +155,7 @@ function HomeContent() {
   } = usePostReactions(user?.id);
   const [savedPosts, setSavedPosts] = useState<SavedPostRow[]>([]);
   const [savingPostId, setSavingPostId] = useState<string | null>(null);
+  const [selectedPublicationId, setSelectedPublicationId] = useState<string | null>(null);
   const [saveToast, setSaveToast] = useState<{ message: string; tone: 'success' | 'error'; visible: boolean } | null>(null);
   const saveToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveToastHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -333,6 +337,30 @@ function HomeContent() {
 
     return result;
   }, [allPublications, followedArtists]);
+
+  const selectedPublication = useMemo(
+    () => allPublications.find((publication) => publication.id === selectedPublicationId) ?? null,
+    [allPublications, selectedPublicationId]
+  );
+
+  const selectedPublicationForModal = useMemo<Publication | null>(() => {
+    if (!selectedPublication) return null;
+    return {
+      id: selectedPublication.id,
+      type: selectedPublication.mediaType === 'video' ? 'video' : selectedPublication.mediaType === 'image' ? 'image' : undefined,
+      mediaType: selectedPublication.mediaType === 'video' ? 'video' : selectedPublication.mediaType === 'image' ? 'image' : undefined,
+      content: selectedPublication.caption || 'Sin descripción',
+      image: selectedPublication.mediaUrl,
+      date: selectedPublication.createdAt,
+      likes: getLikeCountForPost(selectedPublication.id, selectedPublication.likesCount),
+      isLiked: isLiked(selectedPublication.id),
+      isSaved: isPostSaved(selectedPublication.id),
+      author: {
+        name: selectedPublication.authorName,
+        avatar: selectedPublication.authorImage || '',
+      },
+    };
+  }, [selectedPublication, getLikeCountForPost, isLiked, isPostSaved]);
 
   const isPostSaved = (postId: string): boolean => {
     return savedPosts.some((item) => String(item.postId) === String(postId));
@@ -656,10 +684,18 @@ function HomeContent() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               {recentPublications.map((publication) => (
-                <article key={`recent-${publication.id}`} className="bg-riff-header rounded-sm border border-white/5 overflow-hidden">
+                <article
+                  key={`recent-${publication.id}`}
+                  className="bg-riff-header rounded-sm border border-white/5 overflow-hidden cursor-pointer"
+                  onClick={() => setSelectedPublicationId(publication.id)}
+                >
                   <div className="p-4">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-9 h-9 rounded-full bg-riff-primary/20 overflow-hidden flex items-center justify-center text-riff-primary font-semibold">
+                      <Link
+                        href={`/artist/${publication.authorId}`}
+                        className="w-9 h-9 rounded-full bg-riff-primary/20 overflow-hidden flex items-center justify-center text-riff-primary font-semibold"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {publication.authorImage ? (
                           <Image
                             src={publication.authorImage}
@@ -671,9 +707,15 @@ function HomeContent() {
                         ) : (
                           publication.authorName.charAt(0).toUpperCase()
                         )}
-                      </div>
+                      </Link>
                       <div className="min-w-0">
-                        <p className="text-white font-semibold text-sm truncate">{publication.authorName}</p>
+                        <Link
+                          href={`/artist/${publication.authorId}`}
+                          className="text-white font-semibold text-sm truncate hover:text-riff-primary transition-colors"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {publication.authorName}
+                        </Link>
                         <p className="text-riff-text-secondary text-xs">{formatPostDate(publication.createdAt)}</p>
                       </div>
                     </div>
@@ -707,7 +749,10 @@ function HomeContent() {
 
                     <div className="flex items-center justify-end gap-4 text-riff-text-secondary text-xs">
                       <button
-                        onClick={() => handleToggleLike(publication.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleLike(publication.id);
+                        }}
                         disabled={likingPostId === publication.id}
                         className={`flex items-center gap-1 transition-colors disabled:opacity-50 ${
                           isLiked(publication.id) ? 'text-red-400' : 'text-riff-text-secondary hover:text-red-400'
@@ -718,7 +763,10 @@ function HomeContent() {
                         {getLikeCountForPost(publication.id, publication.likesCount)}
                       </button>
                       <button
-                        onClick={() => handleToggleSave(publication.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleSave(publication.id);
+                        }}
                         disabled={savingPostId === publication.id}
                         className="text-riff-text-secondary hover:text-yellow-400 transition-colors disabled:opacity-50"
                         aria-label="Guardar publicación"
@@ -803,12 +851,19 @@ function HomeContent() {
                       : publication.mediaType === 'image'
                         ? 'bg-riff-header border-white/5'
                         : 'bg-riff-card border-white/10'
-                  }`}
+                  } cursor-pointer`}
+                  onClick={() => setSelectedPublicationId(publication.id)}
                 >
                   <div className="p-4">
                     <div className="flex items-center justify-between gap-2 mb-3">
                       <div className="min-w-0">
-                        <p className="text-white font-semibold text-sm truncate">{publication.authorName}</p>
+                        <Link
+                          href={`/artist/${publication.authorId}`}
+                          className="text-white font-semibold text-sm truncate hover:text-riff-primary transition-colors"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {publication.authorName}
+                        </Link>
                         <p className="text-riff-text-secondary text-xs">{formatPostDate(publication.createdAt)}</p>
                       </div>
                       <span className="text-[10px] px-2 py-1 rounded-full border border-white/20 text-white/80 uppercase tracking-wide">
@@ -846,7 +901,10 @@ function HomeContent() {
                     <div className="flex items-center justify-between text-riff-text-secondary text-xs">
                       <div className="flex items-center gap-3">
                         <button
-                          onClick={() => handleToggleLike(publication.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleLike(publication.id);
+                          }}
                           disabled={likingPostId === publication.id}
                           className={`flex items-center gap-1 transition-colors disabled:opacity-50 ${
                             isLiked(publication.id) ? 'text-red-400' : 'text-riff-text-secondary hover:text-red-400'
@@ -858,7 +916,10 @@ function HomeContent() {
                         </button>
                       </div>
                       <button
-                        onClick={() => handleToggleSave(publication.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleSave(publication.id);
+                        }}
                         disabled={savingPostId === publication.id}
                         className="text-riff-text-secondary hover:text-yellow-400 transition-colors disabled:opacity-50"
                         aria-label="Guardar publicación"
@@ -892,6 +953,17 @@ function HomeContent() {
           onClose={handleRatingClose}
         />
       )}
+
+      <PublicationModal
+        publication={selectedPublicationForModal}
+        authorName={selectedPublication?.authorName ?? 'Artista Riff'}
+        authorImage={selectedPublication?.authorImage}
+        isSaving={savingPostId === selectedPublication?.id}
+        onClose={() => setSelectedPublicationId(null)}
+        onLike={(id) => void handleToggleLike(String(id))}
+        onSave={(id) => void handleToggleSave(String(id))}
+        formatDate={formatPostDate}
+      />
 
       {saveToast && (
         <div
