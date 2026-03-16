@@ -9,7 +9,7 @@ import ArtistCard from "@/app/components/cards/ArtistCard";
 import EventRatingModal from "@/app/components/common/EventRatingModal";
 import { useEventRating } from "@/app/hooks/useEventRating";
 import { FaCircleChevronLeft, FaCircleChevronRight } from "react-icons/fa6";
-import { BsBookmark, BsBookmarkFill, BsChat, BsHeart } from "react-icons/bs";
+import { BsBookmark, BsBookmarkFill, BsHeart } from "react-icons/bs";
 import { useArtists, ArtistData } from "@/app/hooks/useArtists";
 import { useUser } from "@/app/hooks/useUser";
 import { useFollow } from "@/app/hooks/useFollow";
@@ -34,8 +34,6 @@ interface RawPost {
   mediaUrl?: string;
   likesCount?: number;
   likes_count?: number;
-  commentsCount?: number;
-  comments_count?: number;
   createdAt?: string;
   created_at?: string;
 }
@@ -49,7 +47,6 @@ interface HeroPublication {
   mediaType: 'video' | 'image' | 'text';
   caption: string;
   likesCount: number;
-  commentsCount: number;
   createdAt: string;
 }
 
@@ -146,6 +143,8 @@ function HomeContent() {
   const { isFollowing } = useFollow(user?.id);
   const [savedPosts, setSavedPosts] = useState<SavedPostRow[]>([]);
   const [savingPostId, setSavingPostId] = useState<string | null>(null);
+  const [saveToast, setSaveToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
+  const saveToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const followedArtists = artists.filter(a => isFollowing(a.id));
   const carouselRef = useRef<HTMLDivElement>(null);
   const followedCarouselRef = useRef<HTMLDivElement>(null);
@@ -174,6 +173,17 @@ function HomeContent() {
 
   const updateFollowedControls = () => {
     setFollowedControls(getControlsState(followedCarouselRef.current));
+  };
+
+  const showSaveToast = (message: string, tone: 'success' | 'error' = 'success') => {
+    setSaveToast({ message, tone });
+    if (saveToastTimerRef.current) {
+      clearTimeout(saveToastTimerRef.current);
+    }
+    saveToastTimerRef.current = setTimeout(() => {
+      setSaveToast(null);
+      saveToastTimerRef.current = null;
+    }, 1800);
   };
 
   const scrollFollowedCarousel = (dir: 'left' | 'right') => {
@@ -223,7 +233,6 @@ function HomeContent() {
           mediaType,
           caption: getPostCaption(post),
           likesCount: Number(post.likesCount ?? post.likes_count ?? 0),
-          commentsCount: Number(post.commentsCount ?? post.comments_count ?? 0),
           createdAt,
         };
       })
@@ -347,6 +356,7 @@ function HomeContent() {
     if (!postId || postId === 'undefined' || postId === 'null') return;
     if (!user?.id) {
       alert('Debes iniciar sesión para guardar publicaciones');
+      showSaveToast('Inicia sesión para guardar publicaciones', 'error');
       return;
     }
     if (savingPostId) return;
@@ -354,6 +364,7 @@ function HomeContent() {
     const token = localStorage.getItem('token');
     if (!token) {
       alert('Debes iniciar sesión para guardar publicaciones');
+      showSaveToast('Inicia sesión para guardar publicaciones', 'error');
       return;
     }
 
@@ -370,16 +381,40 @@ function HomeContent() {
 
         if (!delRes.ok && delRes.status !== 404) {
           await loadSavedPosts();
+          showSaveToast('No se pudo quitar de guardados', 'error');
+        } else {
+          showSaveToast('Publicación quitada de guardados', 'success');
         }
       } else {
-        const createRes = await fetch(`${API_URL}/posts/saved`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ postId, userId: user.id, post_id: postId, sql_user_id: user.id }),
-        });
+        const payloads: Record<string, string>[] = [
+          { postId, userId: user.id },
+          { post_id: postId, sql_user_id: user.id },
+          { postId, userId: user.id, post_id: postId, sql_user_id: user.id, user_id: user.id },
+        ];
+
+        let createRes: Response | null = null;
+        for (const payload of payloads) {
+          const attempt = await fetch(`${API_URL}/posts/saved`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          createRes = attempt;
+
+          if (attempt.status === 409 || attempt.ok) break;
+          if (attempt.status !== 400 && attempt.status !== 415 && attempt.status !== 422) break;
+        }
+
+        if (!createRes) {
+          await loadSavedPosts();
+          showSaveToast('No se pudo guardar la publicación', 'error');
+          return;
+        }
 
         if (createRes.status === 409) {
           await loadSavedPosts();
+          showSaveToast('La publicación ya estaba guardada', 'success');
         } else if (createRes.ok) {
           const raw = await createRes.json().catch(() => ({})) as Record<string, unknown>;
           const row = (raw.data ?? raw.savedPost ?? raw.result ?? raw) as Record<string, unknown>;
@@ -391,13 +426,19 @@ function HomeContent() {
               if (prev.some((item) => String(item.postId) === String(createdPostId))) return prev;
               return [...prev, { id: createdId, postId: createdPostId }];
             });
+            showSaveToast('Publicación guardada', 'success');
           } else {
             await loadSavedPosts();
+            showSaveToast('Publicación guardada', 'success');
           }
+        } else {
+          await loadSavedPosts();
+          showSaveToast('No se pudo guardar la publicación', 'error');
         }
       }
     } catch {
       await loadSavedPosts();
+      showSaveToast('Error al actualizar guardados', 'error');
     } finally {
       setSavingPostId(null);
     }
@@ -453,6 +494,14 @@ function HomeContent() {
     loadSavedPosts();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  useEffect(() => {
+    return () => {
+      if (saveToastTimerRef.current) {
+        clearTimeout(saveToastTimerRef.current);
+      }
+    };
+  }, []);
 
   // 👇 AQUÍ ESTÁ EL CAMBIO MAGISTRAL
   // Ya no le pasamos el arreglo falso 'attendedEvents', 
@@ -586,10 +635,6 @@ function HomeContent() {
                       </div>
                     </div>
 
-                    {publication.caption && (
-                      <p className="text-white/90 text-sm leading-relaxed line-clamp-3 mb-3">{publication.caption}</p>
-                    )}
-
                     {publication.mediaUrl && publication.mediaType !== 'text' && (
                       <div className="overflow-hidden rounded-sm mb-3 bg-black/30 relative h-44">
                         {publication.mediaType === 'video' ? (
@@ -607,9 +652,18 @@ function HomeContent() {
                       </div>
                     )}
 
+                    {publication.mediaType === 'text' ? (
+                      <div className="mb-3 h-44 rounded-sm bg-white/[0.03] border border-white/10 p-4 flex items-center">
+                        <p className="text-white/90 text-base leading-relaxed line-clamp-5">
+                          {publication.caption || 'Publicación sin texto.'}
+                        </p>
+                      </div>
+                    ) : publication.caption ? (
+                      <p className="text-white/90 text-sm leading-relaxed line-clamp-3 mb-3">{publication.caption}</p>
+                    ) : null}
+
                     <div className="flex items-center justify-end gap-4 text-riff-text-secondary text-xs">
                       <span className="flex items-center gap-1"><BsHeart className="w-4 h-4" />{publication.likesCount}</span>
-                      <span className="flex items-center gap-1"><BsChat className="w-4 h-4" />{publication.commentsCount}</span>
                       <button
                         onClick={() => handleToggleSave(publication.id)}
                         disabled={savingPostId === publication.id}
@@ -725,9 +779,11 @@ function HomeContent() {
                         )}
                       </div>
                     ) : (
-                      <blockquote className="mb-3 p-3 rounded-sm bg-white/5 border-l-2 border-riff-primary text-white/90 text-sm leading-relaxed line-clamp-6">
-                        {publication.caption || 'Publicación sin texto.'}
-                      </blockquote>
+                      <div className="mb-3 h-52 rounded-sm bg-white/[0.03] border border-white/10 p-4 flex items-center">
+                        <p className="text-white/90 text-base leading-relaxed line-clamp-6">
+                          {publication.caption || 'Publicación sin texto.'}
+                        </p>
+                      </div>
                     )}
 
                     {publication.mediaType !== 'text' && publication.caption && (
@@ -737,7 +793,6 @@ function HomeContent() {
                     <div className="flex items-center justify-between text-riff-text-secondary text-xs">
                       <div className="flex items-center gap-3">
                         <span className="flex items-center gap-1"><BsHeart className="w-4 h-4" />{publication.likesCount}</span>
-                        <span className="flex items-center gap-1"><BsChat className="w-4 h-4" />{publication.commentsCount}</span>
                       </div>
                       <button
                         onClick={() => handleToggleSave(publication.id)}
@@ -773,6 +828,20 @@ function HomeContent() {
           onSubmit={(rating, comment) => handleRatingSubmit(eventToRate.id, rating, comment)}
           onClose={handleRatingClose}
         />
+      )}
+
+      {saveToast && (
+        <div className="fixed bottom-4 right-4 z-50 pointer-events-none">
+          <div
+            className={`rounded-sm border px-4 py-2 text-sm shadow-lg ${
+              saveToast.tone === 'success'
+                ? 'bg-riff-header border-green-500/40 text-green-200'
+                : 'bg-riff-header border-red-500/40 text-red-200'
+            }`}
+          >
+            {saveToast.message}
+          </div>
+        </div>
       )}
     </div>
   );
