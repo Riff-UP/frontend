@@ -343,6 +343,10 @@ function HomeContent() {
     [allPublications, selectedPublicationId]
   );
 
+  function isPostSaved(postId: string): boolean {
+    return savedPosts.some((item) => String(item.postId) === String(postId));
+  }
+
   const selectedPublicationForModal = useMemo<Publication | null>(() => {
     if (!selectedPublication) return null;
     return {
@@ -361,10 +365,6 @@ function HomeContent() {
       },
     };
   }, [selectedPublication, getLikeCountForPost, isLiked, isPostSaved]);
-
-  const isPostSaved = (postId: string): boolean => {
-    return savedPosts.some((item) => String(item.postId) === String(postId));
-  };
 
   const loadSavedPosts = async () => {
     if (!user?.id) {

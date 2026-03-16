@@ -65,6 +65,18 @@ export function useLogin() {
 
   // Detectar errores de OAuth desde los parámetros de URL
   useEffect(() => {
+    const tokenFromUrl =
+      searchParams.get('token') ||
+      searchParams.get('access_token') ||
+      searchParams.get('jwt');
+
+    if (tokenFromUrl) {
+      localStorage.setItem('token', tokenFromUrl);
+      window.dispatchEvent(new Event('authChange'));
+      router.replace('/profile');
+      return;
+    }
+
     const token = getValidToken();
     if (token) {
       router.replace('/profile');
