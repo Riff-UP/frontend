@@ -9,7 +9,7 @@ import ArtistCard from "@/app/components/cards/ArtistCard";
 import EventRatingModal from "@/app/components/common/EventRatingModal";
 import { useEventRating } from "@/app/hooks/useEventRating";
 import { FaCircleChevronLeft, FaCircleChevronRight } from "react-icons/fa6";
-import { BsBookmark, BsChat, BsHeart } from "react-icons/bs";
+import { BsBookmark, BsBookmarkFill, BsChat, BsHeart } from "react-icons/bs";
 import { useArtists, ArtistData } from "@/app/hooks/useArtists";
 import { useUser } from "@/app/hooks/useUser";
 import { useFollow } from "@/app/hooks/useFollow";
@@ -24,6 +24,10 @@ interface RawPost {
   authorId?: string;
   type?: string;
   mediaType?: string;
+  media_url?: string;
+  imageUrl?: string;
+  resourceType?: string;
+  mimeType?: string;
   title?: string;
   description?: string;
   content?: string;
@@ -54,6 +58,11 @@ interface CarouselControls {
   canScrollRight: boolean;
 }
 
+interface SavedPostRow {
+  id: string;
+  postId: string;
+}
+
 function extractId(raw: unknown): string {
   if (!raw) return "";
   if (typeof raw === "string") return raw;
@@ -66,11 +75,37 @@ function extractId(raw: unknown): string {
   return String(raw);
 }
 
-function getPostImageUrl(post: RawPost): string | undefined {
-  if (post.mediaUrl) return post.mediaUrl;
-  if (post.content && (post.content.startsWith("http") || post.content.startsWith("/"))) {
-    return post.content;
+function normalizeMediaUrl(raw?: string): string | undefined {
+  if (!raw) return undefined;
+
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === "null" || trimmed === "undefined") return undefined;
+  if (trimmed.startsWith("data:")) return trimmed;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+
+  const apiOrigin = API_URL.replace(/\/api$/, "");
+  if (trimmed.startsWith("/")) return `${apiOrigin}${trimmed}`;
+  return `${apiOrigin}/${trimmed}`;
+}
+
+function getPostMediaUrl(post: RawPost): string | undefined {
+  const explicit = normalizeMediaUrl(post.mediaUrl ?? post.media_url ?? post.imageUrl);
+  if (explicit) return explicit;
+
+  const hasExplicitMediaType =
+    post.type === 'video' || post.mediaType === 'video'
+    || post.type === 'image' || post.mediaType === 'image'
+    || post.resourceType === 'video' || post.resourceType === 'image';
+
+  if (!hasExplicitMediaType) return undefined;
+  if (!post.content) return undefined;
+
+  const maybeUrl = post.content.trim();
+  if (maybeUrl.startsWith("http") || maybeUrl.startsWith("/") || maybeUrl.startsWith("//")) {
+    return normalizeMediaUrl(maybeUrl);
   }
+
   return undefined;
 }
 
@@ -80,12 +115,14 @@ function inferMediaTypeFromUrl(url?: string): 'video' | 'image' | 'text' {
   if (cleanUrl.includes('/video/upload/')) return 'video';
   if (/\.(mp4|m4v|mov|webm|avi)$/i.test(cleanUrl)) return 'video';
   if (/\.(jpg|jpeg|png|gif|webp|avif|bmp)$/i.test(cleanUrl)) return 'image';
-  return 'image';
+  return 'text';
 }
 
 function getPostMediaType(post: RawPost, mediaUrl?: string): 'video' | 'image' | 'text' {
-  if (post.type === 'video' || post.mediaType === 'video') return 'video';
-  if (post.type === 'image' || post.mediaType === 'image') return 'image';
+  if (post.type === 'video' || post.mediaType === 'video' || post.resourceType === 'video') return 'video';
+  if (post.type === 'image' || post.mediaType === 'image' || post.resourceType === 'image') return 'image';
+  if (post.mimeType?.startsWith('video/')) return 'video';
+  if (post.mimeType?.startsWith('image/')) return 'image';
   if (!mediaUrl) return 'text';
   return inferMediaTypeFromUrl(mediaUrl);
 }
@@ -107,6 +144,8 @@ function HomeContent() {
   const { artists, loading, setSearch } = useArtists();
   const { user } = useUser();
   const { isFollowing } = useFollow(user?.id);
+  const [savedPosts, setSavedPosts] = useState<SavedPostRow[]>([]);
+  const [savingPostId, setSavingPostId] = useState<string | null>(null);
   const followedArtists = artists.filter(a => isFollowing(a.id));
   const carouselRef = useRef<HTMLDivElement>(null);
   const followedCarouselRef = useRef<HTMLDivElement>(null);
@@ -170,7 +209,7 @@ function HomeContent() {
 
     const normalized = heroPosts
       .map((post) => {
-        const mediaUrl = getPostImageUrl(post);
+        const mediaUrl = getPostMediaUrl(post);
         const authorId = String(post.sql_user_id ?? post.authorId ?? "");
         const createdAt = post.createdAt ?? post.created_at ?? "";
         const mediaType = getPostMediaType(post, mediaUrl);
@@ -253,6 +292,117 @@ function HomeContent() {
     return result;
   }, [allPublications, followedArtists]);
 
+  const isPostSaved = (postId: string): boolean => {
+    return savedPosts.some((item) => String(item.postId) === String(postId));
+  };
+
+  const loadSavedPosts = async () => {
+    if (!user?.id) {
+      setSavedPosts([]);
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setSavedPosts([]);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/posts/saved?userId=${user.id}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const rows: Record<string, unknown>[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+          ? data.data
+          : Array.isArray(data?.savedPosts)
+            ? data.savedPosts
+            : [];
+
+      const normalized: SavedPostRow[] = rows
+        .map((row) => {
+          const rawId = row.savedPostId ?? row._id ?? row.id ?? row.savedId;
+          const postObj = (row.post ?? row.postData ?? row.publication) as Record<string, unknown> | undefined;
+          const rawPostId = row.post_id ?? row.postId ?? row.postID ?? postObj?._id ?? postObj?.id ?? row.post;
+
+          return {
+            id: extractId(rawId),
+            postId: extractId(rawPostId),
+          };
+        })
+        .filter((row) => row.id && row.postId);
+
+      setSavedPosts(normalized);
+    } catch {
+      setSavedPosts([]);
+    }
+  };
+
+  const handleToggleSave = async (postId: string) => {
+    if (!postId || postId === 'undefined' || postId === 'null') return;
+    if (!user?.id) {
+      alert('Debes iniciar sesión para guardar publicaciones');
+      return;
+    }
+    if (savingPostId) return;
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Debes iniciar sesión para guardar publicaciones');
+      return;
+    }
+
+    setSavingPostId(postId);
+    try {
+      const existing = savedPosts.find((row) => String(row.postId) === String(postId));
+
+      if (existing) {
+        setSavedPosts((prev) => prev.filter((row) => row.id !== existing.id));
+        const delRes = await fetch(`${API_URL}/posts/saved/${existing.id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+
+        if (!delRes.ok && delRes.status !== 404) {
+          await loadSavedPosts();
+        }
+      } else {
+        const createRes = await fetch(`${API_URL}/posts/saved`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ postId, userId: user.id, post_id: postId, sql_user_id: user.id }),
+        });
+
+        if (createRes.status === 409) {
+          await loadSavedPosts();
+        } else if (createRes.ok) {
+          const raw = await createRes.json().catch(() => ({})) as Record<string, unknown>;
+          const row = (raw.data ?? raw.savedPost ?? raw.result ?? raw) as Record<string, unknown>;
+          const createdId = extractId(row._id ?? row.savedPostId ?? row.id);
+          const createdPostId = extractId(row.post_id ?? row.postId ?? postId);
+
+          if (createdId && createdPostId) {
+            setSavedPosts((prev) => {
+              if (prev.some((item) => String(item.postId) === String(createdPostId))) return prev;
+              return [...prev, { id: createdId, postId: createdPostId }];
+            });
+          } else {
+            await loadSavedPosts();
+          }
+        }
+      }
+    } catch {
+      await loadSavedPosts();
+    } finally {
+      setSavingPostId(null);
+    }
+  };
+
   // Capturar token de Google OAuth
   useEffect(() => {
     const tokenFromUrl = searchParams.get('token');
@@ -298,6 +448,11 @@ function HomeContent() {
 
     loadHeroPosts();
   }, []);
+
+  useEffect(() => {
+    loadSavedPosts();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // 👇 AQUÍ ESTÁ EL CAMBIO MAGISTRAL
   // Ya no le pasamos el arreglo falso 'attendedEvents', 
@@ -455,7 +610,18 @@ function HomeContent() {
                     <div className="flex items-center justify-end gap-4 text-riff-text-secondary text-xs">
                       <span className="flex items-center gap-1"><BsHeart className="w-4 h-4" />{publication.likesCount}</span>
                       <span className="flex items-center gap-1"><BsChat className="w-4 h-4" />{publication.commentsCount}</span>
-                      <BsBookmark className="w-4 h-4" />
+                      <button
+                        onClick={() => handleToggleSave(publication.id)}
+                        disabled={savingPostId === publication.id}
+                        className="text-riff-text-secondary hover:text-yellow-400 transition-colors disabled:opacity-50"
+                        aria-label="Guardar publicación"
+                      >
+                        {isPostSaved(publication.id) ? (
+                          <BsBookmarkFill className="w-4 h-4 text-yellow-400" />
+                        ) : (
+                          <BsBookmark className="w-4 h-4" />
+                        )}
+                      </button>
                     </div>
                   </div>
                 </article>
@@ -573,8 +739,17 @@ function HomeContent() {
                         <span className="flex items-center gap-1"><BsHeart className="w-4 h-4" />{publication.likesCount}</span>
                         <span className="flex items-center gap-1"><BsChat className="w-4 h-4" />{publication.commentsCount}</span>
                       </div>
-                      <button className="text-riff-text-secondary hover:text-yellow-400 transition-colors" aria-label="Guardar publicación">
-                        <BsBookmark className="w-4 h-4" />
+                      <button
+                        onClick={() => handleToggleSave(publication.id)}
+                        disabled={savingPostId === publication.id}
+                        className="text-riff-text-secondary hover:text-yellow-400 transition-colors disabled:opacity-50"
+                        aria-label="Guardar publicación"
+                      >
+                        {isPostSaved(publication.id) ? (
+                          <BsBookmarkFill className="w-4 h-4 text-yellow-400" />
+                        ) : (
+                          <BsBookmark className="w-4 h-4" />
+                        )}
                       </button>
                     </div>
                   </div>
