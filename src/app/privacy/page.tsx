@@ -14,10 +14,22 @@ export default function PrivacyPolicy() {
           </Link>
         </div>
 
-        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">Política de Privacidad</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">Política de Privacidad y Términos</h1>
+        <p className="text-white/50 text-sm mb-8">Última actualización: 17 de marzo de 2026</p>
 
         <div className="space-y-8 text-white/80 leading-relaxed text-sm sm:text-base">
           
+          {/* NUEVA SECCIÓN: Propósito del Proyecto */}
+          <section className="p-4 bg-riff-primary/10 border border-riff-primary/20 rounded-md">
+            <h2 className="text-lg font-semibold text-riff-primary mb-2">Aviso Importante: Proyecto Académico</h2>
+            <p className="text-white/90">
+              Riff es una plataforma desarrollada como un proyecto académico por estudiantes de la 
+              <strong> Universidad Politécnica de Chiapas (UPChiapas)</strong>. Su propósito es netamente 
+              educativo y demostrativo. Aunque nos esforzamos por ofrecer la mejor experiencia y proteger 
+              tus datos, la plataforma se proporciona "tal cual", sin fines de lucro comercial en esta etapa.
+            </p>
+          </section>
+
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">1. Información que recopilamos</h2>
             <p>En Riff, recopilamos la información mínima necesaria para brindarte la mejor experiencia musical. Esto incluye:</p>
@@ -27,33 +39,36 @@ export default function PrivacyPolicy() {
             </ul>
           </section>
 
+          {/* NUEVA SECCIÓN: Contenido Multimedia */}
           <section>
-            <h2 className="text-xl font-semibold text-white mb-3">2. Cómo usamos tu información</h2>
-            <p>Utilizamos tus datos exclusivamente para el funcionamiento de la plataforma:</p>
+            <h2 className="text-xl font-semibold text-white mb-3">2. Contenido Generado por el Usuario (Fotos y Videos)</h2>
+            <p>
+              Como usuario o artista, puedes subir contenido multimedia (fotografías, videos, portadas de eventos o publicaciones) a Riff. Al hacerlo, aceptas que:
+            </p>
             <ul className="list-disc pl-5 mt-2 space-y-1">
-              <li>Para crear y gestionar tu cuenta de Usuario o Artista.</li>
-              <li>Para mostrarte eventos relevantes y permitirte interactuar con ellos (asistir, calificar).</li>
-              <li>Para enviarte notificaciones sobre cambios en eventos o actualizaciones de los artistas que sigues.</li>
+              <li>Tú conservas todos los derechos de propiedad intelectual sobre tu contenido original.</li>
+              <li>Nos otorgas una licencia no exclusiva para mostrar, reproducir y distribuir ese contenido públicamente dentro de Riff.</li>
+              <li>Eres responsable de asegurarte de que tu contenido no infrinja derechos de autor de terceros ni contenga material ofensivo, ilegal o inapropiado.</li>
+              <li>El equipo de Riff se reserva el derecho de eliminar cualquier contenido multimedia que incumpla estas normas sin previo aviso.</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-white mb-3">3. Autenticación con Google (OAuth)</h2>
-            <p>
-              Riff utiliza los servicios de Google para facilitar tu acceso de forma segura. Nuestra aplicación solo 
-              solicita acceso a tu perfil básico y correo electrónico. <strong>No tenemos acceso a tus contraseñas de Google</strong>, 
-              no leemos tus correos personales ni alteramos la información de tu cuenta de Google.
-            </p>
+            <h2 className="text-xl font-semibold text-white mb-3">3. Cómo usamos tu información</h2>
+            <p>Utilizamos tus datos exclusivamente para el funcionamiento de la plataforma:</p>
+            <ul className="list-disc pl-5 mt-2 space-y-1">
+              <li>Para crear y gestionar tu cuenta de Usuario o Artista.</li>
+              <li>Para mostrarte eventos relevantes y permitirte interactuar con ellos.</li>
+              <li>Para enviarte notificaciones sobre cambios en eventos o actualizaciones.</li>
+            </ul>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-white mb-3">4. Protección y Compartición de Datos</h2>
+            <h2 className="text-xl font-semibold text-white mb-3">4. Autenticación con Google (OAuth)</h2>
             <p>
-              La seguridad de tus datos es nuestra prioridad. Tu información se almacena de forma segura y las 
-              comunicaciones con nuestro servidor están cifradas. <strong>Riff no vende, alquila ni comercializa 
-              tu información personal a terceros.</strong> Solo compartimos información genérica y pública (como 
-              tus reseñas o estadísticas de asistencia) dentro de la misma plataforma para que los artistas 
-              puedan interactuar con su audiencia.
+              Riff utiliza los servicios de Google para facilitar tu acceso de forma segura. Nuestra aplicación solo 
+              solicita acceso a tu perfil básico y correo electrónico. <strong>No tenemos acceso a tus contraseñas de Google</strong>, 
+              no leemos tus correos personales ni alteramos la información de tu cuenta.
             </p>
           </section>
 
@@ -62,22 +77,30 @@ export default function PrivacyPolicy() {
             <p>
               De acuerdo con la legislación vigente aplicable en México, tienes derecho a acceder, rectificar, 
               cancelar u oponerte al uso de tus datos personales. Puedes eliminar tus reseñas, dejar de seguir 
-              artistas o solicitar la eliminación permanente de tu cuenta en cualquier momento contactando 
-              a nuestro equipo de soporte.
+              artistas o solicitar la eliminación permanente de tu cuenta en cualquier momento.
             </p>
           </section>
 
+          {/* SECCIÓN DE CONTACTO */}
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">6. Contacto</h2>
             <p>
-              Si tienes preguntas, dudas o solicitudes relacionadas con esta Política de Privacidad o el manejo 
-              de tus datos en Riff, por favor contáctanos en:
+              Si tienes preguntas, dudas o solicitudes relacionadas con esta Política de Privacidad, 
+              el manejo de tus datos o el contenido publicado en Riff, por favor contáctanos en:
             </p>
-            <div className="mt-4 p-4 bg-riff-background/50 rounded-sm border border-white/10">
-              <p className="font-medium text-riff-primary">brianluisruizperez@gmail.com</p>
-              <p className="font-medium text-riff-primary">diegoazarate110800@gmail.com</p>
-              <p className="font-medium text-riff-primary">camachogomezjuanmanue@gmail.com</p>
-              <p className="text-sm text-white/50 mt-1">Chiapas, México.</p>
+            <div className="mt-4 p-5 bg-white/5 rounded-md border border-white/10 flex flex-col gap-3">
+              <a href="mailto:brianluisruizperez@gmail.com" className="text-riff-primary hover:text-riff-primary-dark transition-colors font-medium">
+                brianluisruizperez@gmail.com
+              </a>
+              <a href="mailto:diegoazarate110800@gmail.com" className="text-riff-primary hover:text-riff-primary-dark transition-colors font-medium">
+                diegoazarate110800@gmail.com
+              </a>
+              <a href="mailto:camachogomezjuanmanue@gmail.com" className="text-riff-primary hover:text-riff-primary-dark transition-colors font-medium">
+                camachogomezjuanmanue@gmail.com
+              </a>
+              <div className="border-t border-white/10 pt-3 mt-1">
+                <p className="text-sm text-white/50">Chiapas, México.</p>
+              </div>
             </div>
           </section>
 
