@@ -75,6 +75,8 @@ export default function PrivacyPolicy() {
             </p>
             <div className="mt-4 p-4 bg-riff-background/50 rounded-sm border border-white/10">
               <p className="font-medium text-riff-primary">brianluisruizperez@gmail.com</p>
+              <p className="font-medium text-riff-primary">diegoazarate110800@gmail.com</p>
+              <p className="font-medium text-riff-primary">camachogomezjuanmanue@gmail.com</p>
               <p className="text-sm text-white/50 mt-1">Chiapas, México.</p>
             </div>
           </section>
