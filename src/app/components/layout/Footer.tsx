@@ -42,9 +42,14 @@ export default function Footer() {
 
         {/* Copyright y links */}
         <div className="border-t border-riff-background/30 py-4 sm:py-6">
-          <div className="flex flex-col items-center text-xs sm:text-sm text-riff-background/60">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 text-xs sm:text-sm text-riff-background/60">
             <p>© {new Date().getFullYear()} Riff. Todos los derechos reservados.</p>
-            
+            <Link 
+              href="/privacy" 
+              className="hover:text-riff-background transition-colors underline underline-offset-4"
+            >
+              Política de Privacidad
+            </Link>
           </div>
         </div>
       </div>
