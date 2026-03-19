@@ -1,0 +1,23 @@
+
+> frontend@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 11.4s
+  Running TypeScript ...
+Failed to compile.
+
+./src/app/components/layout/Header.tsx:119:78
+Type error: Property 'userId' does not exist on type 'JWTPayload'.
+
+[0m [90m 117 |[39m       [36mif[39m (res[33m.[39mok) {
+ [90m 118 |[39m         [36mconst[39m data [33m=[39m [36mawait[39m res[33m.[39mjson()[33m;[39m
+[31m[1m>[22m[39m[90m 119 |[39m         [36mconst[39m resolvedUserId [33m=[39m [33mString[39m(data[33m.[39mid [33m?[39m[33m?[39m tokenData[33m?[39m[33m.[39mid [33m?[39m[33m?[39m tokenData[33m?[39m[33m.[39muserId [33m?[39m[33m?[39m tokenData[33m?[39m[33m.[39msub [33m?[39m[33m?[39m [32m''[39m)[33m;[39m
+ [90m     |[39m                                                                              [31m[1m^[22m[39m
+ [90m 120 |[39m         [36mconst[39m resolvedName [33m=[39m normalizeDisplayName(data[33m.[39mname [33m?[39m[33m?[39m tokenData[33m?[39m[33m.[39mname[33m,[39m tokenData[33m?[39m[33m.[39mname [33m||[39m [32m'Usuario'[39m)[33m;[39m
+ [90m 121 |[39m         [36mconst[39m resolvedEmail [33m=[39m data[33m.[39memail [33m?[39m[33m?[39m tokenData[33m?[39m[33m.[39memail [33m?[39m[33m?[39m [32m''[39m[33m;[39m
+ [90m 122 |[39m         setProfileImage(resolveProfileImage(data[33m.[39mprofileImage[33m,[39m resolvedEmail [33m||[39m resolvedName))[33m;[39m[0m
+Next.js build worker exited with code: 1 and signal: null

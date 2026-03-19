@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { FiSearch } from 'react-icons/fi';
+import { FiBell, FiSearch } from 'react-icons/fi';
 import { API_BASE_URL } from '@/app/config/api';
 import { getValidToken, getUserFromToken } from '@/app/utils/jwt';
 import { normalizeDisplayName, resolveProfileImage } from '@/app/utils/avatar';
@@ -14,11 +14,79 @@ interface HeaderProps {
   searchValue?: string;
 }
 
+interface NotificationItem {
+  id: string;
+  message: string;
+  type: string;
+  createdAt?: string;
+  link?: string;
+  unread: boolean;
+}
+
+function normalizeNotificationPayload(payload: unknown): Record<string, unknown>[] {
+  if (Array.isArray(payload)) return payload as Record<string, unknown>[];
+  if (!payload || typeof payload !== 'object') return [];
+
+  const record = payload as Record<string, unknown>;
+  const candidates = [record.data, record.items, record.notifications];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate as Record<string, unknown>[];
+    }
+  }
+
+  return [];
+}
+
+function normalizeNotification(item: Record<string, unknown>): NotificationItem {
+  const id = String(item.id ?? item._id ?? crypto.randomUUID());
+  const message = String(item.message ?? 'Nueva notificación');
+  const type = String(item.type ?? 'notification');
+  const createdAt = typeof item.createdAt === 'string'
+    ? item.createdAt
+    : typeof item.created_at === 'string'
+      ? item.created_at
+      : undefined;
+  const link = typeof item.deepLink === 'string'
+    ? item.deepLink
+    : typeof item.postUrl === 'string'
+      ? item.postUrl
+      : typeof item.url === 'string'
+        ? item.url
+        : undefined;
+  const unread = typeof item.read === 'boolean'
+    ? !item.read
+    : typeof item.isRead === 'boolean'
+      ? !item.isRead
+      : true;
+
+  return { id, message, type, createdAt, link, unread };
+}
+
+function formatNotificationDate(value?: string): string {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleString('es-MX', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default function Header({ onSearch, searchValue }: HeaderProps) {
   const [internalQuery, setInternalQuery] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>('');
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const notificationsRef = useRef<HTMLDivElement | null>(null);
   const pathname = usePathname();
 
   // Sincronizar con valor externo si viene del padre
@@ -36,6 +104,8 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
       setIsAuthenticated(false);
       setProfileImage(null);
       setUserName('');
+      setCurrentUserId('');
+      setNotifications([]);
       return;
     }
     setIsAuthenticated(true);
@@ -46,13 +116,53 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
       });
       if (res.ok) {
         const data = await res.json();
+        const tokenDataRecord = (tokenData ?? null) as Record<string, unknown> | null;
+        const tokenUserId = typeof tokenDataRecord?.userId === 'string'
+          ? tokenDataRecord.userId
+          : typeof tokenDataRecord?.sub === 'string'
+            ? tokenDataRecord.sub
+            : undefined;
+        const resolvedUserId = String(data.id ?? tokenData?.id ?? tokenUserId ?? '');
         const resolvedName = normalizeDisplayName(data.name ?? tokenData?.name, tokenData?.name || 'Usuario');
         const resolvedEmail = data.email ?? tokenData?.email ?? '';
         setProfileImage(resolveProfileImage(data.profileImage, resolvedEmail || resolvedName));
         setUserName(resolvedName);
+        setCurrentUserId(resolvedUserId);
       }
     } catch { /* silencioso */ }
   };
+
+  const loadNotifications = useCallback(async () => {
+    const token = getValidToken();
+    if (!token || !currentUserId) {
+      setNotifications([]);
+      return;
+    }
+
+    setNotificationsLoading(true);
+    setNotificationsError(null);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/notifications/user/${encodeURIComponent(currentUserId)}?page=1&limit=10`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error('No se pudieron cargar las notificaciones.');
+      }
+
+      const payload = await res.json();
+      const list = normalizeNotificationPayload(payload).map(normalizeNotification);
+      setNotifications(list);
+    } catch (error) {
+      setNotificationsError(error instanceof Error ? error.message : 'Error cargando notificaciones.');
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, [currentUserId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -67,6 +177,24 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
     };
   }, [pathname]);
 
+  useEffect(() => {
+    setNotificationsOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!notificationsRef.current) return;
+      if (!notificationsRef.current.contains(event.target as Node)) {
+        setNotificationsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [notificationsOpen]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setInternalQuery(value);
@@ -78,6 +206,15 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
   };
 
   const initial = userName ? userName.charAt(0).toUpperCase() : 'U';
+  const unreadCount = notifications.filter((item) => item.unread).length;
+
+  const handleToggleNotifications = () => {
+    const nextOpen = !notificationsOpen;
+    setNotificationsOpen(nextOpen);
+    if (nextOpen) {
+      void loadNotifications();
+    }
+  };
 
   return (
     <header className="sticky top-0 z-40 w-full bg-riff-header backdrop-blur-md">
@@ -116,28 +253,116 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
               Inicio
             </Link>
             {isAuthenticated ? (
-              <Link
-                href="/profile"
-                className={`flex items-center gap-2 text-sm sm:text-base font-semibold transition-colors ${
-                  pathname === '/profile' ? 'text-riff-primary' : 'text-riff-background hover:text-riff-primary'
-                }`}
-              >
-                {/* Avatar del usuario */}
-                <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-riff-primary-dark to-riff-primary flex items-center justify-center border border-white/20">
-                  {profileImage ? (
-                    <Image
-                      src={profileImage}
-                      alt={userName}
-                      width={32}
-                      height={32}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-white text-xs font-bold">{initial}</span>
+              <div className="flex items-center gap-3">
+                <div className="relative" ref={notificationsRef}>
+                  <button
+                    type="button"
+                    onClick={handleToggleNotifications}
+                    className="relative p-1.5 rounded-full text-riff-background hover:text-riff-primary hover:bg-white/10 transition-colors"
+                    aria-label="Abrir notificaciones"
+                  >
+                    <FiBell className="w-5 h-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] leading-4 text-center font-bold">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {notificationsOpen && (
+                    <div className="absolute right-0 mt-2 w-[320px] max-h-[420px] overflow-y-auto rounded-md border border-white/10 bg-riff-header shadow-xl z-50">
+                      <div className="px-3 py-2 border-b border-white/10 text-sm text-white/90 font-semibold">
+                        Notificaciones
+                      </div>
+
+                      {notificationsLoading ? (
+                        <div className="px-3 py-4 text-sm text-white/60">Cargando...</div>
+                      ) : notificationsError ? (
+                        <div className="px-3 py-4 text-sm text-red-300">{notificationsError}</div>
+                      ) : notifications.length === 0 ? (
+                        <div className="px-3 py-4 text-sm text-white/60">No tienes notificaciones.</div>
+                      ) : (
+                        <ul className="divide-y divide-white/10">
+                          {notifications.map((item) => {
+                            const dateLabel = formatNotificationDate(item.createdAt);
+                            const content = (
+                              <>
+                                <div className="flex items-start gap-2">
+                                  {item.unread && <span className="mt-1 w-2 h-2 rounded-full bg-riff-primary flex-shrink-0" />}
+                                  <div className="min-w-0">
+                                    <p className="text-sm text-white/90 leading-snug break-words">{item.message}</p>
+                                    <p className="text-[11px] text-white/50 mt-1 uppercase tracking-wide">{item.type}</p>
+                                    {dateLabel && <p className="text-[11px] text-white/40 mt-1">{dateLabel}</p>}
+                                  </div>
+                                </div>
+                              </>
+                            );
+
+                            if (item.link?.startsWith('http://') || item.link?.startsWith('https://')) {
+                              return (
+                                <li key={item.id}>
+                                  <a
+                                    href={item.link}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="block px-3 py-3 hover:bg-white/5 transition-colors"
+                                    onClick={() => setNotificationsOpen(false)}
+                                  >
+                                    {content}
+                                  </a>
+                                </li>
+                              );
+                            }
+
+                            if (item.link?.startsWith('/')) {
+                              return (
+                                <li key={item.id}>
+                                  <Link
+                                    href={item.link}
+                                    className="block px-3 py-3 hover:bg-white/5 transition-colors"
+                                    onClick={() => setNotificationsOpen(false)}
+                                  >
+                                    {content}
+                                  </Link>
+                                </li>
+                              );
+                            }
+
+                            return (
+                              <li key={item.id} className="px-3 py-3">
+                                {content}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
                   )}
                 </div>
-                <span className="hidden sm:inline truncate max-w-[120px]">{userName || 'Perfil'}</span>
-              </Link>
+
+                <Link
+                  href="/profile"
+                  className={`flex items-center gap-2 text-sm sm:text-base font-semibold transition-colors ${
+                    pathname === '/profile' ? 'text-riff-primary' : 'text-riff-background hover:text-riff-primary'
+                  }`}
+                >
+                  {/* Avatar del usuario */}
+                  <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-riff-primary-dark to-riff-primary flex items-center justify-center border border-white/20">
+                    {profileImage ? (
+                      <Image
+                        src={profileImage}
+                        alt={userName}
+                        width={32}
+                        height={32}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-white text-xs font-bold">{initial}</span>
+                    )}
+                  </div>
+                  <span className="hidden sm:inline truncate max-w-[120px]">{userName || 'Perfil'}</span>
+                </Link>
+              </div>
             ) : (
               <Link
                 href="/login"
