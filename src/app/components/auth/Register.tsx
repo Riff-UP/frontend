@@ -9,6 +9,7 @@ import { useRegister } from "../../hooks/useRegister";
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   
   const {
     formData,
@@ -137,7 +138,7 @@ export default function Register() {
         {/* Botón Registrarse */}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !acceptedPrivacy}
           className="w-full py-2.5
                     bg-gradient-to-r from-riff-primary-dark to-riff-primary
                     text-white font-semibold rounded-lg 
@@ -170,7 +171,7 @@ export default function Register() {
       {/* Botón Google */}
       <button
         onClick={handleGoogleRegister}
-        disabled={loading}
+        disabled={loading || !acceptedPrivacy}
         className="w-full py-2.5 bg-white border-1 rounded-lg 
                    flex items-center justify-center gap-3 
                    hover:border-riff-primary 
@@ -188,6 +189,22 @@ export default function Register() {
           Continuar con Google
         </span>
       </button>
+
+      <label className="flex items-start gap-3 text-xs sm:text-sm text-riff-text-secondary">
+        <input
+          type="checkbox"
+          checked={acceptedPrivacy}
+          onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded border border-riff-login accent-riff-primary"
+        />
+        <span>
+          He leído y acepto la{' '}
+          <Link href="/privacy" className="text-riff-primary hover:text-riff-primary-dark underline underline-offset-2">
+            Política de Privacidad
+          </Link>
+          .
+        </span>
+      </label>
 
       {/* Link a login */}
       <p className="text-center text-riff-text-secondary pt-4">

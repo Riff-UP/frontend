@@ -3,7 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-export default function PrivacyBanner() {
+interface PrivacyBannerProps {
+  variant?: 'fixed' | 'inline';
+}
+
+export default function PrivacyBanner({ variant = 'fixed' }: PrivacyBannerProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -22,6 +26,28 @@ export default function PrivacyBanner() {
 
   if (!isVisible) return null;
 
+  if (variant === 'inline') {
+    return (
+      <div className="rounded-lg border border-riff-primary/25 bg-white/5 p-3 sm:p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <p className="text-white/80 text-xs sm:text-sm text-center sm:text-left sm:flex-1">
+            Riff utiliza cookies y recopila datos básicos. Al continuar, aceptas nuestra{' '}
+            <Link href="/privacy" className="text-riff-primary hover:text-riff-registro font-medium underline underline-offset-2 transition-colors">
+              Política de Privacidad
+            </Link>
+            .
+          </p>
+          <button
+            onClick={handleAccept}
+            className="w-full sm:w-auto px-4 py-2 bg-linear-to-r from-riff-primary-dark to-riff-primary text-white rounded-sm font-medium text-xs sm:text-sm hover:opacity-90 transition-opacity whitespace-nowrap"
+          >
+            Entendido
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-riff-header border-t border-riff-primary/30 p-4 sm:p-6 shadow-2xl animate-in slide-in-from-bottom-full duration-500">
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -31,7 +57,12 @@ export default function PrivacyBanner() {
             Política de Privacidad
           </Link>.
         </p>
-        
+        <button
+          onClick={handleAccept}
+          className="w-full sm:w-auto px-6 py-2.5 bg-linear-to-r from-riff-primary-dark to-riff-primary text-white rounded-sm font-medium text-sm hover:opacity-90 transition-opacity whitespace-nowrap"
+        >
+          Entendido
+        </button>
       </div>
     </div>
   );
