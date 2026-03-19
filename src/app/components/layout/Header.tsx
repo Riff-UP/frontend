@@ -23,6 +23,8 @@ interface NotificationItem {
   unread: boolean;
 }
 
+const NOTIFICATIONS_TIMEOUT_MS = 10000;
+
 function normalizeNotificationPayload(payload: unknown): Record<string, unknown>[] {
   if (Array.isArray(payload)) return payload as Record<string, unknown>[];
   if (!payload || typeof payload !== 'object') return [];
@@ -111,17 +113,22 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
     setIsAuthenticated(true);
     try {
       const tokenData = getUserFromToken(token);
+      const tokenDataRecord = (tokenData ?? null) as Record<string, unknown> | null;
+      const tokenUserId = typeof tokenDataRecord?.userId === 'string'
+        ? tokenDataRecord.userId
+        : typeof tokenDataRecord?.sub === 'string'
+          ? tokenDataRecord.sub
+          : tokenData?.id;
+
+      if (tokenUserId) {
+        setCurrentUserId(String(tokenUserId));
+      }
+
       const res = await fetch(`${API_BASE_URL}/users/me`, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
       if (res.ok) {
         const data = await res.json();
-        const tokenDataRecord = (tokenData ?? null) as Record<string, unknown> | null;
-        const tokenUserId = typeof tokenDataRecord?.userId === 'string'
-          ? tokenDataRecord.userId
-          : typeof tokenDataRecord?.sub === 'string'
-            ? tokenDataRecord.sub
-            : undefined;
         const resolvedUserId = String(data.id ?? tokenData?.id ?? tokenUserId ?? '');
         const resolvedName = normalizeDisplayName(data.name ?? tokenData?.name, tokenData?.name || 'Usuario');
         const resolvedEmail = data.email ?? tokenData?.email ?? '';
@@ -142,24 +149,34 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
     setNotificationsLoading(true);
     setNotificationsError(null);
 
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), NOTIFICATIONS_TIMEOUT_MS);
+
     try {
       const res = await fetch(`${API_BASE_URL}/notifications/user/${encodeURIComponent(currentUserId)}?page=1&limit=10`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        cache: 'no-store',
+        signal: controller.signal,
       });
 
       if (!res.ok) {
-        throw new Error('No se pudieron cargar las notificaciones.');
+        throw new Error(`No se pudieron cargar las notificaciones (${res.status}).`);
       }
 
       const payload = await res.json();
       const list = normalizeNotificationPayload(payload).map(normalizeNotification);
       setNotifications(list);
     } catch (error) {
-      setNotificationsError(error instanceof Error ? error.message : 'Error cargando notificaciones.');
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setNotificationsError('La carga de notificaciones tardó demasiado. Intenta de nuevo.');
+      } else {
+        setNotificationsError(error instanceof Error ? error.message : 'Error cargando notificaciones.');
+      }
     } finally {
+      window.clearTimeout(timeoutId);
       setNotificationsLoading(false);
     }
   }, [currentUserId]);
@@ -254,7 +271,7 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
             </Link>
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
-                <div className="relative" ref={notificationsRef}>
+                <div className="relative order-2" ref={notificationsRef}>
                   <button
                     type="button"
                     onClick={handleToggleNotifications}
@@ -342,7 +359,7 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
 
                 <Link
                   href="/profile"
-                  className={`flex items-center gap-2 text-sm sm:text-base font-semibold transition-colors ${
+                  className={`order-1 flex items-center gap-2 text-sm sm:text-base font-semibold transition-colors ${
                     pathname === '/profile' ? 'text-riff-primary' : 'text-riff-background hover:text-riff-primary'
                   }`}
                 >
