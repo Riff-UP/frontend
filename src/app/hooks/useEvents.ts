@@ -20,6 +20,9 @@ export interface CreateEventData {
   event_date: string;
   location: string;
   sql_user_id?: string; // El backend lo requiere en el DTO (aunque el controller lo inyecta del JWT)
+  artistName?: string;
+  artistSlug?: string;
+  artistAvatar?: string;
 }
 
 export interface UpdateEventData {
@@ -27,6 +30,47 @@ export interface UpdateEventData {
   description?: string;
   event_date?: string;
   location?: string;
+  artistName?: string;
+  artistSlug?: string;
+  artistAvatar?: string;
+}
+
+function toSlug(raw: string): string {
+  return raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function buildEventMetadata(data: { artistName?: string; artistSlug?: string; artistAvatar?: string }): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {};
+
+  if (data.artistName?.trim()) {
+    metadata.artistName = data.artistName.trim();
+  }
+
+  if (data.artistSlug?.trim()) {
+    metadata.artistSlug = data.artistSlug.trim();
+  } else if (data.artistName?.trim()) {
+    const generatedSlug = toSlug(data.artistName);
+    if (generatedSlug) {
+      metadata.artistSlug = generatedSlug;
+    }
+  }
+
+  if (data.artistAvatar?.trim()) {
+    metadata.artistAvatar = data.artistAvatar.trim();
+  }
+
+  if (typeof window !== 'undefined') {
+    metadata.eventPathBase = '/events';
+    metadata.eventUrlBase = `${window.location.origin}/events`;
+  }
+
+  return metadata;
 }
 
 interface UseEventsReturn {
@@ -121,7 +165,11 @@ export function useEvents(): UseEventsReturn {
       } catch {
       }
 
-      const payload = { ...data, ...(sql_user_id ? { sql_user_id } : {}) };
+      const payload = {
+        ...data,
+        ...buildEventMetadata(data),
+        ...(sql_user_id ? { sql_user_id } : {}),
+      };
 
       const res = await fetch(`${API_URL}/events`, {
         method: 'POST',
@@ -158,13 +206,18 @@ export function useEvents(): UseEventsReturn {
     try {
       setError(null);
 
+      const payload = {
+        ...data,
+        ...buildEventMetadata(data),
+      };
+
       const res = await fetch(`${API_URL}/events/${id}`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {

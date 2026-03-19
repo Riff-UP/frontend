@@ -48,7 +48,49 @@ export interface CreatePostData {
   title?: string;
   description?: string;
   url?: string;          // URL de la canción (audio posts)
+  artistName?: string;
+  artistSlug?: string;
+  artistAvatar?: string;
   onUploadProgress?: (progressPercent: number, stage: string) => void;
+}
+
+function toSlug(raw: string): string {
+  return raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function buildPostCreationMetadata(userId: string, postData: CreatePostData): Record<string, unknown> {
+  const metadata: Record<string, unknown> = { sql_user_id: userId };
+
+  if (postData.artistName?.trim()) {
+    metadata.artistName = postData.artistName.trim();
+  }
+
+  if (postData.artistSlug?.trim()) {
+    metadata.artistSlug = postData.artistSlug.trim();
+  } else if (postData.artistName?.trim()) {
+    const generatedSlug = toSlug(postData.artistName);
+    if (generatedSlug) {
+      metadata.artistSlug = generatedSlug;
+    }
+  }
+
+  if (postData.artistAvatar?.trim()) {
+    metadata.artistAvatar = postData.artistAvatar.trim();
+  }
+
+  if (typeof window !== 'undefined') {
+    const origin = window.location.origin;
+    metadata.postPathBase = '/posts';
+    metadata.postUrlBase = `${origin}/posts`;
+  }
+
+  return metadata;
 }
 
 async function fetchWithTimeout(
@@ -151,7 +193,7 @@ export function usePosts(userId?: string) {
         if (!audioUrl) throw new Error('La URL de la canción es requerida');
 
         const payload = {
-          sql_user_id: userId,
+          ...buildPostCreationMetadata(userId, postData),
           type: 'audio' as const,
           title: postData.title ?? 'Sin título',
           content: audioUrl,
@@ -180,7 +222,7 @@ export function usePosts(userId?: string) {
         if (!textValue) throw new Error('La publicación no puede estar vacía');
 
         const payload: Record<string, unknown> = {
-          sql_user_id: userId,
+          ...buildPostCreationMetadata(userId, postData),
           type: 'text',
           title: textValue.substring(0, 100) || 'Nueva publicación',
           description: textValue,
@@ -198,7 +240,7 @@ export function usePosts(userId?: string) {
         // Fallback por compatibilidad con backends que no reconocen type:text
         if (!response.ok && (response.status === 400 || response.status === 415)) {
           const fallbackPayload: Record<string, unknown> = {
-            sql_user_id: userId,
+            ...buildPostCreationMetadata(userId, postData),
             title: textValue.substring(0, 100) || 'Nueva publicación',
             description: textValue,
             content: textValue,
@@ -242,7 +284,7 @@ export function usePosts(userId?: string) {
         });
 
         const payload: Record<string, unknown> = {
-          sql_user_id: userId,
+          ...buildPostCreationMetadata(userId, postData),
           type: mediaType,
           title: titleValue,
           description: descriptionValue,
@@ -265,7 +307,13 @@ export function usePosts(userId?: string) {
       }
 
       const formData = new FormData();
+      const creationMetadata = buildPostCreationMetadata(userId, postData);
       formData.append('sql_user_id', userId);
+      if (typeof creationMetadata.artistName === 'string') formData.append('artistName', creationMetadata.artistName);
+      if (typeof creationMetadata.artistSlug === 'string') formData.append('artistSlug', creationMetadata.artistSlug);
+      if (typeof creationMetadata.artistAvatar === 'string') formData.append('artistAvatar', creationMetadata.artistAvatar);
+      if (typeof creationMetadata.postPathBase === 'string') formData.append('postPathBase', creationMetadata.postPathBase);
+      if (typeof creationMetadata.postUrlBase === 'string') formData.append('postUrlBase', creationMetadata.postUrlBase);
       formData.append('type', mediaType);
       formData.append('title', titleValue);
       formData.append('description', descriptionValue);
@@ -291,7 +339,7 @@ export function usePosts(userId?: string) {
         if (mediaFile) mediaUrl = await uploadToR2(mediaFile);
 
         const payload: Record<string, unknown> = {
-          sql_user_id: userId,
+          ...buildPostCreationMetadata(userId, postData),
           type: mediaType,
           title: titleValue,
           description: descriptionValue,

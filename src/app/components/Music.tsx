@@ -49,6 +49,8 @@ export default function Musica() {
       title: data.title,
       url: data.url,
       description: data.description,
+      artistName: user.name,
+      artistAvatar: user.profileImage || undefined,
     });
     setShowAddModal(false);
     await fetchPosts();

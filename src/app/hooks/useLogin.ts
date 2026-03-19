@@ -28,6 +28,36 @@ function normalizeLoginErrorMessage(message: string): string {
   return message;
 }
 
+function normalizeOAuthErrorMessage(errorCode: string): string {
+  const normalized = errorCode.trim().toLowerCase();
+
+  if (normalized === 'google_auth_failed') {
+    return 'Error al autenticarse con Google. Por favor, intenta de nuevo.';
+  }
+
+  if (normalized === 'storage_failed') {
+    return 'Error al guardar la sesión. Por favor, verifica tu navegador.';
+  }
+
+  if (normalized === 'oauth_user_lookup') {
+    return 'No se pudo validar tu cuenta con Google contra la base de usuarios.';
+  }
+
+  if (
+    normalized === 'oauth_user_create' ||
+    normalized === 'oauth_user_create_failed' ||
+    normalized === 'oauth_register_failed'
+  ) {
+    return 'La autenticación con Google llegó al callback, pero falló la creación de tu cuenta.';
+  }
+
+  if (normalized) {
+    return `No se pudo completar el acceso con Google (código: ${normalized}).`;
+  }
+
+  return 'No se pudo completar el acceso con Google.';
+}
+
 export function useLogin() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState<string | null>(null);
@@ -84,10 +114,8 @@ export function useLogin() {
     }
 
     const errorParam = searchParams.get('error');
-    if (errorParam === 'google_auth_failed') {
-      setError('Error al autenticarse con Google. Por favor, intenta de nuevo.');
-    } else if (errorParam === 'storage_failed') {
-      setError('Error al guardar la sesión. Por favor, verifica tu navegador.');
+    if (errorParam) {
+      setError(normalizeOAuthErrorMessage(errorParam));
     }
   }, [router, searchParams]);
 

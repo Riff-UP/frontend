@@ -76,7 +76,13 @@ export default function Publications() {
   const handlePublish = async () => {
     if (!newPost.trim() && !selectedFile) return;
     if (!user) return;
-    const result = await createPost({ content: newPost, mediaFile: selectedFile || undefined, tags: [] });
+    const result = await createPost({
+      content: newPost,
+      mediaFile: selectedFile || undefined,
+      tags: [],
+      artistName: user.name,
+      artistAvatar: user.profileImage || undefined,
+    });
     if (result) {
       setNewPost('');
       if (selectedMediaPreview) {

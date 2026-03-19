@@ -80,7 +80,9 @@ export default function Events() {
         title: newEvent.title,
         location: newEvent.location,
         event_date: eventDateTime,
-        description: newEvent.description
+        description: newEvent.description,
+        artistName: user.name,
+        artistAvatar: user.profileImage || undefined,
       });
       if (!success) {
         setSaving(false);
@@ -92,6 +94,8 @@ export default function Events() {
         location: newEvent.location,
         event_date: eventDateTime,
         description: newEvent.description,
+        artistName: user.name,
+        artistAvatar: user.profileImage || undefined,
       });
 
       if (!result) {
