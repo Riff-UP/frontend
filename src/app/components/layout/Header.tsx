@@ -25,6 +25,19 @@ interface NotificationItem {
 
 const NOTIFICATIONS_TIMEOUT_MS = 10000;
 
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 function normalizeNotificationPayload(payload: unknown): Record<string, unknown>[] {
   if (Array.isArray(payload)) return payload as Record<string, unknown>[];
   if (!payload || typeof payload !== 'object') return [];
@@ -149,18 +162,27 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
     setNotificationsLoading(true);
     setNotificationsError(null);
 
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), NOTIFICATIONS_TIMEOUT_MS);
-
     try {
-      const res = await fetch(`${API_BASE_URL}/notifications/user/${encodeURIComponent(currentUserId)}?page=1&limit=10`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store',
-        signal: controller.signal,
-      });
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+
+      // 1) Ruta dedicada por usuario
+      let res = await fetchWithTimeout(
+        `${API_BASE_URL}/notifications/user/${encodeURIComponent(currentUserId)}?page=1&limit=10`,
+        { headers, cache: 'no-store' },
+        NOTIFICATIONS_TIMEOUT_MS,
+      );
+
+      // 2) Fallback a listado filtrado por query si la ruta dedicada falla
+      if (!res.ok) {
+        res = await fetchWithTimeout(
+          `${API_BASE_URL}/notifications?userIdReceiver=${encodeURIComponent(currentUserId)}&page=1&limit=10`,
+          { headers, cache: 'no-store' },
+          NOTIFICATIONS_TIMEOUT_MS,
+        );
+      }
 
       if (!res.ok) {
         throw new Error(`No se pudieron cargar las notificaciones (${res.status}).`);
@@ -176,7 +198,6 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
         setNotificationsError(error instanceof Error ? error.message : 'Error cargando notificaciones.');
       }
     } finally {
-      window.clearTimeout(timeoutId);
       setNotificationsLoading(false);
     }
   }, [currentUserId]);
