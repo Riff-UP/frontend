@@ -32,7 +32,7 @@ export default function PrivacyBanner({ variant = 'fixed' }: PrivacyBannerProps)
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <p className="text-white/80 text-xs sm:text-sm text-center sm:text-left sm:flex-1">
             Riff utiliza cookies y recopila datos básicos. Al continuar, aceptas nuestra{' '}
-            <Link href="/privacy" className="text-riff-primary-dark/80 hover:text-riff-registro font-medium underline underline-offset-2 transition-colors">
+            <Link href="/privacy" className="text-riff-primary-dark hover:text-riff-registro font-medium underline underline-offset-2 transition-colors">
               Política de Privacidad
             </Link>
             .

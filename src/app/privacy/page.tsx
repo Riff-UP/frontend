@@ -22,13 +22,13 @@ export default function PrivacyPolicy() {
           <section className="p-4 bg-riff-primary/10 border border-riff-primary/20 rounded-md">
             <h2 className="text-lg font-semibold text-riff-primary mb-2">1. Propósito de la Plataforma</h2>
             <p className="text-white/90">
-              Riff es una plataforma digital orientada a la promoción y difusión de artistas musicales locales. 
-              Está diseñada para músicos (solitario o banda) y usuarios interesados en descubrir contenido local, 
+              Riff es una plataforma digital orientada a la promoción y difusión de músicos locales. 
+              Está diseñada para músicos (en solitario o bandas) y usuarios interesados en descubrir contenido local, 
               permitiendo la creación de perfiles, publicación de contenido multimedia, difusión de eventos y la interacción 
               directa entre artistas y su audiencia.
             </p>
             <p className="text-white/90 mt-3">
-              <strong>Importante:</strong>Riff es una herramienta de promoción y análisis de interacción digital; 
+              <strong>Importante:</strong> Riff es una herramienta de promoción y análisis de interacción digital; 
               no garantiza el éxito comercial ni sustituye estrategias profesionales de marketing, 
               distribución musical o representación artística.
             </p>
@@ -42,8 +42,10 @@ export default function PrivacyPolicy() {
               el usuario acepta que los datos estadísticos generados a partir de su interacción 
               (como visualizaciones, seguidores, reacciones, publicaciones y asistencia a eventos) 
               puedan ser utilizados de manera anónima para fines de análisis y validación de hipótesis.
-
+            </p>
+            <p>
               En particular, el sistema está orientado a comprobar la siguiente hipótesis de investigación:
+
             </p>
             <blockquote className="mt-3 border-l-2 border-riff-primary/40 pl-4 text-white/90 italic">
               "El uso de una plataforma digital especializada en artistas musicales locales incrementa 
@@ -61,7 +63,6 @@ export default function PrivacyPolicy() {
             </ul>
           </section>
 
-          {/* NUEVA SECCIÓN: Contenido Multimedia */}
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">4. Contenido Generado por el Usuario (Fotos y Videos)</h2>
             <p>
@@ -111,7 +112,7 @@ export default function PrivacyPolicy() {
               el manejo de tus datos o el contenido publicado en Riff, por favor contáctanos en:
             </p>
             <div className="mt-4 p-5 bg-white/5 rounded-md border border-white/10 flex flex-col gap-3">
-              <a href="mailto:riff2496@gmail.com" className="text-riff-primary hover:text-riff-primary-dark transition-colors font-medium">
+              <a href="mailto:riff2496@gmail.com" className="text-riff-primary hover:text-riff-registro transition-colors font-medium">
                 riff2496@gmail.com
               </a>
               <div className="border-t border-white/10 pt-3 mt-1">
