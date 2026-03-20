@@ -136,21 +136,6 @@ export default function Login() {
         </span>
       </button>
 
-      <label className="flex items-center justify-center gap-3 text-xs sm:text-sm text-riff-text-secondary text-center">
-        <input
-          type="checkbox"
-          checked={acceptedPrivacy}
-          onChange={(e) => setAcceptedPrivacy(e.target.checked)}
-          className="h-4 w-4 rounded border border-riff-login accent-riff-primary"
-        />
-        <span>
-          He leído y acepto la{' '}
-          <Link href="/privacy" className="text-riff-primary-dark/80 hover:text-riff-primary-dark underline underline-offset-2">
-            Política de Privacidad
-          </Link>
-          .
-        </span>
-      </label>
 
       {/* Link a registro */}
       <p className="text-center text-riff-text-secondary pt-4">
