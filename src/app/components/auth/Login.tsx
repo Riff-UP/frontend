@@ -8,7 +8,6 @@ import { useLogin } from "../../hooks/useLogin";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
-  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   
   const {
     formData,
@@ -86,7 +85,7 @@ export default function Login() {
 
         <button
           type="submit"
-          disabled={loading || !acceptedPrivacy}
+          disabled={loading}
           className="w-full py-2.5
                     bg-gradient-to-r from-riff-primary-dark to-riff-primary
                     text-white font-semibold rounded-lg 
@@ -117,7 +116,7 @@ export default function Login() {
 
       <button
         onClick={handleGoogleLogin}
-        disabled={loading || !acceptedPrivacy}
+        disabled={loading}
         className="w-full py-2.5 bg-white border-1 rounded-lg 
                    flex items-center justify-center gap-3 
                    hover:border-riff-primary 
