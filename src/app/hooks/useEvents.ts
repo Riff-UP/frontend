@@ -83,6 +83,17 @@ interface UseEventsReturn {
   refreshEvents: () => Promise<void>;
 }
 
+async function readErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload = await response.json();
+    if (typeof payload?.message === 'string') return payload.message;
+    if (Array.isArray(payload?.message)) return payload.message.join(', ');
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function useEvents(): UseEventsReturn {
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -171,7 +182,7 @@ export function useEvents(): UseEventsReturn {
         ...(sql_user_id ? { sql_user_id } : {}),
       };
 
-      const res = await fetch(`${API_URL}/events`, {
+      let res = await fetch(`${API_URL}/events`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -180,9 +191,29 @@ export function useEvents(): UseEventsReturn {
         body: JSON.stringify(payload),
       });
 
+      // Compatibilidad: si el backend valida DTO estricto, reintentar solo con campos base.
+      if (res.status === 400) {
+        const minimalPayload = {
+          title: data.title,
+          description: data.description,
+          event_date: data.event_date,
+          location: data.location,
+          ...(sql_user_id ? { sql_user_id } : {}),
+        };
+
+        res = await fetch(`${API_URL}/events`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(minimalPayload),
+        });
+      }
+
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
-        throw new Error(errorData.message || `Error ${res.status}: ${res.statusText}`);
+        const message = await readErrorMessage(res, `Error ${res.status}: ${res.statusText}`);
+        throw new Error(message);
       }
 
       const newEvent = await res.json();
@@ -211,7 +242,7 @@ export function useEvents(): UseEventsReturn {
         ...buildEventMetadata(data),
       };
 
-      const res = await fetch(`${API_URL}/events/${id}`, {
+      let res = await fetch(`${API_URL}/events/${id}`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -220,9 +251,27 @@ export function useEvents(): UseEventsReturn {
         body: JSON.stringify(payload),
       });
 
+      if (res.status === 400) {
+        const minimalPayload: UpdateEventData = {
+          ...(data.title !== undefined ? { title: data.title } : {}),
+          ...(data.description !== undefined ? { description: data.description } : {}),
+          ...(data.event_date !== undefined ? { event_date: data.event_date } : {}),
+          ...(data.location !== undefined ? { location: data.location } : {}),
+        };
+
+        res = await fetch(`${API_URL}/events/${id}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(minimalPayload),
+        });
+      }
+
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al actualizar evento');
+        const message = await readErrorMessage(res, 'Error al actualizar evento');
+        throw new Error(message);
       }
 
       const updatedEvent = await res.json();
