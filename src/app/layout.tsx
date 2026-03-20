@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import PrivacyBanner from "@/app/components/common/PrivacyBanner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,7 +14,12 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Riff",
-  description: "Conecta con artistas, sigue sus publicaciones y no te pierdas ningún evento.",
+  description: "Conecta con artistas",
+  icons: {
+    icon: "/images/favicon.png",
+    shortcut: "/images/favicon.png",
+    apple: "/images/favicon.png",
+  },
 };
 
 export default function RootLayout({
@@ -30,7 +34,6 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         {children}
-        <PrivacyBanner/>
       </body>
     </html>
   );
