@@ -190,12 +190,12 @@ export default function Register() {
         </span>
       </button>
 
-      <label className="flex items-start gap-3 text-xs sm:text-sm text-riff-text-secondary">
+      <label className="flex items-center justify-center gap-3 text-xs sm:text-sm text-riff-text-secondary text-center">
         <input
           type="checkbox"
           checked={acceptedPrivacy}
           onChange={(e) => setAcceptedPrivacy(e.target.checked)}
-          className="mt-0.5 h-4 w-4 rounded border border-riff-login accent-riff-primary"
+          className="h-4 w-4 rounded border border-riff-login accent-riff-primary"
         />
         <span>
           He leído y acepto la{' '}

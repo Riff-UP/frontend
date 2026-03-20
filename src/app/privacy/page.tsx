@@ -20,40 +20,35 @@ export default function PrivacyPolicy() {
         <div className="space-y-8 text-white/80 leading-relaxed text-sm sm:text-base">
           
           <section className="p-4 bg-riff-primary/10 border border-riff-primary/20 rounded-md">
-            <h2 className="text-lg font-semibold text-riff-primary mb-2">1. Naturaleza y Propósito de la Plataforma</h2>
+            <h2 className="text-lg font-semibold text-riff-primary mb-2">1. Propósito de la Plataforma</h2>
             <p className="text-white/90">
-              ReSet es una herramienta digital de acompañamiento diseñada para adultos (mayores de 18 años)
-              que se encuentran en etapa de abstinencia activa o recuperación avanzada. La plataforma te permite
-              llevar una bitácora diaria de tu estado emocional, gestionar un sistema de rachas de sobriedad,
-              y mantener un enlace directo con una red de apoyo y un foro comunitario.
+              Riff es una plataforma digital orientada a la promoción y difusión de artistas musicales locales. 
+              Está diseñada para músicos (solitario o banda) y usuarios interesados en descubrir contenido local, 
+              permitiendo la creación de perfiles, publicación de contenido multimedia, difusión de eventos y la interacción 
+              directa entre artistas y su audiencia.
             </p>
             <p className="text-white/90 mt-3">
-              <strong>Importante:</strong> ReSet es una herramienta de apoyo y automonitoreo; en ningún
-              momento sustituye el diagnóstico, tratamiento médico, psicológico o psiquiátrico profesional.
+              <strong>Importante:</strong>Riff es una herramienta de promoción y análisis de interacción digital; 
+              no garantiza el éxito comercial ni sustituye estrategias profesionales de marketing, 
+              distribución musical o representación artística.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-white mb-3">2. Uso de Datos para Investigación Científica</h2>
-            <p>
-              Además de proporcionarte una red de apoyo, ReSet es un proyecto desarrollado por un equipo
-              de ingeniería de software integrado por:
-            </p>
-            <ul className="list-disc pl-5 mt-2 space-y-1">
-              <li>Gilberto Málaga Fernández</li>
-              <li>Luis Alberto Náfate Hernández</li>
-              <li>Jeshua Isaac Luna Zúñiga</li>
-            </ul>
+            <h2 className="text-xl font-semibold text-white mb-3">2. Uso de Datos con Propósito Académico</h2>
+            
             <p className="mt-3">
-              El proyecto tiene un propósito de investigación académica avalado bajo las normativas de salud.
-              Al utilizar la plataforma, aceptas que los datos estadísticos generados por tu interacción sirvan
-              para comprobar la siguiente hipótesis de investigación:
+              El proyecto tiene un propósito de investigación académica, por lo que, al utilizar la plataforma, 
+              el usuario acepta que los datos estadísticos generados a partir de su interacción 
+              (como visualizaciones, seguidores, reacciones, publicaciones y asistencia a eventos) 
+              puedan ser utilizados de manera anónima para fines de análisis y validación de hipótesis.
+
+              En particular, el sistema está orientado a comprobar la siguiente hipótesis de investigación:
             </p>
             <blockquote className="mt-3 border-l-2 border-riff-primary/40 pl-4 text-white/90 italic">
-              "La integración de un canal de enlace social dentro de la plataforma Reset actúa como un facilitador
-              para la apertura emocional del usuario. Se postula que la existencia de este recurso técnico incrementa
-              la frecuencia de los registros de vulnerabilidad, al reducir la percepción de aislamiento durante el
-              proceso de recuperación, independientemente de la naturaleza (química o conductual) de la adicción."
+              "El uso de una plataforma digital especializada en artistas musicales locales incrementa 
+              significativamente la visibilidad y la interacción de los usuarios en comparación con el uso de plataformas
+              digitales genéricas, al ofrecer herramientas específicas de promoción y conexión comunitaria."
             </blockquote>
           </section>
 
