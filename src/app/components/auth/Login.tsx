@@ -145,7 +145,7 @@ export default function Login() {
         />
         <span>
           He leído y acepto la{' '}
-          <Link href="/privacy" className="text-riff-primary hover:text-riff-primary-dark underline underline-offset-2">
+          <Link href="/privacy" className="text-riff-primary-dark/80 hover:text-riff-primary-dark underline underline-offset-2">
             Política de Privacidad
           </Link>
           .
