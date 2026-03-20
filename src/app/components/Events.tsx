@@ -81,8 +81,6 @@ export default function Events() {
         location: newEvent.location,
         event_date: eventDateTime,
         description: newEvent.description,
-        artistName: user.name,
-        artistAvatar: user.profileImage || undefined,
       });
       if (!success) {
         setSaving(false);
@@ -94,8 +92,6 @@ export default function Events() {
         location: newEvent.location,
         event_date: eventDateTime,
         description: newEvent.description,
-        artistName: user.name,
-        artistAvatar: user.profileImage || undefined,
       });
 
       if (!result) {
