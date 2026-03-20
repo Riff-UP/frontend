@@ -94,6 +94,45 @@ async function readErrorMessage(response: Response, fallback: string): Promise<s
   }
 }
 
+function getUserIdFromToken(token: string): string | undefined {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return undefined;
+    const payload = JSON.parse(atob(parts[1]));
+    return payload.id || payload.userId || payload.sub || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function sameEventDate(a?: string, b?: string): boolean {
+  if (!a || !b) return false;
+  const left = new Date(a).getTime();
+  const right = new Date(b).getTime();
+  if (Number.isNaN(left) || Number.isNaN(right)) {
+    return a === b;
+  }
+  return left === right;
+}
+
+async function fetchEventsSnapshot(token: string): Promise<EventData[]> {
+  const res = await fetch(`${API_URL}/events`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) return [];
+
+  const data = await res.json();
+  const allEvents: EventData[] = data.data || data || [];
+  const currentUserId = getUserIdFromToken(token);
+
+  if (!currentUserId) return allEvents;
+  return allEvents.filter((event) => String(event.sql_user_id) === currentUserId);
+}
+
 export function useEvents(): UseEventsReturn {
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -166,15 +205,7 @@ export function useEvents(): UseEventsReturn {
       setError(null);
 
       // Extraer userId del JWT para enviarlo como sql_user_id
-      let sql_user_id: string | undefined;
-      try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1]));
-          sql_user_id = payload.id || payload.userId || payload.sub || undefined;
-        }
-      } catch {
-      }
+      const sql_user_id = getUserIdFromToken(token);
 
       const payload = {
         ...data,
@@ -212,6 +243,20 @@ export function useEvents(): UseEventsReturn {
       }
 
       if (!res.ok) {
+        const snapshot = await fetchEventsSnapshot(token);
+        const persisted = snapshot.find((event) => {
+          return (
+            event.title === data.title
+            && event.location === data.location
+            && sameEventDate(event.event_date, data.event_date)
+          );
+        });
+
+        if (persisted) {
+          setEvents(snapshot);
+          return persisted;
+        }
+
         const message = await readErrorMessage(res, `Error ${res.status}: ${res.statusText}`);
         throw new Error(message);
       }
@@ -270,6 +315,21 @@ export function useEvents(): UseEventsReturn {
       }
 
       if (!res.ok) {
+        const snapshot = await fetchEventsSnapshot(token);
+        const persisted = snapshot.find((event) => event._id === id);
+
+        if (persisted) {
+          const titleOk = data.title === undefined || persisted.title === data.title;
+          const locationOk = data.location === undefined || persisted.location === data.location;
+          const descriptionOk = data.description === undefined || persisted.description === data.description;
+          const dateOk = data.event_date === undefined || sameEventDate(persisted.event_date, data.event_date);
+
+          if (titleOk && locationOk && descriptionOk && dateOk) {
+            setEvents(snapshot);
+            return true;
+          }
+        }
+
         const message = await readErrorMessage(res, 'Error al actualizar evento');
         throw new Error(message);
       }
