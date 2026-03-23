@@ -27,6 +27,30 @@ export function countFollowersInRecords(records: FollowRecord[], targetId: strin
 interface FollowersTotalResponse {
   userId?: string;
   totalFollowers?: number;
+  data?: {
+    userId?: string;
+    totalFollowers?: number;
+  };
+  result?: {
+    userId?: string;
+    totalFollowers?: number;
+  };
+}
+
+function parseFollowersTotal(payload: FollowersTotalResponse): number | undefined {
+  if (typeof payload?.totalFollowers === 'number') {
+    return payload.totalFollowers;
+  }
+
+  if (typeof payload?.data?.totalFollowers === 'number') {
+    return payload.data.totalFollowers;
+  }
+
+  if (typeof payload?.result?.totalFollowers === 'number') {
+    return payload.result.totalFollowers;
+  }
+
+  return undefined;
 }
 
 export async function fetchFollowersCount(targetId: string): Promise<number | undefined> {
@@ -44,16 +68,18 @@ export async function fetchFollowersCount(targetId: string): Promise<number | un
 
     if (totalResponse.ok) {
       const payload = (await totalResponse.json()) as FollowersTotalResponse;
-      if (typeof payload?.totalFollowers === 'number') {
-        return payload.totalFollowers;
+      const parsedTotal = parseFollowersTotal(payload);
+      if (typeof parsedTotal === 'number') {
+        return parsedTotal;
       }
-      return 0;
+      // Si el shape no coincide, continuar con fallback legacy.
     }
 
     // Mapeo esperado por gateway:
     // 404 (not found) y 400 (bad request) no deben romper UI.
+    // OJO: no devolvemos 0 inmediato para permitir fallback legacy en transicion.
     if (totalResponse.status === 404 || totalResponse.status === 400) {
-      return 0;
+      // Continuar con fallback.
     }
 
     // 504 timeout: intentar fallback legacy antes de devolver indefinido.
