@@ -13,6 +13,24 @@ interface Reaction {
   createdAt?: string;
 }
 
+function extractTotalReactions(payload: unknown): number | undefined {
+  if (!payload || typeof payload !== 'object') return undefined;
+
+  const record = payload as Record<string, unknown>;
+  const direct = record.totalReactions ?? record.count ?? record.total;
+  if (typeof direct === 'number' && Number.isFinite(direct)) return direct;
+
+  const nestedCandidates = [record.data, record.result];
+  for (const candidate of nestedCandidates) {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) continue;
+    const nested = candidate as Record<string, unknown>;
+    const nestedValue = nested.totalReactions ?? nested.count ?? nested.total;
+    if (typeof nestedValue === 'number' && Number.isFinite(nestedValue)) return nestedValue;
+  }
+
+  return undefined;
+}
+
 function extractId(raw: unknown): string {
   if (!raw) return '';
   if (typeof raw === 'string') return raw;
@@ -122,7 +140,8 @@ export function usePostReactions(userId?: string) {
 
   /**
    * Obtiene el conteo total de reacciones de uno o varios posts.
-   * Llama a GET /posts/reactions/post/:postId por cada postId.
+    * Llama a GET /posts/:postId/reactions/total por cada postId.
+    * Mantiene fallback al endpoint legacy /posts/reactions/post/:postId.
    */
   const fetchPostReactionCounts = useCallback(async (postIds: string[]) => {
     if (!postIds.length) return;
@@ -131,9 +150,15 @@ export function usePostReactions(userId?: string) {
 
     const results = await Promise.allSettled(
       postIds.map(postId =>
-        fetch(`${API_URL}/posts/reactions/post/${postId}`, {
+        fetch(`${API_URL}/posts/${postId}/reactions/total`, {
           headers: { Authorization: `Bearer ${token}` },
-        }).then(r => (r.ok ? r.json() : Promise.reject(r.status)))
+        })
+          .then(r => (r.ok ? r.json() : Promise.reject(r.status)))
+          .catch(() =>
+            fetch(`${API_URL}/posts/reactions/post/${postId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }).then(r => (r.ok ? r.json() : Promise.reject(r.status)))
+          )
       )
     );
 
@@ -142,14 +167,15 @@ export function usePostReactions(userId?: string) {
       results.forEach((result, i) => {
         if (result.status === 'fulfilled') {
           const data = result.value;
-          // El backend puede devolver un array de reacciones o { count: N }
-          const count = typeof data?.count === 'number'
-            ? data.count
+          // El backend puede devolver agregados ({ totalReactions }) o arreglo legacy.
+          const aggregateCount = extractTotalReactions(data);
+          const count = typeof aggregateCount === 'number'
+            ? aggregateCount
             : Array.isArray(data)
-            ? data.length
-            : Array.isArray(data?.data)
-            ? data.data.length
-            : 0;
+              ? data.length
+              : Array.isArray((data as { data?: unknown[] })?.data)
+                ? ((data as { data?: unknown[] }).data?.length ?? 0)
+                : 0;
           next.set(postIds[i], count);
         }
       });

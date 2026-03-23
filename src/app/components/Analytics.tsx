@@ -161,6 +161,32 @@ function eventName(value: unknown, fallback: string): string {
   return fallback;
 }
 
+function readNumericMetric(payload: unknown, directKeys: string[]): number | undefined {
+  if (!payload || typeof payload !== 'object') {
+    return undefined;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const nested = [record.data, record.result]
+    .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object' && !Array.isArray(entry));
+
+  for (const key of directKeys) {
+    const direct = record[key];
+    if (typeof direct === 'number' && Number.isFinite(direct)) {
+      return direct;
+    }
+
+    for (const node of nested) {
+      const nestedValue = node[key];
+      if (typeof nestedValue === 'number' && Number.isFinite(nestedValue)) {
+        return nestedValue;
+      }
+    }
+  }
+
+  return undefined;
+}
+
 export default function Analytics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -240,29 +266,43 @@ export default function Analytics() {
           return authorId === userId;
         });
 
-        const recentPosts = posts.slice(0, 25);
-        const postIds = recentPosts
-          .map((post) => extractId(post._id ?? post.id))
-          .filter((postId) => postId.length > 0);
+        const recentPosts = posts
+          .slice(0, 25)
+          .map((post) => ({
+            ...post,
+            postId: extractId(post._id ?? post.id),
+            createdAt: post.createdAt ?? post.created_at ?? post.date,
+          }))
+          .filter((post) => post.postId.length > 0);
 
         const reactionsResponses = await Promise.allSettled(
-          postIds.map((postId) => fetchJson(`/posts/reactions/post/${encodeURIComponent(postId)}`, token))
+          recentPosts.map((post) =>
+            fetchJson(`/posts/${encodeURIComponent(post.postId)}/reactions/total`, token)
+              .catch(() => fetchJson(`/posts/reactions/post/${encodeURIComponent(post.postId)}`, token))
+          )
         );
 
         const interactionsByWeek = weekBuckets.map(() => 0);
 
-        reactionsResponses.forEach((result) => {
+        reactionsResponses.forEach((result, index) => {
           if (result.status !== 'fulfilled') {
             return;
           }
 
-          toRecordArray(result.value).forEach((reaction) => {
-            const createdDate = toDate(reaction.createdAt ?? reaction.created_at ?? reaction.date);
-            const weekIndex = findWeekIndex(createdDate, weekBuckets);
-            if (weekIndex >= 0) {
-              interactionsByWeek[weekIndex] += 1;
-            }
-          });
+          const totalFromAggregate = readNumericMetric(result.value, ['totalReactions', 'count', 'total']);
+          const postDate = toDate(recentPosts[index]?.createdAt);
+          const weekIndex = findWeekIndex(postDate, weekBuckets);
+
+          if (typeof totalFromAggregate === 'number' && weekIndex >= 0) {
+            interactionsByWeek[weekIndex] += totalFromAggregate;
+            return;
+          }
+
+          // Fallback legacy: algunos entornos todavia devuelven arreglo de reacciones.
+          const legacyCount = toRecordArray(result.value).length;
+          if (legacyCount > 0 && weekIndex >= 0) {
+            interactionsByWeek[weekIndex] += legacyCount;
+          }
         });
 
         const interactionSeries: InteractionData[] = weekBuckets.map((bucket, index) => ({
@@ -284,11 +324,17 @@ export default function Analytics() {
           .slice(0, 12);
 
         const attendanceResults = await Promise.allSettled(
-          events.map((event) => fetchJson(`/events/attendance/event/${encodeURIComponent(event.id)}`, token))
+          events.map((event) =>
+            fetchJson(`/events/${encodeURIComponent(event.id)}/attendance/total`, token)
+              .catch(() => fetchJson(`/events/attendance/event/${encodeURIComponent(event.id)}`, token))
+          )
         );
 
         const ratingResults = await Promise.allSettled(
-          events.map((event) => fetchJson(`/events/reviews/event/${encodeURIComponent(event.id)}`, token))
+          events.map((event) =>
+            fetchJson(`/events/${encodeURIComponent(event.id)}/rating/average`, token)
+              .catch(() => fetchJson(`/events/reviews/event/${encodeURIComponent(event.id)}`, token))
+          )
         );
 
         const attendanceData: EventAttendanceData[] = events.map((event, index) => {
@@ -296,10 +342,15 @@ export default function Analytics() {
           let attendees = 0;
 
           if (response.status === 'fulfilled') {
-            attendees = toRecordArray(response.value).filter((entry) => {
-              const status = String(entry.status ?? '').toLowerCase();
-              return status !== 'cancelled';
-            }).length;
+            const totalFromAggregate = readNumericMetric(response.value, ['totalAttendees', 'attendees', 'count', 'total']);
+            if (typeof totalFromAggregate === 'number') {
+              attendees = totalFromAggregate;
+            } else {
+              attendees = toRecordArray(response.value).filter((entry) => {
+                const status = String(entry.status ?? '').toLowerCase();
+                return status !== 'cancelled';
+              }).length;
+            }
           }
 
           return {
@@ -315,15 +366,23 @@ export default function Analytics() {
           let averageRating = 0;
 
           if (response.status === 'fulfilled') {
-            const reviews = toRecordArray(response.value);
-            const ratingValues = reviews
-              .map((entry) => Number(entry.rating ?? entry.score ?? 0))
-              .filter((value) => Number.isFinite(value) && value > 0);
+            const averageFromAggregate = readNumericMetric(response.value, ['averageRating', 'avgRating', 'average', 'avg']);
+            const totalFromAggregate = readNumericMetric(response.value, ['totalRatings', 'ratingsCount', 'count', 'total']);
 
-            totalRatings = ratingValues.length;
-            averageRating = totalRatings > 0
-              ? ratingValues.reduce((sum, value) => sum + value, 0) / totalRatings
-              : 0;
+            if (typeof averageFromAggregate === 'number') {
+              averageRating = averageFromAggregate;
+              totalRatings = typeof totalFromAggregate === 'number' ? totalFromAggregate : 0;
+            } else {
+              const reviews = toRecordArray(response.value);
+              const ratingValues = reviews
+                .map((entry) => Number(entry.rating ?? entry.score ?? 0))
+                .filter((value) => Number.isFinite(value) && value > 0);
+
+              totalRatings = ratingValues.length;
+              averageRating = totalRatings > 0
+                ? ratingValues.reduce((sum, value) => sum + value, 0) / totalRatings
+                : 0;
+            }
           }
 
           return {
