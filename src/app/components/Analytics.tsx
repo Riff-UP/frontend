@@ -278,7 +278,6 @@ export default function Analytics() {
         const reactionsResponses = await Promise.allSettled(
           recentPosts.map((post) =>
             fetchJson(`/posts/${encodeURIComponent(post.postId)}/reactions/total`, token)
-              .catch(() => fetchJson(`/posts/reactions/post/${encodeURIComponent(post.postId)}`, token))
           )
         );
 
@@ -298,11 +297,6 @@ export default function Analytics() {
             return;
           }
 
-          // Fallback legacy: algunos entornos todavia devuelven arreglo de reacciones.
-          const legacyCount = toRecordArray(result.value).length;
-          if (legacyCount > 0 && weekIndex >= 0) {
-            interactionsByWeek[weekIndex] += legacyCount;
-          }
         });
 
         const interactionSeries: InteractionData[] = weekBuckets.map((bucket, index) => ({
@@ -326,14 +320,12 @@ export default function Analytics() {
         const attendanceResults = await Promise.allSettled(
           events.map((event) =>
             fetchJson(`/events/${encodeURIComponent(event.id)}/attendance/total`, token)
-              .catch(() => fetchJson(`/events/attendance/event/${encodeURIComponent(event.id)}`, token))
           )
         );
 
         const ratingResults = await Promise.allSettled(
           events.map((event) =>
             fetchJson(`/events/${encodeURIComponent(event.id)}/rating/average`, token)
-              .catch(() => fetchJson(`/events/reviews/event/${encodeURIComponent(event.id)}`, token))
           )
         );
 
@@ -343,14 +335,7 @@ export default function Analytics() {
 
           if (response.status === 'fulfilled') {
             const totalFromAggregate = readNumericMetric(response.value, ['totalAttendees', 'attendees', 'count', 'total']);
-            if (typeof totalFromAggregate === 'number') {
-              attendees = totalFromAggregate;
-            } else {
-              attendees = toRecordArray(response.value).filter((entry) => {
-                const status = String(entry.status ?? '').toLowerCase();
-                return status !== 'cancelled';
-              }).length;
-            }
+            attendees = typeof totalFromAggregate === 'number' ? totalFromAggregate : 0;
           }
 
           return {
@@ -372,16 +357,6 @@ export default function Analytics() {
             if (typeof averageFromAggregate === 'number') {
               averageRating = averageFromAggregate;
               totalRatings = typeof totalFromAggregate === 'number' ? totalFromAggregate : 0;
-            } else {
-              const reviews = toRecordArray(response.value);
-              const ratingValues = reviews
-                .map((entry) => Number(entry.rating ?? entry.score ?? 0))
-                .filter((value) => Number.isFinite(value) && value > 0);
-
-              totalRatings = ratingValues.length;
-              averageRating = totalRatings > 0
-                ? ratingValues.reduce((sum, value) => sum + value, 0) / totalRatings
-                : 0;
             }
           }
 

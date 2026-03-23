@@ -141,7 +141,6 @@ export function usePostReactions(userId?: string) {
   /**
    * Obtiene el conteo total de reacciones de uno o varios posts.
     * Llama a GET /posts/:postId/reactions/total por cada postId.
-    * Mantiene fallback al endpoint legacy /posts/reactions/post/:postId.
    */
   const fetchPostReactionCounts = useCallback(async (postIds: string[]) => {
     if (!postIds.length) return;
@@ -154,11 +153,6 @@ export function usePostReactions(userId?: string) {
           headers: { Authorization: `Bearer ${token}` },
         })
           .then(r => (r.ok ? r.json() : Promise.reject(r.status)))
-          .catch(() =>
-            fetch(`${API_URL}/posts/reactions/post/${postId}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }).then(r => (r.ok ? r.json() : Promise.reject(r.status)))
-          )
       )
     );
 
@@ -167,15 +161,11 @@ export function usePostReactions(userId?: string) {
       results.forEach((result, i) => {
         if (result.status === 'fulfilled') {
           const data = result.value;
-          // El backend puede devolver agregados ({ totalReactions }) o arreglo legacy.
+          // El backend puede devolver agregados directos o envueltos en data/result.
           const aggregateCount = extractTotalReactions(data);
           const count = typeof aggregateCount === 'number'
             ? aggregateCount
-            : Array.isArray(data)
-              ? data.length
-              : Array.isArray((data as { data?: unknown[] })?.data)
-                ? ((data as { data?: unknown[] }).data?.length ?? 0)
-                : 0;
+            : 0;
           next.set(postIds[i], count);
         }
       });
