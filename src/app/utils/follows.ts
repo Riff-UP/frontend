@@ -24,10 +24,43 @@ export function countFollowersInRecords(records: FollowRecord[], targetId: strin
   return records.filter((record) => getFollowTargetId(record) === targetId).length;
 }
 
+interface FollowersTotalResponse {
+  userId?: string;
+  totalFollowers?: number;
+}
+
 export async function fetchFollowersCount(targetId: string): Promise<number | undefined> {
   if (!targetId) return undefined;
 
   const headers = getAuthHeaders(false);
+
+  // Nuevo contrato de gateway: GET /users/:userId/followers/total
+  // Respuesta esperada: { userId, totalFollowers }
+  try {
+    const totalResponse = await fetch(
+      `${API_BASE_URL}/users/${encodeURIComponent(targetId)}/followers/total`,
+      { headers }
+    );
+
+    if (totalResponse.ok) {
+      const payload = (await totalResponse.json()) as FollowersTotalResponse;
+      if (typeof payload?.totalFollowers === 'number') {
+        return payload.totalFollowers;
+      }
+      return 0;
+    }
+
+    // Mapeo esperado por gateway:
+    // 404 (not found) y 400 (bad request) no deben romper UI.
+    if (totalResponse.status === 404 || totalResponse.status === 400) {
+      return 0;
+    }
+
+    // 504 timeout: intentar fallback legacy antes de devolver indefinido.
+  } catch {
+    // Silencioso: intentar fallback legacy.
+  }
+
   const encodedTargetId = encodeURIComponent(targetId);
   let sawExplicitEmpty = false;
 
