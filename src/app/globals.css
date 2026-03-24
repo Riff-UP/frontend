@@ -79,6 +79,28 @@
   background-color: var(--riff-shell-footer);
 }
 
+[data-theme='light'] .theme-force-light-text {
+  color: #e8eef8;
+}
+
+[data-theme='light'] .theme-force-light-text .text-white,
+[data-theme='light'] .theme-force-light-text .text-white\/90,
+[data-theme='light'] .theme-force-light-text .text-white\/80,
+[data-theme='light'] .theme-force-light-text .text-white\/70,
+[data-theme='light'] .theme-force-light-text .text-white\/60,
+[data-theme='light'] .theme-force-light-text .text-white\/50,
+[data-theme='light'] .theme-force-light-text .text-white\/40,
+[data-theme='light'] .theme-force-light-text .text-riff-background,
+[data-theme='light'] .theme-force-light-text .text-riff-background\/60,
+[data-theme='light'] .theme-force-light-text .text-riff-background\/30 {
+  color: #e8eef8 !important;
+}
+
+[data-theme='light'] .theme-force-light-text .placeholder-riff-background\/60::placeholder,
+[data-theme='light'] .theme-force-light-text .placeholder-white\/60::placeholder {
+  color: rgb(232 238 248 / 0.65) !important;
+}
+
 [data-theme='light'] .text-white {
   color: rgb(15 23 42) !important;
 }
