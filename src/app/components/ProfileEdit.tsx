@@ -570,9 +570,7 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
             >
               Cerrar sesión
             </button>
-            <p className="text-white/70 text-xs sm:text-sm">
-              La eliminación de cuenta está disponible en la sección Configuración.
-            </p>
+
           </div>
         </div>
     </div>

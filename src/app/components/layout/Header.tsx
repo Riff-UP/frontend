@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { FiBell, FiSearch } from 'react-icons/fi';
+import { FiMoon, FiSun } from 'react-icons/fi';
 import { API_BASE_URL } from '@/app/config/api';
 import { getValidToken, getUserFromToken } from '@/app/utils/jwt';
 import { normalizeDisplayName, resolveProfileImage } from '@/app/utils/avatar';
@@ -101,8 +102,28 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const notificationsRef = useRef<HTMLDivElement | null>(null);
   const pathname = usePathname();
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const attrTheme = document.documentElement.getAttribute('data-theme');
+    const savedTheme = localStorage.getItem('riff-theme');
+    const initialTheme: 'dark' | 'light' = (savedTheme === 'light' || savedTheme === 'dark')
+      ? savedTheme
+      : (attrTheme === 'light' ? 'light' : 'dark');
+    setTheme(initialTheme);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme: 'dark' | 'light' = theme === 'dark' ? 'light' : 'dark';
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('riff-theme', nextTheme);
+      document.documentElement.setAttribute('data-theme', nextTheme);
+    }
+    setTheme(nextTheme);
+  };
 
   // Sincronizar con valor externo si viene del padre
   useEffect(() => {
@@ -282,6 +303,15 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
           </form>
 
           <nav className="flex items-center gap-3 sm:gap-8">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="p-1.5 rounded-full text-riff-background hover:text-riff-primary hover:bg-white/10 transition-colors"
+              aria-label={theme === 'dark' ? 'Activar tema claro' : 'Activar tema oscuro'}
+              title={theme === 'dark' ? 'Tema claro' : 'Tema oscuro'}
+            >
+              {theme === 'dark' ? <FiSun className="w-5 h-5" /> : <FiMoon className="w-5 h-5" />}
+            </button>
             <Link
               href="/"
               className={`text-sm sm:text-base font-semibold transition-colors relative ${
