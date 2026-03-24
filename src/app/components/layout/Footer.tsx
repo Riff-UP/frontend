@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export default function Footer() {
   return (
-    <footer className="w-full bg-riff-header border-t border-white/5 mt-8 sm:mt-12">
+    <footer className="w-full theme-shell-footer border-t border-white/5 mt-8 sm:mt-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="py-6 sm:py-8 flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6">
           {/* Logo Riff */}

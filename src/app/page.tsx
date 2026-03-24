@@ -601,7 +601,7 @@ function HomeContent() {
                 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight"
                 style={{ textShadow: "2px 2px 8px rgba(0,0,0,0.7)" }}
               >
-                Con Riff, impulsa tu musica al siguiente nivel
+                Con Riff, impulsa tu música al siguiente nivel
               </h1>
             </div>
           </div>
@@ -837,137 +837,7 @@ function HomeContent() {
           </section>
         )}
 
-        {/* Feed Mixto */}
-        <section className="max-w-8xl mx-auto px-4 sm:px-4 lg:px-0 py-6 sm:py-8">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-white">Feed mixto</h2>
-            <span className="text-riff-text-secondary text-xs sm:text-sm">Videos, fotos y texto</span>
-          </div>
-
-          {mixedFeed.length === 0 ? (
-            <p className="text-riff-text-secondary py-8">Sin contenido para mostrar en el feed.</p>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-              {mixedFeed.map((publication, index) => (
-                <article
-                  key={`mix-${publication.id}-${index}`}
-                  className={`rounded-sm border overflow-hidden ${
-                    publication.mediaType === 'video'
-                      ? 'bg-black/60 border-riff-primary/40'
-                      : publication.mediaType === 'image'
-                        ? 'bg-riff-header border-white/5'
-                        : 'bg-riff-card border-white/10'
-                  } cursor-pointer`}
-                  onClick={() => setSelectedPublicationId(publication.id)}
-                >
-                  <div className="p-4">
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <Link
-                          href={`/artist/${publication.authorId}`}
-                          className="w-9 h-9 rounded-full bg-riff-primary/20 overflow-hidden flex items-center justify-center text-riff-primary font-semibold shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {publication.authorImage ? (
-                            <Image
-                              src={publication.authorImage}
-                              alt={publication.authorName}
-                              width={36}
-                              height={36}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            publication.authorName.charAt(0).toUpperCase()
-                          )}
-                        </Link>
-                        <div className="min-w-0">
-                          <Link
-                            href={`/artist/${publication.authorId}`}
-                            className="text-white font-semibold text-sm truncate hover:text-riff-primary transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {publication.authorName}
-                          </Link>
-                          <p className="text-riff-text-secondary text-xs">{formatPostDate(publication.createdAt)}</p>
-                        </div>
-                      </div>
-                      <span className="text-[10px] px-2 py-1 rounded-full border border-white/20 text-white/80 uppercase tracking-wide">
-                        {publication.mediaType === 'video' ? 'Video' : publication.mediaType === 'image' ? 'Foto' : 'Texto'}
-                      </span>
-                    </div>
-
-                    {publication.mediaUrl && publication.mediaType !== 'text' ? (
-                      <div className="overflow-hidden rounded-sm mb-3 bg-black/30 relative h-52">
-                        {publication.mediaType === 'video' ? (
-                          <video
-                            src={publication.mediaUrl}
-                            muted
-                            playsInline
-                            preload="metadata"
-                            className="w-full h-52 object-cover pointer-events-none"
-                          />
-                        ) : (
-                          <Image
-                            src={publication.mediaUrl}
-                            alt="Publicación"
-                            fill
-                            className="object-cover"
-                            sizes="(max-width: 1024px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                            unoptimized
-                          />
-                        )}
-                      </div>
-                    ) : (
-                      <div className="mb-3 h-52 rounded-sm bg-white/[0.03] border border-white/10 p-4 flex items-center">
-                        <p className="text-white/90 text-base leading-relaxed line-clamp-6">
-                          {publication.caption || 'Publicación sin texto.'}
-                        </p>
-                      </div>
-                    )}
-
-                    {publication.mediaType !== 'text' && publication.caption && (
-                      <p className="text-white/85 text-sm leading-relaxed line-clamp-3 mb-3">{publication.caption}</p>
-                    )}
-
-                    <div className="flex items-center justify-between text-riff-text-secondary text-xs">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleLike(publication.id);
-                          }}
-                          disabled={likingPostId === publication.id}
-                          className={`flex items-center gap-1 transition-colors disabled:opacity-50 ${
-                            isLiked(publication.id) ? 'text-red-400' : 'text-riff-text-secondary hover:text-red-400'
-                          }`}
-                          aria-label="Me gusta"
-                        >
-                          {isLiked(publication.id) ? <BsHeartFill className="w-4 h-4" /> : <BsHeart className="w-4 h-4" />}
-                          {getLikeCountForPost(publication.id, publication.likesCount)}
-                        </button>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleSave(publication.id);
-                        }}
-                        disabled={savingPostId === publication.id}
-                        className="text-riff-text-secondary hover:text-yellow-400 transition-colors disabled:opacity-50"
-                        aria-label="Guardar publicación"
-                      >
-                        {isPostSaved(publication.id) ? (
-                          <BsBookmarkFill className="w-4 h-4 text-yellow-400" />
-                        ) : (
-                          <BsBookmark className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+        
 
         
 

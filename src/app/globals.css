@@ -21,6 +21,8 @@
   --riff-save-2: #679872;
   --riff-delete: #AA2222;
   --riff-delete-2: #BA4444;
+  --riff-shell-header: #2a2a2a;
+  --riff-shell-footer: #2a2a2a;
 }
 
 @theme inline {
@@ -61,10 +63,20 @@
   --riff-border: #94a3b8;
   --riff-header: #ffffff;
   --riff-card: #f8fafc;
-  --riff-background: #0f172a;
+  --riff-background: #f8fafc;
   --riff-overlay: #14213d;
   --riff-login: #1f2937;
   --riff-registro: #1d4ed8;
+  --riff-shell-header: #243447;
+  --riff-shell-footer: #1f2d3f;
+}
+
+.theme-shell-header {
+  background-color: var(--riff-shell-header);
+}
+
+.theme-shell-footer {
+  background-color: var(--riff-shell-footer);
 }
 
 [data-theme='light'] .text-white {
@@ -83,6 +95,10 @@
   color: rgb(15 23 42 / 0.7) !important;
 }
 
+[data-theme='light'] .text-white\/75 {
+  color: rgb(15 23 42 / 0.75) !important;
+}
+
 [data-theme='light'] .text-white\/60 {
   color: rgb(15 23 42 / 0.6) !important;
 }
@@ -93,6 +109,10 @@
 
 [data-theme='light'] .text-white\/40 {
   color: rgb(15 23 42 / 0.4) !important;
+}
+
+[data-theme='light'] .text-white\/85 {
+  color: rgb(15 23 42 / 0.85) !important;
 }
 
 [data-theme='light'] .text-white\/30 {

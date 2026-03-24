@@ -129,7 +129,7 @@ export default function LandingPage() {
             <div className="mt-10 grid grid-cols-1 gap-3 sm:max-w-2xl sm:grid-cols-3">
               <div data-reveal data-reveal-delay="120ms" className="reveal-on-scroll rounded-sm border border-white/10 bg-white/5 p-3">
                 <p className="text-sm font-semibold text-riff-primary">Sin costos para empezar</p>
-                <p className="mt-1 text-xs text-white/70">Crea perfil, sube musica y publica eventos gratis.</p>
+                <p className="mt-1 text-xs text-white/70">Crea perfil, sube música y publica eventos gratis.</p>
               </div>
               <div data-reveal data-reveal-delay="180ms" className="reveal-on-scroll rounded-sm border border-white/10 bg-white/5 p-3">
                 <p className="text-sm font-semibold text-riff-primary">Enfocado en nuevos artistas</p>

@@ -276,7 +276,7 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-riff-header backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full theme-shell-header backdrop-blur-md">
       <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16 gap-2 sm:gap-8">
           <Link href="/" className="flex items-center group flex-shrink-0">

@@ -379,7 +379,7 @@ export default function HomePage() {
           {/* Texto izquierdo */}
           <div className="flex-1 text-left">
             <h1 className="text-3xl sm:text-5xl font-extrabold text-white mb-4 leading-tight drop-shadow-lg">
-              Con Riff, impulsa tu<br />musica al siguiente nivel
+              Con Riff, impulsa tu<br />música al siguiente nivel
             </h1>
             <p className="text-white/70 text-sm sm:text-base mb-8 max-w-md">
               Descubre lo más reciente de la comunidad con publicaciones visuales de artistas destacando ahora mismo.
