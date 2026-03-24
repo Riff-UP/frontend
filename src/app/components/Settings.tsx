@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { FiMoon, FiSettings, FiSun, FiTrash2 } from 'react-icons/fi';
+import { useState } from 'react';
+import { FiLock, FiTrash2 } from 'react-icons/fi';
 import type { UseUserReturn } from '../hooks/useUser';
 import DeleteConfirmModal from './common/DeleteConfirmModal';
 
@@ -9,36 +9,15 @@ interface SettingsProps {
   userState: UseUserReturn;
 }
 
-type ThemeMode = 'dark' | 'light';
-
 export default function Settings({ userState }: SettingsProps) {
-  const { deleteAccount } = userState;
-  const [theme, setTheme] = useState<ThemeMode>('dark');
+  const { user, error, deleteAccount, setPassword } = userState;
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const attrTheme = document.documentElement.getAttribute('data-theme');
-    const savedTheme = localStorage.getItem('riff-theme');
-    const initialTheme: ThemeMode = (savedTheme === 'light' || savedTheme === 'dark')
-      ? savedTheme
-      : (attrTheme === 'light' ? 'light' : 'dark');
-
-    setTheme(initialTheme);
-  }, []);
-
-  const applyTheme = (nextTheme: ThemeMode) => {
-    if (typeof window === 'undefined') return;
-    document.documentElement.setAttribute('data-theme', nextTheme);
-    localStorage.setItem('riff-theme', nextTheme);
-    setTheme(nextTheme);
-  };
-
-  const handleThemeToggle = () => {
-    applyTheme(theme === 'dark' ? 'light' : 'dark');
-  };
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleConfirmDelete = async () => {
     setDeletingAccount(true);
@@ -50,45 +29,127 @@ export default function Settings({ userState }: SettingsProps) {
     }
   };
 
+  const handleSetPassword = async () => {
+    setPasswordMessage(null);
+
+    if (newPassword.length < 6) {
+      setPasswordMessage({ type: 'error', text: 'La contraseña debe tener al menos 6 caracteres.' });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage({ type: 'error', text: 'Las contraseñas no coinciden.' });
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      const success = await setPassword(newPassword);
+
+      if (success) {
+        setPasswordMessage({
+          type: 'success',
+          text: 'Contraseña establecida. Ahora puedes iniciar sesión con email y contraseña.',
+        });
+        setNewPassword('');
+        setConfirmPassword('');
+        setShowPasswordForm(false);
+        return;
+      }
+
+      setPasswordMessage({ type: 'error', text: error || 'Error al establecer contraseña.' });
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   return (
     <div className="w-full rounded-sm border border-white/10 bg-riff-header p-6 sm:p-8">
       <div className="flex items-center gap-3 mb-6">
-        <FiSettings className="w-6 h-6 text-riff-primary" />
         <div>
           <h2 className="text-white text-xl sm:text-2xl font-bold">Configuracion</h2>
-          <p className="text-white/70 text-sm mt-1">Ajusta preferencias de la cuenta y apariencia.</p>
+          <p className="text-white/70 text-sm mt-1">Ajusta preferencias de tu cuenta.</p>
         </div>
       </div>
 
       <div className="space-y-6">
-        <div className="rounded-sm border border-white/10 bg-riff-card p-4 sm:p-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h3 className="text-white font-semibold">Tema claro</h3>
-              <p className="text-white/70 text-xs sm:text-sm mt-1">
-                Cambia entre modo oscuro y claro para toda la aplicacion.
-              </p>
+        {user?.googleId && !user?.hasPassword && (
+          <div className="rounded-sm border border-white/10 bg-riff-card p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <FiLock className="w-4 h-4 text-riff-primary" />
+              <h3 className="text-white font-semibold">Cuenta de Google</h3>
             </div>
 
-            <button
-              onClick={handleThemeToggle}
-              className={`relative inline-flex h-9 w-20 items-center rounded-full border transition-colors ${
-                theme === 'light'
-                  ? 'border-riff-primary/60 bg-riff-primary/20'
-                  : 'border-white/20 bg-black/20'
-              }`}
-              aria-label="Cambiar tema"
-            >
-              <span
-                className={`absolute left-1 flex h-7 w-7 items-center justify-center rounded-full bg-white text-riff-primary shadow transition-transform ${
-                  theme === 'light' ? 'translate-x-11' : 'translate-x-0'
-                }`}
+            <p className="text-white/70 text-xs sm:text-sm mt-1 mb-4">
+              Tu cuenta está vinculada con Google. Puedes establecer una contraseña para también iniciar sesión con email y contraseña.
+            </p>
+
+            {passwordMessage && (
+              <div className={`mb-3 p-3 rounded-sm text-sm ${
+                passwordMessage.type === 'success'
+                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                  : 'bg-red-500/20 text-red-400 border border-red-500/30'
+              }`}>
+                {passwordMessage.text}
+              </div>
+            )}
+
+            {!showPasswordForm ? (
+              <button
+                onClick={() => setShowPasswordForm(true)}
+                className="inline-flex items-center gap-2 rounded-sm border border-white/20 bg-riff-text-primary/40 px-4 py-2 text-sm font-medium text-white hover:bg-riff-text-primary/60 transition-colors"
               >
-                {theme === 'light' ? <FiSun className="h-4 w-4" /> : <FiMoon className="h-4 w-4" />}
-              </span>
-            </button>
+                <FiLock className="w-4 h-4" />
+                Establecer contraseña
+              </button>
+            ) : (
+              <div className="max-w-sm space-y-3">
+                <div>
+                  <label className="block text-white text-xs sm:text-sm mb-1">Nueva contraseña</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                    className="w-full px-3 py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-white text-xs sm:text-sm mb-1">Confirmar contraseña</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repite la contraseña"
+                    className="w-full px-3 py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSetPassword}
+                    disabled={savingPassword}
+                    className="px-4 py-2 bg-gradient-to-r from-riff-save to-riff-save-2 hover:from-riff-save-2 hover:to-riff-save text-white text-sm font-medium rounded-sm transition-colors disabled:opacity-50"
+                  >
+                    {savingPassword ? 'Guardando...' : 'Guardar contraseña'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowPasswordForm(false);
+                      setNewPassword('');
+                      setConfirmPassword('');
+                      setPasswordMessage(null);
+                    }}
+                    className="px-4 py-2 border border-white/20 text-white/80 hover:text-white hover:bg-white/5 text-sm rounded-sm transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
         <div className="rounded-sm border border-red-400/30 bg-red-500/5 p-4 sm:p-5">
           <h3 className="text-red-300 font-semibold">Zona de peligro</h3>

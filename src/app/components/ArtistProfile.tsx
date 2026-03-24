@@ -259,7 +259,7 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
   return (
     <div className="min-h-screen bg-riff-text-primary">
       {/* Cover Image Header */}
-      <div className="relative h-64 sm:h-80 lg:h-96 overflow-hidden theme-force-light-text">
+      <div className="relative h-64 sm:h-80 lg:h-96 overflow-hidden">
 
         {bannerImages.length > 0 ? (
           bannerImages.map((img, i) => (

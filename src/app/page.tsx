@@ -586,7 +586,7 @@ function HomeContent() {
 
         {/* Hero Section */}
         <section
-          className="relative theme-force-light-text h-[300px] sm:h-[400px] lg:h-[450px] w-full max-w-8xl mx-auto overflow-hidden rounded-lg"
+          className="relative h-[300px] sm:h-[400px] lg:h-[450px] w-full max-w-8xl mx-auto overflow-hidden rounded-lg"
           style={{
             backgroundImage: "url(/images/portada.jpg)",
             backgroundSize: "cover",

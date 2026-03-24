@@ -5,7 +5,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { FiBell, FiSearch } from 'react-icons/fi';
-import { FiMoon, FiSun } from 'react-icons/fi';
 import { API_BASE_URL } from '@/app/config/api';
 import { getValidToken, getUserFromToken } from '@/app/utils/jwt';
 import { normalizeDisplayName, resolveProfileImage } from '@/app/utils/avatar';
@@ -102,28 +101,8 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const notificationsRef = useRef<HTMLDivElement | null>(null);
   const pathname = usePathname();
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const attrTheme = document.documentElement.getAttribute('data-theme');
-    const savedTheme = localStorage.getItem('riff-theme');
-    const initialTheme: 'dark' | 'light' = (savedTheme === 'light' || savedTheme === 'dark')
-      ? savedTheme
-      : (attrTheme === 'light' ? 'light' : 'dark');
-    setTheme(initialTheme);
-  }, []);
-
-  const toggleTheme = () => {
-    const nextTheme: 'dark' | 'light' = theme === 'dark' ? 'light' : 'dark';
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('riff-theme', nextTheme);
-      document.documentElement.setAttribute('data-theme', nextTheme);
-    }
-    setTheme(nextTheme);
-  };
 
   // Sincronizar con valor externo si viene del padre
   useEffect(() => {
@@ -276,7 +255,7 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full theme-shell-header theme-force-light-text backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full theme-shell-header backdrop-blur-md">
       <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16 gap-2 sm:gap-8">
           <Link href="/" className="flex items-center group flex-shrink-0">
