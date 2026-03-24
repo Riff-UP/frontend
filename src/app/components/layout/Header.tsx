@@ -303,15 +303,7 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
           </form>
 
           <nav className="flex items-center gap-3 sm:gap-8">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="p-1.5 rounded-full text-white hover:text-riff-primary hover:bg-white/10 transition-colors"
-              aria-label={theme === 'dark' ? 'Activar tema claro' : 'Activar tema oscuro'}
-              title={theme === 'dark' ? 'Tema claro' : 'Tema oscuro'}
-            >
-              {theme === 'dark' ? <FiSun className="w-5 h-5" /> : <FiMoon className="w-5 h-5" />}
-            </button>
+            
             <Link
               href="/"
               className={`text-sm sm:text-base font-semibold transition-colors relative ${

@@ -21,7 +21,7 @@ interface ArtistProfileProps {
 }
 
 export default function ArtistProfile({ artist }: ArtistProfileProps) {
-  const [activeTab, setActiveTab] = useState<'canciones' | 'publicaciones' | 'eventos'>('publicaciones');
+  const [activeTab, setActiveTab] = useState<'publicaciones' | 'eventos'>('publicaciones');
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
@@ -252,7 +252,6 @@ export default function ArtistProfile({ artist }: ArtistProfileProps) {
   const isAuth = !!user;
 
   const tabs = [
-    { id: 'canciones' as const, label: 'Canciones' },
     { id: 'publicaciones' as const, label: 'Publicaciones' },
     { id: 'eventos' as const, label: 'Eventos' },
   ];
