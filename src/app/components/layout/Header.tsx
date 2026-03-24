@@ -291,13 +291,13 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
 
           <form onSubmit={handleSubmit} className="flex-1 max-w-xl">
             <div className="relative">
-              <FiSearch className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-riff-background/60" />
+              <FiSearch className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-white/60" />
               <input
                 type="text"
                 placeholder="Descubre artistas"
                 value={internalQuery}
                 onChange={handleChange}
-                className="w-full pl-9 sm:pl-12 pr-2 sm:pr-4 py-1.5 sm:py-2 text-sm sm:text-base bg-riff-text-secondary/30 border border-white/10 rounded-sm text-white placeholder-riff-background/60 focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary focus:bg-white/10 transition-all duration-300"
+                className="w-full pl-9 sm:pl-12 pr-2 sm:pr-4 py-1.5 sm:py-2 text-sm sm:text-base bg-riff-text-secondary/30 border border-white/10 rounded-sm text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary focus:bg-white/10 transition-all duration-300"
               />
             </div>
           </form>
@@ -306,7 +306,7 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
             <button
               type="button"
               onClick={toggleTheme}
-              className="p-1.5 rounded-full text-riff-background hover:text-riff-primary hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-full text-white hover:text-riff-primary hover:bg-white/10 transition-colors"
               aria-label={theme === 'dark' ? 'Activar tema claro' : 'Activar tema oscuro'}
               title={theme === 'dark' ? 'Tema claro' : 'Tema oscuro'}
             >
@@ -315,7 +315,7 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
             <Link
               href="/"
               className={`text-sm sm:text-base font-semibold transition-colors relative ${
-                pathname === '/' ? 'text-riff-primary' : 'text-riff-background hover:text-riff-primary'
+                pathname === '/' ? 'text-riff-primary' : 'text-white hover:text-riff-primary'
               }`}
             >
               Inicio
@@ -326,7 +326,7 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
                   <button
                     type="button"
                     onClick={handleToggleNotifications}
-                    className="relative p-1.5 rounded-full text-riff-background hover:text-riff-primary hover:bg-white/10 transition-colors"
+                    className="relative p-1.5 rounded-full text-white hover:text-riff-primary hover:bg-white/10 transition-colors"
                     aria-label="Abrir notificaciones"
                   >
                     <FiBell className="w-5 h-5" />
@@ -411,7 +411,7 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
                 <Link
                   href="/profile"
                   className={`order-1 flex items-center gap-2 text-sm sm:text-base font-semibold transition-colors ${
-                    pathname === '/profile' ? 'text-riff-primary' : 'text-riff-background hover:text-riff-primary'
+                    pathname === '/profile' ? 'text-riff-primary' : 'text-white hover:text-riff-primary'
                   }`}
                 >
                   {/* Avatar del usuario */}
@@ -435,7 +435,7 @@ export default function Header({ onSearch, searchValue }: HeaderProps) {
               <Link
                 href="/login"
                 className={`flex items-center gap-2 text-sm sm:text-base font-semibold transition-colors ${
-                  pathname === '/login' ? 'text-riff-primary' : 'text-riff-background hover:text-riff-primary'
+                  pathname === '/login' ? 'text-riff-primary' : 'text-white hover:text-riff-primary'
                 }`}
               >
                 <span>Iniciar sesión</span>

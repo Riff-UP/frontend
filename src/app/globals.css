@@ -52,23 +52,23 @@
 }
 
 [data-theme='light'] {
-  --background: #eff3f9;
-  --foreground: #111827;
+  --background: #edf2f8;
+  --foreground: #0f172a;
 
-  --riff-primary: #0b6dde;
-  --riff-primary-dark: #173a78;
-  --riff-secondary: #3b82f6;
-  --riff-text-primary: #eef2f7;
+  --riff-primary: #3563b8;
+  --riff-primary-dark: #1f3f78;
+  --riff-secondary: #4c7dd6;
+  --riff-text-primary: #e8eef8;
   --riff-text-secondary: #334155;
-  --riff-border: #94a3b8;
-  --riff-header: #ffffff;
-  --riff-card: #f8fafc;
-  --riff-background: #f8fafc;
-  --riff-overlay: #14213d;
-  --riff-login: #1f2937;
-  --riff-registro: #1d4ed8;
-  --riff-shell-header: #243447;
-  --riff-shell-footer: #1f2d3f;
+  --riff-border: #9fb1c8;
+  --riff-header: #f7faff;
+  --riff-card: #eef4fb;
+  --riff-background: #f7faff;
+  --riff-overlay: #223657;
+  --riff-login: #1f2c43;
+  --riff-registro: #2f5ea9;
+  --riff-shell-header: #1f3048;
+  --riff-shell-footer: #1a273a;
 }
 
 .theme-shell-header {

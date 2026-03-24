@@ -20,7 +20,7 @@ export default function Footer() {
 
           {/* Logos de instituciones asociadas */}
           <div className="flex items-center gap-4 sm:gap-8 flex-wrap justify-center">
-            <div className="text-riff-background text-xs sm:text-sm font-medium">
+            <div className="text-white text-xs sm:text-sm font-medium">
               De parte de:
             </div>
             <Image 
@@ -41,12 +41,12 @@ export default function Footer() {
         </div>
 
         {/* Copyright y links */}
-        <div className="border-t border-riff-background/30 py-4 sm:py-6">
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 text-xs sm:text-sm text-riff-background/60">
+        <div className="border-t border-white/10 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 text-xs sm:text-sm text-white/60">
             <p>© {new Date().getFullYear()} Riff. Todos los derechos reservados.</p>
             <Link 
               href="/privacy" 
-              className="hover:text-riff-background transition-colors underline underline-offset-4"
+              className="hover:text-white transition-colors underline underline-offset-4"
             >
               Política de Privacidad
             </Link>
