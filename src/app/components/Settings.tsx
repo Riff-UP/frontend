@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FiLock, FiTrash2 } from 'react-icons/fi';
+import { FiEye, FiEyeOff, FiLock, FiTrash2 } from 'react-icons/fi';
 import type { UseUserReturn } from '../hooks/useUser';
 import DeleteConfirmModal from './common/DeleteConfirmModal';
 
@@ -11,13 +11,26 @@ interface SettingsProps {
 
 export default function Settings({ userState }: SettingsProps) {
   const { user, error, deleteAccount, setPassword } = userState;
+  const hasPassword = !!user?.hasPassword;
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const passwordStrength = (pwd: string) => {
+    if (pwd.length === 0) return null;
+    if (pwd.length < 6) return { label: 'Debil', color: 'bg-red-400', width: 'w-1/4' };
+    if (pwd.length < 8) return { label: 'Regular', color: 'bg-yellow-400', width: 'w-2/4' };
+    if (pwd.length < 12 || !/[A-Z]/.test(pwd) || !/[0-9]/.test(pwd)) return { label: 'Buena', color: 'bg-blue-400', width: 'w-3/4' };
+    return { label: 'Muy fuerte', color: 'bg-green-400', width: 'w-full' };
+  };
+
+  const strength = passwordStrength(newPassword);
 
   const handleConfirmDelete = async () => {
     setDeletingAccount(true);
@@ -49,7 +62,9 @@ export default function Settings({ userState }: SettingsProps) {
       if (success) {
         setPasswordMessage({
           type: 'success',
-          text: 'Contraseña establecida. Ahora puedes iniciar sesión con email y contraseña.',
+          text: hasPassword
+            ? 'Contraseña actualizada correctamente.'
+            : 'Contraseña establecida. Ahora puedes iniciar sesión con email y contraseña.',
         });
         setNewPassword('');
         setConfirmPassword('');
@@ -57,7 +72,10 @@ export default function Settings({ userState }: SettingsProps) {
         return;
       }
 
-      setPasswordMessage({ type: 'error', text: error || 'Error al establecer contraseña.' });
+      setPasswordMessage({
+        type: 'error',
+        text: error || (hasPassword ? 'Error al actualizar contraseña.' : 'Error al establecer contraseña.'),
+      });
     } finally {
       setSavingPassword(false);
     }
@@ -73,15 +91,17 @@ export default function Settings({ userState }: SettingsProps) {
       </div>
 
       <div className="space-y-6">
-        {user?.googleId && !user?.hasPassword && (
+        {user && (
           <div className="rounded-sm border border-white/10 bg-riff-card p-4 sm:p-5">
             <div className="flex items-center gap-2 mb-2">
               <FiLock className="w-4 h-4 text-riff-primary" />
-              <h3 className="text-white font-semibold">Cuenta de Google</h3>
+              <h3 className="text-white font-semibold">Contraseña</h3>
             </div>
 
             <p className="text-white/70 text-xs sm:text-sm mt-1 mb-4">
-              Tu cuenta está vinculada con Google. Puedes establecer una contraseña para también iniciar sesión con email y contraseña.
+              {hasPassword
+                ? 'Cambia tu contraseña para mantener tu cuenta segura.'
+                : 'Establece una contraseña para también iniciar sesión con email y contraseña.'}
             </p>
 
             {passwordMessage && (
@@ -100,30 +120,57 @@ export default function Settings({ userState }: SettingsProps) {
                 className="inline-flex items-center gap-2 rounded-sm border border-white/20 bg-riff-text-primary/40 px-4 py-2 text-sm font-medium text-white hover:bg-riff-text-primary/60 transition-colors"
               >
                 <FiLock className="w-4 h-4" />
-                Establecer contraseña
+                {hasPassword ? 'Cambiar contraseña' : 'Establecer contraseña'}
               </button>
             ) : (
               <div className="max-w-sm space-y-3">
                 <div>
                   <label className="block text-white text-xs sm:text-sm mb-1">Nueva contraseña</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres"
-                    className="w-full px-3 py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                      className="w-full px-3 py-2 pr-10 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white transition-colors"
+                    >
+                      {showPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {strength && (
+                    <div className="mt-2 space-y-1">
+                      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all duration-300 ${strength.color} ${strength.width}`} />
+                      </div>
+                      <p className="text-xs text-riff-text-secondary text-right">{strength.label}</p>
+                    </div>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-white text-xs sm:text-sm mb-1">Confirmar contraseña</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repite la contraseña"
-                    className="w-full px-3 py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Repite la contraseña"
+                      className="w-full px-3 py-2 pr-10 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white transition-colors"
+                    >
+                      {showConfirmPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
@@ -132,13 +179,15 @@ export default function Settings({ userState }: SettingsProps) {
                     disabled={savingPassword}
                     className="px-4 py-2 bg-gradient-to-r from-riff-save to-riff-save-2 hover:from-riff-save-2 hover:to-riff-save text-white text-sm font-medium rounded-sm transition-colors disabled:opacity-50"
                   >
-                    {savingPassword ? 'Guardando...' : 'Guardar contraseña'}
+                    {savingPassword ? 'Guardando...' : (hasPassword ? 'Actualizar contraseña' : 'Guardar contraseña')}
                   </button>
                   <button
                     onClick={() => {
                       setShowPasswordForm(false);
                       setNewPassword('');
                       setConfirmPassword('');
+                      setShowPassword(false);
+                      setShowConfirmPassword(false);
                       setPasswordMessage(null);
                     }}
                     className="px-4 py-2 border border-white/20 text-white/80 hover:text-white hover:bg-white/5 text-sm rounded-sm transition-colors"
