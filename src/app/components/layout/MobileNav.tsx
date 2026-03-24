@@ -2,9 +2,9 @@
 
 import { CgProfile } from "react-icons/cg";
 import { BiImages } from "react-icons/bi";
-import { MdOutlineLibraryMusic, MdOutlineQueryStats } from "react-icons/md";
+import { MdOutlineQueryStats } from "react-icons/md";
 import { IoIosCalendar } from "react-icons/io";
-import { FiBookmark } from 'react-icons/fi';
+import { FiBookmark, FiSettings } from 'react-icons/fi';
 
 interface MobileNavProps {
   activeSection: string;
@@ -16,13 +16,13 @@ export default function MobileNav({ activeSection, onSectionChange }: MobileNavP
     { id: 'perfil', label: 'Perfil', icon: CgProfile },
     { id: 'publicaciones', label: 'Posts', icon: BiImages },
     { id: 'eventos', label: 'Eventos', icon: IoIosCalendar },
-    { id: 'musica', label: 'Música', icon: MdOutlineLibraryMusic },
     { id: 'guardados', label: 'Guardados', icon: FiBookmark },
     { id: 'estadisticas', label: 'Stats', icon: MdOutlineQueryStats },
+    { id: 'configuracion', label: 'Ajustes', icon: FiSettings },
   ];
 
   return (
-    <nav className="md:hidden sticky top-16 bg-gradient-to-b from-riff-card to-riff-header border-b border-white/10 z-10 mb-4">
+    <nav className="md:hidden sticky top-16 bg-linear-to-b from-riff-card to-riff-header border-b border-white/10 z-10 mb-4">
       <div className="flex justify-around">
         {menuItems.map((item) => {
           const Icon = item.icon;

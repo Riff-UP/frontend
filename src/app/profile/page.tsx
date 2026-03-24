@@ -11,6 +11,7 @@ import Publications from '../components/Publications';
 import Events from '../components/Events';
 import Saved from '../components/Saved';
 import Analytics from '../components/Analytics';
+import Settings from '../components/Settings';
 import { SavedPostsProvider } from '../context/SavedPostsContext';
 import { useUser } from '../hooks/useUser';
 import { getValidToken } from '../utils/jwt';
@@ -21,20 +22,10 @@ function ProfilePageContent({ activeSection, setActiveSection, userState }: { ac
       case 'perfil': return <ProfileEdit userState={userState} />;
       case 'publicaciones': return <Publications />;
       case 'eventos': return <Events />;
-      case 'musica':
-        return (
-          <div className="w-full">
-            <div className="mb-6">
-              <h2 className="text-white text-xl sm:text-2xl font-bold">Música</h2>
-              <p className="text-white/80 text-xs sm:text-sm mt-1">
-                Esta sección se implementará próximamente.
-              </p>
-            </div>
-          </div>
-
-        );
+      
       case 'guardados': return <Saved />;
       case 'estadisticas': return <Analytics />;
+      case 'configuracion': return <Settings userState={userState} />;
       default: return <ProfileEdit userState={userState} />;
     }
   };

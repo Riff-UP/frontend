@@ -9,17 +9,15 @@ import type { UseUserReturn } from '../hooks/useUser';
 import { uploadToR2, validateImageFile } from '../utils/r2Storage';
 import { fetchFollowersCount } from '../utils/follows';
 import { useLogout } from '../hooks/useLogout';
-import DeleteConfirmModal from './common/DeleteConfirmModal';
 
 interface ProfileEditProps {
   userState: UseUserReturn;
 }
 
 export default function ProfileEdit({ userState }: ProfileEditProps) {
-  const { user, loading, error, updateUser, deleteAccount, setPassword, addSocialMedia, updateSocialMedia, removeSocialMedia } = userState;
+  const { user, loading, error, updateUser, setPassword, addSocialMedia, updateSocialMedia, removeSocialMedia } = userState;
   const { handleLogout } = useLogout();
   const [saving, setSaving] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   
   // Estados para establecer contraseña
@@ -238,15 +236,6 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
       }));
     }
     setSaveMessage(null);
-  };
-
-  const handleDeleteAccount = async () => {
-    setShowDeleteModal(true);
-  };
-
-  const confirmDeleteAccount = async () => {
-    setShowDeleteModal(false);
-    await deleteAccount();
   };
 
   const handleSetPassword = async () => {
@@ -574,30 +563,18 @@ export default function ProfileEdit({ userState }: ProfileEditProps) {
 
         {/* Zona de peligro — recuadro separado */}
         <div className="w-full max-w-4xl mt-4 bg-riff-header border border-red-500/20 rounded-sm p-3 sm:p-4 md:p-6">
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
             <button
               onClick={handleLogout}
               className="md:hidden px-5 py-2 bg-riff-text-secondary/30 hover:bg-riff-text-secondary/40 text-white text-sm font-medium rounded-sm border border-white/20 transition-colors duration-200"
             >
               Cerrar sesión
             </button>
-            <button
-              onClick={handleDeleteAccount}
-              disabled={saving}
-              className="px-5 py-2 bg-gradient-to-r from-riff-delete to-riff-delete-2 hover:from-riff-delete-2 hover:to-riff-delete text-white text-sm font-medium rounded-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Eliminar cuenta
-            </button>
+            <p className="text-white/70 text-xs sm:text-sm">
+              La eliminación de cuenta está disponible en la sección Configuración.
+            </p>
           </div>
         </div>
-
-      <DeleteConfirmModal
-        isOpen={showDeleteModal}
-        title="Eliminar cuenta"
-        message="¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer."
-        onConfirm={confirmDeleteAccount}
-        onCancel={() => setShowDeleteModal(false)}
-      />
     </div>
   );
 }

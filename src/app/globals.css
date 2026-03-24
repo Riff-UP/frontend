@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0a;
+  --foreground: #ededed;
   
   /* Colores Riff */
   --riff-primary: #007BFF;
@@ -13,7 +13,7 @@
   --riff-border: #3A3A3A;
   --riff-header: #2A2A2A;
   --riff-card: #1A1A1A;
-  --riff-background: #FFFFFF;
+  --riff-background: #0a0a0a;
   --riff-overlay: #000033;
   --riff-login: #00003C;
   --riff-registro: #1D489E;
@@ -49,11 +49,22 @@
   --color-riff-delete-2: var(--riff-delete-2);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+[data-theme='light'] {
+  --background: #eff3f9;
+  --foreground: #111827;
+
+  --riff-primary: #0b6dde;
+  --riff-primary-dark: #173a78;
+  --riff-secondary: #3b82f6;
+  --riff-text-primary: #dfe6f1;
+  --riff-text-secondary: #334155;
+  --riff-border: #64748b;
+  --riff-header: #2b3340;
+  --riff-card: #202733;
+  --riff-background: #eff3f9;
+  --riff-overlay: #14213d;
+  --riff-login: #1f2937;
+  --riff-registro: #1d4ed8;
 }
 
 body {
