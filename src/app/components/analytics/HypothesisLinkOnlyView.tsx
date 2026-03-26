@@ -18,6 +18,7 @@ interface DayBucket {
 }
 
 interface FollowRecord {
+  followerId?: string;
   followedId?: string;
   followingId?: string;
   createdAt?: string;
@@ -30,8 +31,11 @@ interface ReactionRecord {
 }
 
 interface DataAudit {
+  usersFetched: number;
+  usersActive: number;
   followsFetched: number;
   followsAfterFilter: number;
+  followsDroppedByInactiveUsers: number;
   followsPre: number;
   followsPost: number;
   postsFetched: number;
@@ -103,6 +107,48 @@ function dedupeRecords(rows: Record<string, unknown>[], prefix: string): Record<
   });
 
   return deduped;
+}
+
+function extractUserIdFromAny(record: Record<string, unknown>): string {
+  return String(
+    record.id ??
+    record.userId ??
+    record.sql_user_id ??
+    record.followerId ??
+    record.followingId ??
+    record.followedId ??
+    ''
+  );
+}
+
+function isActiveUserRecord(record: Record<string, unknown>): boolean {
+  if (isSoftDeletedRecord(record)) {
+    return false;
+  }
+
+  const status = record.status;
+  if (status === undefined || status === null) {
+    return true;
+  }
+
+  if (status === true || status === 1 || status === 'true' || status === '1') {
+    return true;
+  }
+
+  if (typeof status === 'string') {
+    const normalized = status.trim().toLowerCase();
+    return normalized === 'active' || normalized === 'enabled';
+  }
+
+  return false;
+}
+
+function extractFollowFollowerId(record: FollowRecord): string {
+  return String((record as unknown as Record<string, unknown>).followerId ?? '');
+}
+
+function extractFollowTargetId(record: FollowRecord): string {
+  return String(record.followedId ?? record.followingId ?? '');
 }
 
 function toRecordArray(payload: unknown): Record<string, unknown>[] {
@@ -251,22 +297,52 @@ export default function HypothesisLinkOnlyView() {
       setError(null);
 
       try {
-        const [followersResult, postsResult, reactionsResult] = await Promise.all([
+        const [usersResult, followersResult, postsResult, reactionsResult] = await Promise.all([
+          fetchJson('/users?limit=5000&offset=0', token)
+            .catch(() => fetchJson('/users/artists?limit=5000&offset=0', token))
+            .catch(() => []),
           fetchJson('/follows', token).catch(() => fetchJson('/follows?page=1&limit=5000', token)),
           fetchJson('/posts', token),
           fetchJson('/posts/reactions', token).catch(() => []),
         ]);
 
+        const rawUsers = toRecordArray(usersResult);
         const rawFollowers = toRecordArray(followersResult);
         const rawPosts = toRecordArray(postsResult);
         const rawReactions = toRecordArray(reactionsResult);
+
+        const activeUserIds = new Set(
+          rawUsers
+            .filter((record) => isActiveUserRecord(record))
+            .map((record) => extractUserIdFromAny(record))
+            .filter((id) => id.length > 0)
+        );
 
         const dedupedFollowers = dedupeRecords(rawFollowers, 'follow');
         const dedupedPosts = dedupeRecords(rawPosts, 'post');
         const dedupedReactions = dedupeRecords(rawReactions, 'reaction');
 
-        const followerRecords = dedupedFollowers
+        const followersWithoutSoftDelete = dedupedFollowers
           .filter((record) => !isSoftDeletedRecord(record)) as FollowRecord[];
+
+        const followerRecords = followersWithoutSoftDelete
+          .filter((record) => {
+            if (activeUserIds.size === 0) {
+              return true;
+            }
+
+            const followerId = extractFollowFollowerId(record);
+            const targetId = extractFollowTargetId(record);
+
+            if (!followerId || !targetId) {
+              return false;
+            }
+
+            return activeUserIds.has(followerId) && activeUserIds.has(targetId);
+          });
+
+        const followsDroppedByInactiveUsers = Math.max(followersWithoutSoftDelete.length - followerRecords.length, 0);
+
         const posts = dedupedPosts
           .filter((record) => !isSoftDeletedRecord(record))
           .map((post) => ({
@@ -349,8 +425,11 @@ export default function HypothesisLinkOnlyView() {
           setFollowersSeries(builtFollowersSeries);
           setInteractionsSeries(builtInteractionsSeries);
           setAudit({
+            usersFetched: rawUsers.length,
+            usersActive: activeUserIds.size,
             followsFetched: rawFollowers.length,
             followsAfterFilter: followerRecords.length,
+            followsDroppedByInactiveUsers,
             followsPre,
             followsPost,
             postsFetched: rawPosts.length,
@@ -601,8 +680,11 @@ export default function HypothesisLinkOnlyView() {
               <h3 className="text-white text-lg font-bold mb-3">Auditoría de datos (origen de métricas)</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-white/80">
+                  <p>Usuarios traídos: <span className="text-white font-semibold">{audit?.usersFetched ?? 0}</span></p>
+                  <p>Usuarios activos detectados: <span className="text-white font-semibold">{audit?.usersActive ?? 0}</span></p>
                   <p>Follows traídos: <span className="text-white font-semibold">{audit?.followsFetched ?? 0}</span></p>
                   <p>Follows usados (sin soft-delete/inactivos): <span className="text-white font-semibold">{audit?.followsAfterFilter ?? 0}</span></p>
+                  <p>Follows descartados por cuentas inactivas: <span className="text-white font-semibold">{audit?.followsDroppedByInactiveUsers ?? 0}</span></p>
                   <p>Follows pre: <span className="text-white font-semibold">{audit?.followsPre ?? 0}</span></p>
                   <p>Follows post: <span className="text-white font-semibold">{audit?.followsPost ?? 0}</span></p>
                 </div>
