@@ -269,6 +269,35 @@ function percentChange(pre: number, post: number): number | null {
   return ((post - pre) / pre) * 100;
 }
 
+function toMultiplierFromPct(pct: number | null): number | null {
+  if (pct === null) return null;
+  const multiplier = 1 + (pct / 100);
+  if (!Number.isFinite(multiplier) || multiplier < 0) {
+    return null;
+  }
+  return multiplier;
+}
+
+function formatReadableChange(pct: number | null): { main: string; detail: string } {
+  if (pct === null) {
+    return { main: 'N/A', detail: 'Sin base pre suficiente para calcular porcentaje' };
+  }
+
+  if (Math.abs(pct) < 200) {
+    return { main: `${pct.toFixed(1)}%`, detail: 'Cambio porcentual directo' };
+  }
+
+  const multiplier = toMultiplierFromPct(pct);
+  if (multiplier !== null) {
+    return {
+      main: `${multiplier.toFixed(2)}x`,
+      detail: `Equivale a ${pct.toFixed(1)}%`,
+    };
+  }
+
+  return { main: `${pct.toFixed(1)}%`, detail: 'Cambio porcentual directo' };
+}
+
 export default function HypothesisLinkOnlyView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -482,6 +511,11 @@ export default function HypothesisLinkOnlyView() {
     const interactionsMeets = interactionsPct !== null && interactionsPct >= HYPOTHESIS_THRESHOLD;
     const hypothesisPass = visibilityMeets && interactionsMeets;
 
+    const visibilityReadable = formatReadableChange(visibilityPct);
+    const interactionsReadable = formatReadableChange(interactionsPct);
+    const visibilityMultiplier = toMultiplierFromPct(visibilityPct);
+    const interactionsMultiplier = toMultiplierFromPct(interactionsPct);
+
     return {
       preFollowersDelta,
       postFollowersDelta,
@@ -492,6 +526,10 @@ export default function HypothesisLinkOnlyView() {
       visibilityMeets,
       interactionsMeets,
       hypothesisPass,
+      visibilityReadable,
+      interactionsReadable,
+      visibilityMultiplier,
+      interactionsMultiplier,
       totalDays,
       preDays: midpoint,
       postDays: Math.max(totalDays - midpoint, 0),
@@ -500,8 +538,8 @@ export default function HypothesisLinkOnlyView() {
         { metric: 'Interacción', pre: preInteractions, post: postInteractions },
       ],
       changeChartData: [
-        { metric: 'Visibilidad %', value: visibilityPct ?? 0, threshold: HYPOTHESIS_THRESHOLD },
-        { metric: 'Interacción %', value: interactionsPct ?? 0, threshold: HYPOTHESIS_THRESHOLD },
+        { metric: 'Visibilidad (x)', value: visibilityMultiplier ?? 0, threshold: 1 + (HYPOTHESIS_THRESHOLD / 100), rawPct: visibilityPct ?? 0 },
+        { metric: 'Interacción (x)', value: interactionsMultiplier ?? 0, threshold: 1 + (HYPOTHESIS_THRESHOLD / 100), rawPct: interactionsPct ?? 0 },
       ],
     };
   }, [dayBuckets.length, followersSeries, interactionsSeries]);
@@ -564,8 +602,9 @@ export default function HypothesisLinkOnlyView() {
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                 <p className="text-white/60 text-xs uppercase tracking-[0.12em]">Cambio Visibilidad</p>
                 <p className="text-white text-3xl font-bold mt-2">
-                  {analysis.visibilityPct === null ? 'N/A' : `${analysis.visibilityPct.toFixed(1)}%`}
+                  {analysis.visibilityReadable.main}
                 </p>
+                <p className="text-white/55 text-xs mt-1">{analysis.visibilityReadable.detail}</p>
                 <p className={`text-xs mt-2 ${analysis.visibilityMeets ? 'text-green-300' : 'text-red-300'}`}>
                   {analysis.visibilityMeets ? 'Cumple umbral 15%' : 'No cumple umbral 15%'}
                 </p>
@@ -574,8 +613,9 @@ export default function HypothesisLinkOnlyView() {
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                 <p className="text-white/60 text-xs uppercase tracking-[0.12em]">Cambio Interacción</p>
                 <p className="text-white text-3xl font-bold mt-2">
-                  {analysis.interactionsPct === null ? 'N/A' : `${analysis.interactionsPct.toFixed(1)}%`}
+                  {analysis.interactionsReadable.main}
                 </p>
+                <p className="text-white/55 text-xs mt-1">{analysis.interactionsReadable.detail}</p>
                 <p className={`text-xs mt-2 ${analysis.interactionsMeets ? 'text-green-300' : 'text-red-300'}`}>
                   {analysis.interactionsMeets ? 'Cumple umbral 15%' : 'No cumple umbral 15%'}
                 </p>
@@ -655,13 +695,25 @@ export default function HypothesisLinkOnlyView() {
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-riff-card to-riff-header p-4 sm:p-6">
-                <h3 className="text-white text-lg font-bold mb-4">Cambio porcentual vs umbral</h3>
+                <h3 className="text-white text-lg font-bold mb-4">Crecimiento relativo (x) vs umbral</h3>
                 <SafeResponsiveChart>
                   <BarChart data={analysis.changeChartData} margin={{ top: 8, right: 8, left: -18, bottom: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334" opacity={0.4} />
                     <XAxis dataKey="metric" stroke="#9aa" tick={{ fill: '#ccd', fontSize: 12 }} />
                     <YAxis stroke="#9aa" tick={{ fill: '#ccd', fontSize: 12 }} />
                     <Tooltip
+                      formatter={(value, name, payload) => {
+                        const source = payload?.payload as { rawPct?: number } | undefined;
+                        if (name === 'value') {
+                          const times = typeof value === 'number' ? `${value.toFixed(2)}x` : String(value);
+                          const raw = typeof source?.rawPct === 'number' ? ` (${source.rawPct.toFixed(1)}%)` : '';
+                          return [`${times}${raw}`, 'Crecimiento'];
+                        }
+                        if (name === 'threshold') {
+                          return [`${Number(value).toFixed(2)}x (15%)`, 'Umbral'];
+                        }
+                        return [String(value), String(name)];
+                      }}
                       contentStyle={{
                         backgroundColor: 'rgba(17, 24, 39, 0.95)',
                         border: '1px solid rgba(148, 163, 184, 0.35)',
