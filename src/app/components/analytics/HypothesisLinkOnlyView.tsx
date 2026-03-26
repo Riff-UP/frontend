@@ -3,13 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import Header from '@/app/components/layout/Header';
 import Footer from '@/app/components/layout/Footer';
-import FollowerGrowthChart from '@/app/components/analytics/FollowerGrowthChart';
-import InteractionsChart from '@/app/components/analytics/InteractionsChart';
 import SafeResponsiveChart from '@/app/components/analytics/SafeResponsiveChart';
 import { API_BASE_URL } from '@/app/config/api';
-import { getUserFromToken, getValidToken } from '@/app/utils/jwt';
+import { getValidToken } from '@/app/utils/jwt';
 import type { FollowerGrowthData, InteractionData } from '@/app/types';
-import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from 'recharts';
 
 const MAX_ANALYSIS_DAY = 30;
 const HYPOTHESIS_THRESHOLD = 15;
@@ -22,6 +20,11 @@ interface DayBucket {
 interface FollowRecord {
   followedId?: string;
   followingId?: string;
+  createdAt?: string;
+  created_at?: string;
+}
+
+interface ReactionRecord {
   createdAt?: string;
   created_at?: string;
 }
@@ -158,12 +161,10 @@ export default function HypothesisLinkOnlyView() {
 
     const loadData = async () => {
       const token = getValidToken();
-      const user = token ? getUserFromToken(token) : null;
-      const userId = user?.id;
 
-      if (!token || !userId) {
+      if (!token) {
         if (!cancelled) {
-          setError('Inicia sesión para consultar datos del backend y evaluar la hipótesis.');
+          setError('Inicia sesión para consultar datos globales del backend y evaluar la hipótesis.');
           setLoading(false);
         }
         return;
@@ -173,25 +174,23 @@ export default function HypothesisLinkOnlyView() {
       setError(null);
 
       try {
-        const followerRequests = [
-          fetchJson(`/follows/followers/${encodeURIComponent(userId)}`, token),
-          fetchJson(`/follows?followingId=${encodeURIComponent(userId)}`, token),
-          fetchJson(`/follows?followedId=${encodeURIComponent(userId)}`, token),
-        ];
-
-        const [followersResult, postsResult] = await Promise.all([
-          Promise.any(followerRequests),
-          fetchJson(`/posts?userId=${encodeURIComponent(userId)}`, token).catch(() => fetchJson('/posts', token)),
+        const [followersResult, postsResult, reactionsResult] = await Promise.all([
+          fetchJson('/follows', token).catch(() => fetchJson('/follows?page=1&limit=5000', token)),
+          fetchJson('/posts', token),
+          fetchJson('/posts/reactions', token).catch(() => []),
         ]);
 
         const followerRecords = toRecordArray(followersResult) as FollowRecord[];
-        const matchingFollowerRecords = followerRecords.filter((record) => {
-          const targetId = String(record.followedId ?? record.followingId ?? '');
-          return targetId === userId;
-        });
+        const posts = toRecordArray(postsResult).map((post) => ({
+          ...post,
+          postId: extractId(post._id ?? post.id),
+          createdAt: post.createdAt ?? post.created_at ?? post.date,
+        }));
+
+        const reactions = toRecordArray(reactionsResult) as ReactionRecord[];
 
         const newFollowersByDay = dayBuckets.map(() => 0);
-        matchingFollowerRecords.forEach((record) => {
+        followerRecords.forEach((record) => {
           const createdDate = toDate(record.createdAt ?? record.created_at);
           const dayIndex = findDayIndex(createdDate, dayBuckets);
           if (dayIndex >= 0) {
@@ -200,7 +199,7 @@ export default function HypothesisLinkOnlyView() {
         });
 
         const followersBaseline = Math.max(
-          matchingFollowerRecords.length - newFollowersByDay.reduce((sum, current) => sum + current, 0),
+          followerRecords.length - newFollowersByDay.reduce((sum, current) => sum + current, 0),
           0
         );
 
@@ -214,33 +213,34 @@ export default function HypothesisLinkOnlyView() {
           };
         });
 
-        const posts = toRecordArray(postsResult)
-          .filter((post) => {
-            const authorId = String(post.sql_user_id ?? post.authorId ?? '');
-            return authorId === userId;
-          })
-          .map((post) => ({
-            ...post,
-            postId: extractId(post._id ?? post.id),
-            createdAt: post.createdAt ?? post.created_at ?? post.date,
-          }))
-          .filter((post) => post.postId.length > 0);
-
-        const reactionsResponses = await Promise.allSettled(
-          posts.map((post) => fetchJson(`/posts/${encodeURIComponent(post.postId)}/reactions/total`, token))
-        );
-
         const interactionsByDay = dayBuckets.map(() => 0);
-        reactionsResponses.forEach((result, index) => {
-          if (result.status !== 'fulfilled') return;
 
-          const postDate = toDate(posts[index]?.createdAt);
-          const dayIndex = findDayIndex(postDate, dayBuckets);
-          if (dayIndex < 0) return;
+        if (reactions.length > 0) {
+          reactions.forEach((reaction) => {
+            const reactionDate = toDate(reaction.createdAt ?? reaction.created_at);
+            const dayIndex = findDayIndex(reactionDate, dayBuckets);
+            if (dayIndex >= 0) {
+              interactionsByDay[dayIndex] += 1;
+            }
+          });
+        } else {
+          // Fallback si el endpoint de reacciones no responde: usa agregados por post en su fecha de creacion.
+          const postsWithIds = posts.filter((post) => post.postId.length > 0);
+          const reactionsResponses = await Promise.allSettled(
+            postsWithIds.map((post) => fetchJson(`/posts/${encodeURIComponent(post.postId)}/reactions/total`, token))
+          );
 
-          const totalFromAggregate = readNumericMetric(result.value, ['totalReactions', 'count', 'total']);
-          interactionsByDay[dayIndex] += typeof totalFromAggregate === 'number' ? totalFromAggregate : 0;
-        });
+          reactionsResponses.forEach((result, index) => {
+            if (result.status !== 'fulfilled') return;
+
+            const postDate = toDate(postsWithIds[index]?.createdAt);
+            const dayIndex = findDayIndex(postDate, dayBuckets);
+            if (dayIndex < 0) return;
+
+            const totalFromAggregate = readNumericMetric(result.value, ['totalReactions', 'count', 'total']);
+            interactionsByDay[dayIndex] += typeof totalFromAggregate === 'number' ? totalFromAggregate : 0;
+          });
+        }
 
         const builtInteractionsSeries: InteractionData[] = dayBuckets.map((bucket, index) => ({
           week: bucket.label,
@@ -256,7 +256,7 @@ export default function HypothesisLinkOnlyView() {
         }
       } catch {
         if (!cancelled) {
-          setError('No fue posible consultar datos del backend para evaluar la hipótesis.');
+          setError('No fue posible consultar datos globales del backend para evaluar la hipótesis.');
           setLoading(false);
         }
       }
@@ -402,8 +402,45 @@ export default function HypothesisLinkOnlyView() {
             </section>
 
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <FollowerGrowthChart data={followersSeries} />
-              <InteractionsChart data={interactionsSeries} />
+              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-riff-card to-riff-header p-4 sm:p-6">
+                <h3 className="text-white text-lg font-bold mb-4">Crecimiento global de seguidores por día</h3>
+                <SafeResponsiveChart>
+                  <LineChart data={followersSeries} margin={{ top: 8, right: 8, left: -18, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334" opacity={0.35} />
+                    <XAxis dataKey="week" stroke="#9aa" tick={{ fill: '#ccd', fontSize: 12 }} />
+                    <YAxis stroke="#9aa" tick={{ fill: '#ccd', fontSize: 12 }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                        border: '1px solid rgba(148, 163, 184, 0.35)',
+                        borderRadius: '10px',
+                        color: '#fff',
+                      }}
+                    />
+                    <Line type="monotone" dataKey="followers" stroke="#007BFF" strokeWidth={3} dot={{ r: 3 }} />
+                  </LineChart>
+                </SafeResponsiveChart>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-riff-card to-riff-header p-4 sm:p-6">
+                <h3 className="text-white text-lg font-bold mb-4">Interacciones globales por día</h3>
+                <SafeResponsiveChart>
+                  <LineChart data={interactionsSeries} margin={{ top: 8, right: 8, left: -18, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334" opacity={0.35} />
+                    <XAxis dataKey="week" stroke="#9aa" tick={{ fill: '#ccd', fontSize: 12 }} />
+                    <YAxis stroke="#9aa" tick={{ fill: '#ccd', fontSize: 12 }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                        border: '1px solid rgba(148, 163, 184, 0.35)',
+                        borderRadius: '10px',
+                        color: '#fff',
+                      }}
+                    />
+                    <Line type="monotone" dataKey="interactions" stroke="#2B78D4" strokeWidth={3} dot={{ r: 3 }} />
+                  </LineChart>
+                </SafeResponsiveChart>
+              </div>
             </section>
 
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -453,10 +490,10 @@ export default function HypothesisLinkOnlyView() {
             <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
               <h3 className="text-white text-lg font-bold mb-3">Síntesis metodológica</h3>
               <ul className="space-y-2 text-white/80 text-sm list-disc pl-5">
-                <li>Se usa el mes actual del día 01 al día 30 con datos del backend del artista autenticado.</li>
+                <li>Se usa el mes actual del día 01 al día 30 con datos globales de toda la plataforma.</li>
                 <li>Pre = primera mitad del mes ({analysis.preDays} días) y Post = segunda mitad ({analysis.postDays} días).</li>
-                <li>Visibilidad se aproxima con crecimiento de seguidores por periodo.</li>
-                <li>Interacción se aproxima con reacciones agregadas de publicaciones por periodo.</li>
+                <li>Visibilidad se aproxima con nuevos follows del sistema por periodo.</li>
+                <li>Interacción se aproxima con reacciones globales de publicaciones por periodo.</li>
                 <li>La hipótesis se valida solo si ambos cambios porcentuales son mayores o iguales a 15%.</li>
               </ul>
             </section>
