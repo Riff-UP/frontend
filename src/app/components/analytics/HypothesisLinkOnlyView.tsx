@@ -11,13 +11,12 @@ import { getUserFromToken, getValidToken } from '@/app/utils/jwt';
 import type { FollowerGrowthData, InteractionData } from '@/app/types';
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
 
-const WEEK_COUNT = 8;
+const DAY_COUNT = 60;
 const HYPOTHESIS_THRESHOLD = 15;
 
-interface WeekBucket {
+interface DayBucket {
   label: string;
-  start: Date;
-  end: Date;
+  dayKey: string;
 }
 
 interface FollowRecord {
@@ -66,38 +65,35 @@ function toDate(value: unknown): Date | null {
   return parsed;
 }
 
-function getWeekBuckets(): WeekBucket[] {
-  const now = new Date();
-  const currentWeekStart = new Date(now);
-  currentWeekStart.setHours(0, 0, 0, 0);
-  const day = currentWeekStart.getDay();
-  const diffToMonday = (day + 6) % 7;
-  currentWeekStart.setDate(currentWeekStart.getDate() - diffToMonday);
+function toDayKey(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
 
-  const buckets: WeekBucket[] = [];
-  for (let index = WEEK_COUNT - 1; index >= 0; index -= 1) {
-    const start = new Date(currentWeekStart);
-    start.setDate(currentWeekStart.getDate() - (index * 7));
-    const end = new Date(start);
-    end.setDate(start.getDate() + 7);
+function formatDayLabel(value: Date): string {
+  return value.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' });
+}
+
+function getDayBuckets(): DayBucket[] {
+  const now = new Date();
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+
+  const buckets: DayBucket[] = [];
+  for (let index = DAY_COUNT - 1; index >= 0; index -= 1) {
+    const day = new Date(today);
+    day.setDate(today.getDate() - index);
     buckets.push({
-      label: `Sem ${WEEK_COUNT - index}`,
-      start,
-      end,
+      label: formatDayLabel(day),
+      dayKey: toDayKey(day),
     });
   }
   return buckets;
 }
 
-function findWeekIndex(value: Date | null, buckets: WeekBucket[]): number {
+function findDayIndex(value: Date | null, buckets: DayBucket[]): number {
   if (!value) return -1;
-  for (let index = 0; index < buckets.length; index += 1) {
-    const bucket = buckets[index];
-    if (value >= bucket.start && value < bucket.end) {
-      return index;
-    }
-  }
-  return -1;
+  const key = toDayKey(value);
+  return buckets.findIndex((bucket) => bucket.dayKey === key);
 }
 
 async function fetchJson(path: string, token: string): Promise<unknown> {
@@ -153,7 +149,7 @@ export default function HypothesisLinkOnlyView() {
   const [interactionsSeries, setInteractionsSeries] = useState<InteractionData[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string>('');
 
-  const weekBuckets = useMemo(() => getWeekBuckets(), []);
+  const dayBuckets = useMemo(() => getDayBuckets(), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -192,27 +188,27 @@ export default function HypothesisLinkOnlyView() {
           return targetId === userId;
         });
 
-        const newFollowersByWeek = weekBuckets.map(() => 0);
+        const newFollowersByDay = dayBuckets.map(() => 0);
         matchingFollowerRecords.forEach((record) => {
           const createdDate = toDate(record.createdAt ?? record.created_at);
-          const weekIndex = findWeekIndex(createdDate, weekBuckets);
-          if (weekIndex >= 0) {
-            newFollowersByWeek[weekIndex] += 1;
+          const dayIndex = findDayIndex(createdDate, dayBuckets);
+          if (dayIndex >= 0) {
+            newFollowersByDay[dayIndex] += 1;
           }
         });
 
         const followersBaseline = Math.max(
-          matchingFollowerRecords.length - newFollowersByWeek.reduce((sum, current) => sum + current, 0),
+          matchingFollowerRecords.length - newFollowersByDay.reduce((sum, current) => sum + current, 0),
           0
         );
 
         let cumulativeFollowers = followersBaseline;
-        const builtFollowersSeries: FollowerGrowthData[] = weekBuckets.map((bucket, index) => {
-          cumulativeFollowers += newFollowersByWeek[index];
+        const builtFollowersSeries: FollowerGrowthData[] = dayBuckets.map((bucket, index) => {
+          cumulativeFollowers += newFollowersByDay[index];
           return {
             week: bucket.label,
             followers: cumulativeFollowers,
-            date: bucket.start.toISOString(),
+            date: bucket.dayKey,
           };
         });
 
@@ -232,22 +228,22 @@ export default function HypothesisLinkOnlyView() {
           posts.map((post) => fetchJson(`/posts/${encodeURIComponent(post.postId)}/reactions/total`, token))
         );
 
-        const interactionsByWeek = weekBuckets.map(() => 0);
+        const interactionsByDay = dayBuckets.map(() => 0);
         reactionsResponses.forEach((result, index) => {
           if (result.status !== 'fulfilled') return;
 
           const postDate = toDate(posts[index]?.createdAt);
-          const weekIndex = findWeekIndex(postDate, weekBuckets);
-          if (weekIndex < 0) return;
+          const dayIndex = findDayIndex(postDate, dayBuckets);
+          if (dayIndex < 0) return;
 
           const totalFromAggregate = readNumericMetric(result.value, ['totalReactions', 'count', 'total']);
-          interactionsByWeek[weekIndex] += typeof totalFromAggregate === 'number' ? totalFromAggregate : 0;
+          interactionsByDay[dayIndex] += typeof totalFromAggregate === 'number' ? totalFromAggregate : 0;
         });
 
-        const builtInteractionsSeries: InteractionData[] = weekBuckets.map((bucket, index) => ({
+        const builtInteractionsSeries: InteractionData[] = dayBuckets.map((bucket, index) => ({
           week: bucket.label,
-          interactions: interactionsByWeek[index],
-          date: bucket.start.toISOString(),
+          interactions: interactionsByDay[index],
+          date: bucket.dayKey,
         }));
 
         if (!cancelled) {
@@ -268,16 +264,16 @@ export default function HypothesisLinkOnlyView() {
     return () => {
       cancelled = true;
     };
-  }, [weekBuckets]);
+  }, [dayBuckets]);
 
   const analysis = useMemo(() => {
-    const midpoint = Math.floor(WEEK_COUNT / 2);
+    const midpoint = Math.floor(DAY_COUNT / 2);
 
     const preFollowersDelta = followersSeries.length > 0
       ? followersSeries[midpoint - 1]?.followers - followersSeries[0]?.followers
       : 0;
     const postFollowersDelta = followersSeries.length > 0
-      ? followersSeries[WEEK_COUNT - 1]?.followers - followersSeries[midpoint]?.followers
+      ? followersSeries[DAY_COUNT - 1]?.followers - followersSeries[midpoint]?.followers
       : 0;
 
     const preInteractions = interactionsSeries
@@ -451,8 +447,8 @@ export default function HypothesisLinkOnlyView() {
             <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
               <h3 className="text-white text-lg font-bold mb-3">Síntesis metodológica</h3>
               <ul className="space-y-2 text-white/80 text-sm list-disc pl-5">
-                <li>Se usa una ventana de 8 semanas de datos del backend del artista autenticado.</li>
-                <li>Pre = semanas 1-4 y Post = semanas 5-8.</li>
+                <li>Se usa una ventana de 60 días de datos del backend del artista autenticado.</li>
+                <li>Pre = días 1-30 y Post = días 31-60.</li>
                 <li>Visibilidad se aproxima con crecimiento de seguidores por periodo.</li>
                 <li>Interacción se aproxima con reacciones agregadas de publicaciones por periodo.</li>
                 <li>La hipótesis se valida solo si ambos cambios porcentuales son mayores o iguales a 15%.</li>
