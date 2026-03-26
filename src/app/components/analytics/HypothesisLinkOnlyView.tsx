@@ -29,6 +29,20 @@ interface ReactionRecord {
   created_at?: string;
 }
 
+interface DataAudit {
+  followsFetched: number;
+  followsAfterFilter: number;
+  followsPre: number;
+  followsPost: number;
+  postsFetched: number;
+  postsAfterFilter: number;
+  reactionsFetched: number;
+  reactionsAfterFilter: number;
+  reactionsPre: number;
+  reactionsPost: number;
+  reactionsSource: 'direct' | 'fallback-by-post';
+}
+
 function isSoftDeletedRecord(record: Record<string, unknown>): boolean {
   const deletedAt = record.deletedAt ?? record.deleted_at;
   if (typeof deletedAt === 'string' && deletedAt.trim() !== '') {
@@ -60,6 +74,35 @@ function isSoftDeletedRecord(record: Record<string, unknown>): boolean {
   }
 
   return false;
+}
+
+function recordKey(record: Record<string, unknown>, fallbackPrefix: string, index: number): string {
+  const rawId = record.id ?? record._id;
+  const id = extractId(rawId);
+  if (id) {
+    return `${fallbackPrefix}:id:${id}`;
+  }
+
+  const createdAt = String(record.createdAt ?? record.created_at ?? '');
+  const left = String(record.followerId ?? record.followingId ?? record.followedId ?? record.sql_user_id ?? '');
+  const right = String(record.post_id ?? record.postId ?? record.userId ?? '');
+  return `${fallbackPrefix}:composite:${left}:${right}:${createdAt}:${index}`;
+}
+
+function dedupeRecords(rows: Record<string, unknown>[], prefix: string): Record<string, unknown>[] {
+  const seen = new Set<string>();
+  const deduped: Record<string, unknown>[] = [];
+
+  rows.forEach((row, index) => {
+    const key = recordKey(row, prefix, index);
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    deduped.push(row);
+  });
+
+  return deduped;
 }
 
 function toRecordArray(payload: unknown): Record<string, unknown>[] {
@@ -186,6 +229,7 @@ export default function HypothesisLinkOnlyView() {
   const [followersSeries, setFollowersSeries] = useState<FollowerGrowthData[]>([]);
   const [interactionsSeries, setInteractionsSeries] = useState<InteractionData[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [audit, setAudit] = useState<DataAudit | null>(null);
 
   const dayBuckets = useMemo(() => getDayBuckets(), []);
 
@@ -213,9 +257,17 @@ export default function HypothesisLinkOnlyView() {
           fetchJson('/posts/reactions', token).catch(() => []),
         ]);
 
-        const followerRecords = toRecordArray(followersResult)
+        const rawFollowers = toRecordArray(followersResult);
+        const rawPosts = toRecordArray(postsResult);
+        const rawReactions = toRecordArray(reactionsResult);
+
+        const dedupedFollowers = dedupeRecords(rawFollowers, 'follow');
+        const dedupedPosts = dedupeRecords(rawPosts, 'post');
+        const dedupedReactions = dedupeRecords(rawReactions, 'reaction');
+
+        const followerRecords = dedupedFollowers
           .filter((record) => !isSoftDeletedRecord(record)) as FollowRecord[];
-        const posts = toRecordArray(postsResult)
+        const posts = dedupedPosts
           .filter((record) => !isSoftDeletedRecord(record))
           .map((post) => ({
             ...post,
@@ -223,7 +275,7 @@ export default function HypothesisLinkOnlyView() {
             createdAt: post.createdAt ?? post.created_at ?? post.date,
           }));
 
-        const reactions = toRecordArray(reactionsResult)
+        const reactions = dedupedReactions
           .filter((record) => !isSoftDeletedRecord(record)) as ReactionRecord[];
 
         const newFollowersByDay = dayBuckets.map(() => 0);
@@ -251,6 +303,7 @@ export default function HypothesisLinkOnlyView() {
         });
 
         const interactionsByDay = dayBuckets.map(() => 0);
+        let reactionsSource: 'direct' | 'fallback-by-post' = 'direct';
 
         if (reactions.length > 0) {
           reactions.forEach((reaction) => {
@@ -262,6 +315,7 @@ export default function HypothesisLinkOnlyView() {
           });
         } else {
           // Fallback si el endpoint de reacciones no responde: usa agregados por post en su fecha de creacion.
+          reactionsSource = 'fallback-by-post';
           const postsWithIds = posts.filter((post) => post.postId.length > 0);
           const reactionsResponses = await Promise.allSettled(
             postsWithIds.map((post) => fetchJson(`/posts/${encodeURIComponent(post.postId)}/reactions/total`, token))
@@ -285,9 +339,28 @@ export default function HypothesisLinkOnlyView() {
           date: bucket.dayKey,
         }));
 
+        const midpoint = Math.max(1, Math.floor(dayBuckets.length / 2));
+        const followsPre = newFollowersByDay.slice(0, midpoint).reduce((sum, value) => sum + value, 0);
+        const followsPost = newFollowersByDay.slice(midpoint).reduce((sum, value) => sum + value, 0);
+        const reactionsPre = interactionsByDay.slice(0, midpoint).reduce((sum, value) => sum + value, 0);
+        const reactionsPost = interactionsByDay.slice(midpoint).reduce((sum, value) => sum + value, 0);
+
         if (!cancelled) {
           setFollowersSeries(builtFollowersSeries);
           setInteractionsSeries(builtInteractionsSeries);
+          setAudit({
+            followsFetched: rawFollowers.length,
+            followsAfterFilter: followerRecords.length,
+            followsPre,
+            followsPost,
+            postsFetched: rawPosts.length,
+            postsAfterFilter: posts.length,
+            reactionsFetched: rawReactions.length,
+            reactionsAfterFilter: reactions.length,
+            reactionsPre,
+            reactionsPost,
+            reactionsSource,
+          });
           setLastUpdated(new Date().toISOString());
           setLoading(false);
         }
@@ -525,6 +598,26 @@ export default function HypothesisLinkOnlyView() {
             </section>
 
             <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <h3 className="text-white text-lg font-bold mb-3">Auditoría de datos (origen de métricas)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-white/80">
+                  <p>Follows traídos: <span className="text-white font-semibold">{audit?.followsFetched ?? 0}</span></p>
+                  <p>Follows usados (sin soft-delete/inactivos): <span className="text-white font-semibold">{audit?.followsAfterFilter ?? 0}</span></p>
+                  <p>Follows pre: <span className="text-white font-semibold">{audit?.followsPre ?? 0}</span></p>
+                  <p>Follows post: <span className="text-white font-semibold">{audit?.followsPost ?? 0}</span></p>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-white/80">
+                  <p>Posts traídos: <span className="text-white font-semibold">{audit?.postsFetched ?? 0}</span></p>
+                  <p>Posts usados (sin soft-delete/inactivos): <span className="text-white font-semibold">{audit?.postsAfterFilter ?? 0}</span></p>
+                  <p>Reacciones traídas: <span className="text-white font-semibold">{audit?.reactionsFetched ?? 0}</span></p>
+                  <p>Reacciones usadas: <span className="text-white font-semibold">{audit?.reactionsAfterFilter ?? 0}</span></p>
+                  <p>Interacciones pre/post: <span className="text-white font-semibold">{audit?.reactionsPre ?? 0} / {audit?.reactionsPost ?? 0}</span></p>
+                  <p>Fuente de reacciones: <span className="text-white font-semibold">{audit?.reactionsSource === 'direct' ? '/posts/reactions' : 'fallback por post'}</span></p>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
               <h3 className="text-white text-lg font-bold mb-3">Síntesis metodológica</h3>
               <ul className="space-y-2 text-white/80 text-sm list-disc pl-5">
                 <li>Se usa el mes actual del día 01 al día 30 con datos globales de toda la plataforma.</li>
@@ -532,6 +625,7 @@ export default function HypothesisLinkOnlyView() {
                 <li>Visibilidad se aproxima con nuevos follows del sistema por periodo.</li>
                 <li>Interacción se aproxima con reacciones globales de publicaciones por periodo.</li>
                 <li>Se excluyen registros con soft-delete o estado inactivo para evitar ruido de pruebas.</li>
+                <li>Se aplica deduplicación por id/combinación de campos para prevenir conteos inflados.</li>
                 <li>La hipótesis se valida solo si ambos cambios porcentuales son mayores o iguales a 15%.</li>
               </ul>
             </section>
