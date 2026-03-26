@@ -11,7 +11,7 @@ import { getUserFromToken, getValidToken } from '@/app/utils/jwt';
 import type { FollowerGrowthData, InteractionData } from '@/app/types';
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
 
-const DAY_COUNT = 60;
+const MAX_ANALYSIS_DAY = 30;
 const HYPOTHESIS_THRESHOLD = 15;
 
 interface DayBucket {
@@ -75,13 +75,15 @@ function formatDayLabel(value: Date): string {
 
 function getDayBuckets(): DayBucket[] {
   const now = new Date();
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+  const endDay = Math.min(MAX_ANALYSIS_DAY, lastDayOfMonth);
 
   const buckets: DayBucket[] = [];
-  for (let index = DAY_COUNT - 1; index >= 0; index -= 1) {
-    const day = new Date(today);
-    day.setDate(today.getDate() - index);
+  for (let dayNumber = 1; dayNumber <= endDay; dayNumber += 1) {
+    const day = new Date(year, month, dayNumber);
+    day.setHours(0, 0, 0, 0);
     buckets.push({
       label: formatDayLabel(day),
       dayKey: toDayKey(day),
@@ -267,13 +269,14 @@ export default function HypothesisLinkOnlyView() {
   }, [dayBuckets]);
 
   const analysis = useMemo(() => {
-    const midpoint = Math.floor(DAY_COUNT / 2);
+    const totalDays = dayBuckets.length;
+    const midpoint = Math.max(1, Math.floor(totalDays / 2));
 
-    const preFollowersDelta = followersSeries.length > 0
+    const preFollowersDelta = followersSeries.length > 1
       ? followersSeries[midpoint - 1]?.followers - followersSeries[0]?.followers
       : 0;
-    const postFollowersDelta = followersSeries.length > 0
-      ? followersSeries[DAY_COUNT - 1]?.followers - followersSeries[midpoint]?.followers
+    const postFollowersDelta = followersSeries.length > midpoint
+      ? followersSeries[totalDays - 1]?.followers - followersSeries[midpoint]?.followers
       : 0;
 
     const preInteractions = interactionsSeries
@@ -300,6 +303,9 @@ export default function HypothesisLinkOnlyView() {
       visibilityMeets,
       interactionsMeets,
       hypothesisPass,
+      totalDays,
+      preDays: midpoint,
+      postDays: Math.max(totalDays - midpoint, 0),
       comparisonChartData: [
         { metric: 'Visibilidad', pre: preFollowersDelta, post: postFollowersDelta },
         { metric: 'Interacción', pre: preInteractions, post: postInteractions },
@@ -309,7 +315,7 @@ export default function HypothesisLinkOnlyView() {
         { metric: 'Interacción %', value: interactionsPct ?? 0, threshold: HYPOTHESIS_THRESHOLD },
       ],
     };
-  }, [followersSeries, interactionsSeries]);
+  }, [dayBuckets.length, followersSeries, interactionsSeries]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-riff-bg via-riff-card to-riff-header">
@@ -447,8 +453,8 @@ export default function HypothesisLinkOnlyView() {
             <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
               <h3 className="text-white text-lg font-bold mb-3">Síntesis metodológica</h3>
               <ul className="space-y-2 text-white/80 text-sm list-disc pl-5">
-                <li>Se usa una ventana de 60 días de datos del backend del artista autenticado.</li>
-                <li>Pre = días 1-30 y Post = días 31-60.</li>
+                <li>Se usa el mes actual del día 01 al día 30 con datos del backend del artista autenticado.</li>
+                <li>Pre = primera mitad del mes ({analysis.preDays} días) y Post = segunda mitad ({analysis.postDays} días).</li>
                 <li>Visibilidad se aproxima con crecimiento de seguidores por periodo.</li>
                 <li>Interacción se aproxima con reacciones agregadas de publicaciones por periodo.</li>
                 <li>La hipótesis se valida solo si ambos cambios porcentuales son mayores o iguales a 15%.</li>
