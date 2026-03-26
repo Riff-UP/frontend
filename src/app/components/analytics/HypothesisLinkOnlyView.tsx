@@ -29,6 +29,39 @@ interface ReactionRecord {
   created_at?: string;
 }
 
+function isSoftDeletedRecord(record: Record<string, unknown>): boolean {
+  const deletedAt = record.deletedAt ?? record.deleted_at;
+  if (typeof deletedAt === 'string' && deletedAt.trim() !== '') {
+    return true;
+  }
+  if (deletedAt instanceof Date) {
+    return true;
+  }
+
+  const isDeleted = record.isDeleted ?? record.is_deleted;
+  if (isDeleted === true || isDeleted === 1 || isDeleted === 'true' || isDeleted === '1') {
+    return true;
+  }
+
+  const deletedFlag = record.deleted;
+  if (deletedFlag === true || deletedFlag === 1 || deletedFlag === 'true' || deletedFlag === '1') {
+    return true;
+  }
+
+  const statusValue = record.status;
+  if (statusValue === false || statusValue === 0 || statusValue === 'false' || statusValue === '0') {
+    return true;
+  }
+  if (typeof statusValue === 'string') {
+    const normalized = statusValue.trim().toLowerCase();
+    if (normalized === 'deleted' || normalized === 'inactive' || normalized === 'archived') {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function toRecordArray(payload: unknown): Record<string, unknown>[] {
   if (Array.isArray(payload)) {
     return payload.filter((entry): entry is Record<string, unknown> => typeof entry === 'object' && entry !== null);
@@ -180,14 +213,18 @@ export default function HypothesisLinkOnlyView() {
           fetchJson('/posts/reactions', token).catch(() => []),
         ]);
 
-        const followerRecords = toRecordArray(followersResult) as FollowRecord[];
-        const posts = toRecordArray(postsResult).map((post) => ({
-          ...post,
-          postId: extractId(post._id ?? post.id),
-          createdAt: post.createdAt ?? post.created_at ?? post.date,
-        }));
+        const followerRecords = toRecordArray(followersResult)
+          .filter((record) => !isSoftDeletedRecord(record)) as FollowRecord[];
+        const posts = toRecordArray(postsResult)
+          .filter((record) => !isSoftDeletedRecord(record))
+          .map((post) => ({
+            ...post,
+            postId: extractId(post._id ?? post.id),
+            createdAt: post.createdAt ?? post.created_at ?? post.date,
+          }));
 
-        const reactions = toRecordArray(reactionsResult) as ReactionRecord[];
+        const reactions = toRecordArray(reactionsResult)
+          .filter((record) => !isSoftDeletedRecord(record)) as ReactionRecord[];
 
         const newFollowersByDay = dayBuckets.map(() => 0);
         followerRecords.forEach((record) => {
@@ -494,6 +531,7 @@ export default function HypothesisLinkOnlyView() {
                 <li>Pre = primera mitad del mes ({analysis.preDays} días) y Post = segunda mitad ({analysis.postDays} días).</li>
                 <li>Visibilidad se aproxima con nuevos follows del sistema por periodo.</li>
                 <li>Interacción se aproxima con reacciones globales de publicaciones por periodo.</li>
+                <li>Se excluyen registros con soft-delete o estado inactivo para evitar ruido de pruebas.</li>
                 <li>La hipótesis se valida solo si ambos cambios porcentuales son mayores o iguales a 15%.</li>
               </ul>
             </section>

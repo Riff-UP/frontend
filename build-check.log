@@ -1,0 +1,41 @@
+
+> frontend@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 8.7s
+  Running TypeScript ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/16) ...
+  Generating static pages using 15 workers (4/16) 
+  Generating static pages using 15 workers (8/16) 
+  Generating static pages using 15 workers (12/16) 
+✓ Generating static pages using 15 workers (16/16) in 738.5ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/analytics/[[...path]]
+├ ƒ /api/upload/cloudinary/sign
+├ ƒ /api/upload/r2
+├ ○ /artist
+├ ƒ /artist/[id]
+├ ○ /forgot-password
+├ ○ /lab/riff-benchmark-analytics-7f3k
+├ ○ /lab/riff-hipotesis-impacto-mx4n
+├ ○ /landing
+├ ○ /login
+├ ○ /privacy
+├ ○ /profile
+├ ○ /register
+├ ○ /reset-password
+└ ○ /verify-code
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
