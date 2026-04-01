@@ -64,6 +64,7 @@ function formatOAuthPopupError(raw: string): string | null {
 function getOAuthTokenFromUrl(url: URL): string {
   const fromSearch =
     url.searchParams.get('access_token') ||
+    url.searchParams.get('accessToken') ||
     url.searchParams.get('token') ||
     url.searchParams.get('jwt') ||
     '';
@@ -75,10 +76,40 @@ function getOAuthTokenFromUrl(url: URL): string {
   const hashParams = new URLSearchParams(url.hash.startsWith('#') ? url.hash.slice(1) : url.hash);
   return (
     hashParams.get('access_token') ||
+    hashParams.get('accessToken') ||
     hashParams.get('token') ||
     hashParams.get('jwt') ||
     ''
   ).trim();
+}
+
+function extractOAuthTokenFromRawText(raw: string): string {
+  const source = raw.trim();
+  if (!source) {
+    return '';
+  }
+
+  const patterns = [
+    /"access_token"\s*:\s*"([^"]+)"/i,
+    /"accessToken"\s*:\s*"([^"]+)"/i,
+    /"token"\s*:\s*"([^"]+)"/i,
+    /access_token=([^\s&"'<>]+)/i,
+    /token=([^\s&"'<>]+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = source.match(pattern);
+    if (match?.[1]) {
+      return decodeURIComponent(match[1]).trim();
+    }
+  }
+
+  return '';
+}
+
+function hasOAuthSuccessSignal(raw: string): boolean {
+  const normalized = raw.toLowerCase();
+  return normalized.includes('oauth completado correctamente') || normalized.includes('oauth completado');
 }
 
 function getOAuthErrorFromUrl(url: URL): string | null {
@@ -507,6 +538,35 @@ export default function BenchmarkDashboard() {
         }
 
         const popupBody = currentPopup.document.body?.innerText?.trim() || '';
+        const popupHtml = currentPopup.document.documentElement?.outerHTML || '';
+
+        const tokenFromBody = extractOAuthTokenFromRawText(popupBody);
+        const tokenFromHtml = extractOAuthTokenFromRawText(popupHtml);
+        const recoveredToken = tokenFromBody || tokenFromHtml;
+
+        if (recoveredToken) {
+          clearOAuthPopupWatcher();
+          currentPopup.close();
+          oauthPopupRef.current = null;
+          setOauthLoading(false);
+          setOauthError(null);
+          setOauthMessage('Token OAuth recuperado desde callback. Refrescando panel…');
+          setAnalyticsAccessToken(recoveredToken);
+          void refreshDashboard().then(() => setOauthMessage(null));
+          return;
+        }
+
+        if (hasOAuthSuccessSignal(popupBody)) {
+          clearOAuthPopupWatcher();
+          currentPopup.close();
+          oauthPopupRef.current = null;
+          setOauthLoading(false);
+          setOauthError(null);
+          setOauthMessage('OAuth completado, pero el callback no devolvió access token al frontend. Usa el campo manual o ajusta backend para enviar token en query/hash/postMessage.');
+          void refreshDashboard();
+          return;
+        }
+
         const popupError = formatOAuthPopupError(popupBody);
 
         if (!popupError) {
