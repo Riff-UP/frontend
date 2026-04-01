@@ -61,6 +61,41 @@ function formatOAuthPopupError(raw: string): string | null {
   }
 }
 
+function getOAuthTokenFromUrl(url: URL): string {
+  const fromSearch =
+    url.searchParams.get('access_token') ||
+    url.searchParams.get('token') ||
+    url.searchParams.get('jwt') ||
+    '';
+
+  if (fromSearch.trim()) {
+    return fromSearch.trim();
+  }
+
+  const hashParams = new URLSearchParams(url.hash.startsWith('#') ? url.hash.slice(1) : url.hash);
+  return (
+    hashParams.get('access_token') ||
+    hashParams.get('token') ||
+    hashParams.get('jwt') ||
+    ''
+  ).trim();
+}
+
+function getOAuthErrorFromUrl(url: URL): string | null {
+  const errorCode = url.searchParams.get('error') || '';
+  const description = url.searchParams.get('error_description') || '';
+
+  if (!errorCode.trim() && !description.trim()) {
+    return null;
+  }
+
+  if (description.trim()) {
+    return `${errorCode || 'oauth_error'}: ${description}`;
+  }
+
+  return errorCode.trim();
+}
+
 function formatNumber(value: number): string {
   return value.toLocaleString('es-MX');
 }
@@ -439,6 +474,35 @@ export default function BenchmarkDashboard() {
         const looksLikeAnalyticsProxy = popupUrl.pathname.startsWith('/api/analytics');
 
         if (!sameOrigin || !looksLikeAnalyticsProxy) {
+          return;
+        }
+
+        const callbackState = popupUrl.searchParams.get('state') || '';
+        if (callbackState && callbackState !== ANALYTICS_OAUTH_STATE) {
+          return;
+        }
+
+        const tokenFromUrl = getOAuthTokenFromUrl(popupUrl);
+        if (tokenFromUrl) {
+          clearOAuthPopupWatcher();
+          currentPopup.close();
+          oauthPopupRef.current = null;
+          setOauthLoading(false);
+          setOauthError(null);
+          setOauthMessage('Token OAuth recibido desde callback. Refrescando panel…');
+          setAnalyticsAccessToken(tokenFromUrl);
+          void refreshDashboard().then(() => setOauthMessage(null));
+          return;
+        }
+
+        const oauthErrorFromUrl = getOAuthErrorFromUrl(popupUrl);
+        if (oauthErrorFromUrl) {
+          clearOAuthPopupWatcher();
+          currentPopup.close();
+          oauthPopupRef.current = null;
+          setOauthLoading(false);
+          setOauthMessage(null);
+          setOauthError(oauthErrorFromUrl);
           return;
         }
 

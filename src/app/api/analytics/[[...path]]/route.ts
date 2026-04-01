@@ -101,22 +101,59 @@ function buildForwardHeaders(source: Headers, request: NextRequest): Headers {
   return headers;
 }
 
-function buildResponseHeaders(source: Headers): Headers {
+function normalizeProxyPath(pathname: string): string {
+  if (pathname === '/analytics' || pathname.startsWith('/analytics/')) {
+    return `/api${pathname}`;
+  }
+
+  return pathname;
+}
+
+function rewriteRedirectLocation(locationValue: string, request: NextRequest, upstreamUrl: URL): string {
+  let parsedLocation: URL;
+
+  try {
+    parsedLocation = new URL(locationValue, upstreamUrl);
+  } catch {
+    return locationValue;
+  }
+
+  const isUpstreamHost = parsedLocation.host === upstreamUrl.host;
+  const normalizedPath = normalizeProxyPath(parsedLocation.pathname);
+  const isAnalyticsPath = normalizedPath === '/api/analytics' || normalizedPath.startsWith('/api/analytics/');
+
+  if (!isUpstreamHost || !isAnalyticsPath) {
+    return locationValue;
+  }
+
+  const rewritten = new URL(request.nextUrl.origin);
+  rewritten.pathname = normalizedPath;
+  rewritten.search = parsedLocation.search;
+  rewritten.hash = parsedLocation.hash;
+
+  return rewritten.toString();
+}
+
+function buildResponseHeaders(source: Headers, request: NextRequest, upstreamUrl: URL): Headers {
   const headers = new Headers();
 
   source.forEach((value, key) => {
     if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
-      headers.set(key, value);
+      if (key.toLowerCase() === 'location') {
+        headers.set(key, rewriteRedirectLocation(value, request, upstreamUrl));
+      } else {
+        headers.set(key, value);
+      }
     }
   });
 
   return headers;
 }
 
-function toNextResponse(response: Response): Promise<NextResponse> {
+function toNextResponse(response: Response, request: NextRequest, upstreamUrl: URL): Promise<NextResponse> {
   return response.arrayBuffer().then((body) => new NextResponse(body, {
     status: response.status,
-    headers: buildResponseHeaders(response.headers),
+    headers: buildResponseHeaders(response.headers, request, upstreamUrl),
   }));
 }
 
@@ -169,7 +206,8 @@ async function proxyAnalyticsRequest(
 
   for (const baseUrl of candidates) {
     try {
-      const upstreamResponse = await fetch(`${baseUrl}${suffix}${search}`, {
+      const upstreamRequestUrl = new URL(`${baseUrl}${suffix}${search}`);
+      const upstreamResponse = await fetch(upstreamRequestUrl, {
         method: request.method,
         headers: buildForwardHeaders(request.headers, request),
         body: requestBody,
@@ -203,7 +241,7 @@ async function proxyAnalyticsRequest(
         }
       }
 
-      return toNextResponse(upstreamResponse);
+      return toNextResponse(upstreamResponse, request, upstreamRequestUrl);
     } catch (error) {
       lastNetworkError = error instanceof Error ? error : new Error('No se pudo conectar con el gateway de analytics.');
       if (candidates.length === 1) {
@@ -213,7 +251,8 @@ async function proxyAnalyticsRequest(
   }
 
   if (lastRetryableResponse) {
-    return toNextResponse(lastRetryableResponse);
+    const fallbackRequestUrl = new URL(`${candidates[0]}${suffix}${search}`);
+    return toNextResponse(lastRetryableResponse, request, fallbackRequestUrl);
   }
 
   if (lastNetworkError) {
