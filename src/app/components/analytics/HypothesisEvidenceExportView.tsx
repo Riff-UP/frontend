@@ -5,7 +5,7 @@ import Header from '@/app/components/layout/Header';
 import Footer from '@/app/components/layout/Footer';
 import SafeResponsiveChart from '@/app/components/analytics/SafeResponsiveChart';
 import { API_BASE_URL } from '@/app/config/api';
-import { getValidToken } from '@/app/utils/jwt';
+import { getUserFromToken, getValidToken } from '@/app/utils/jwt';
 import { toPng, toSvg } from 'html-to-image';
 import {
   Bar,
@@ -28,6 +28,7 @@ interface DayBucket {
 }
 
 interface DataAudit {
+  scopeMode: 'global' | 'my';
   usersFetched: number;
   usersActive: number;
   followsFetched: number;
@@ -259,6 +260,7 @@ function formatNum(value: number): string {
 }
 
 export default function HypothesisEvidenceExportView() {
+  const [scopeMode, setScopeMode] = useState<'global' | 'my'>('global');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [series, setSeries] = useState<SeriesRow[]>([]);
@@ -310,22 +312,63 @@ export default function HypothesisEvidenceExportView() {
             .filter((id) => id.length > 0)
         );
 
+        const currentUserId = getUserFromToken(token)?.id || '';
+        const targetUserIds = scopeMode === 'my'
+          ? (currentUserId ? [currentUserId] : [])
+          : Array.from(activeUserIds);
+
+        if (targetUserIds.length === 0) {
+          throw new Error('No se encontraron usuarios objetivo para el alcance seleccionado.');
+        }
+
         const dedupedFollows = dedupeRecords(rawFollows, 'follow');
         const dedupedPosts = dedupeRecords(rawPosts, 'post');
         const dedupedReactions = dedupeRecords(rawReactions, 'reaction');
 
-        const followsWithoutSoftDelete = dedupedFollows.filter((record) => !isSoftDeletedRecord(record));
+        let followsWithoutSoftDelete = dedupedFollows.filter((record) => !isSoftDeletedRecord(record));
+
+        // Si el endpoint global viene scopeado por sesión, fuerza agregación por usuario objetivo.
+        if (scopeMode === 'global' && followsWithoutSoftDelete.length < Math.max(targetUserIds.length / 3, 10)) {
+          const followChunks = await Promise.allSettled(
+            targetUserIds.map((userId) => fetchJson(`/follows?followedId=${encodeURIComponent(userId)}`, token))
+          );
+          const expanded = followChunks
+            .filter((result): result is PromiseFulfilledResult<unknown> => result.status === 'fulfilled')
+            .flatMap((result) => toRecordArray(result.value));
+          followsWithoutSoftDelete = dedupeRecords(expanded, 'follow-expanded').filter((record) => !isSoftDeletedRecord(record));
+        }
+
+        const targetUserIdSet = new Set(targetUserIds);
         const validFollows = followsWithoutSoftDelete.filter((record) => {
-          if (activeUserIds.size === 0) return true;
           const followerId = String(record.followerId ?? '');
           const followedId = String(record.followedId ?? record.followingId ?? '');
           if (!followerId || !followedId) return false;
-          return activeUserIds.has(followerId) && activeUserIds.has(followedId);
+          if (activeUserIds.size > 0 && (!activeUserIds.has(followerId) || !activeUserIds.has(followedId))) return false;
+          return targetUserIdSet.has(followedId);
         });
 
         const followsDroppedByInactiveUsers = Math.max(followsWithoutSoftDelete.length - validFollows.length, 0);
 
-        const posts = dedupedPosts.filter((record) => !isSoftDeletedRecord(record));
+        let posts = dedupedPosts.filter((record) => !isSoftDeletedRecord(record));
+
+        // Refuerza alcance por usuario objetivo.
+        posts = posts.filter((record) => {
+          const authorId = String(record.sql_user_id ?? record.authorId ?? record.userId ?? '');
+          return targetUserIdSet.has(authorId);
+        });
+
+        // Si el endpoint /posts viene scopeado por sesión, agrega posts por usuario objetivo.
+        if (scopeMode === 'global' && posts.length < Math.max(targetUserIds.length / 4, 8)) {
+          const perUserPosts = await Promise.allSettled(
+            targetUserIds.map((userId) => fetchJson(`/posts?userId=${encodeURIComponent(userId)}`, token))
+          );
+          const expandedPosts = perUserPosts
+            .filter((result): result is PromiseFulfilledResult<unknown> => result.status === 'fulfilled')
+            .flatMap((result) => toRecordArray(result.value));
+          posts = dedupeRecords(expandedPosts, 'post-expanded')
+            .filter((record) => !isSoftDeletedRecord(record));
+        }
+
         const reactions = dedupedReactions.filter((record) => !isSoftDeletedRecord(record));
 
         const followersByDay = dayBuckets.map(() => 0);
@@ -399,6 +442,7 @@ export default function HypothesisEvidenceExportView() {
         if (!cancelled) {
           setSeries(builtSeries);
           setAudit({
+            scopeMode,
             usersFetched: rawUsers.length,
             usersActive: activeUserIds.size,
             followsFetched: rawFollows.length,
@@ -429,7 +473,7 @@ export default function HypothesisEvidenceExportView() {
     return () => {
       cancelled = true;
     };
-  }, [dayBuckets]);
+  }, [dayBuckets, scopeMode]);
 
   const analysis = useMemo(() => {
     const totalDays = dayBuckets.length;
@@ -587,6 +631,22 @@ export default function HypothesisEvidenceExportView() {
           {lastUpdated ? (
             <p className="text-white/55 text-sm mt-3">Actualizado: {new Date(lastUpdated).toLocaleString('es-MX')}</p>
           ) : null}
+          <div className="mt-4 inline-flex rounded-lg border border-white/15 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setScopeMode('global')}
+              className={`px-4 py-2 text-sm font-semibold ${scopeMode === 'global' ? 'bg-riff-primary text-white' : 'bg-white/5 text-white/75 hover:bg-white/10'}`}
+            >
+              Global app
+            </button>
+            <button
+              type="button"
+              onClick={() => setScopeMode('my')}
+              className={`px-4 py-2 text-sm font-semibold ${scopeMode === 'my' ? 'bg-riff-primary text-white' : 'bg-white/5 text-white/75 hover:bg-white/10'}`}
+            >
+              Mi cuenta
+            </button>
+          </div>
         </section>
 
         {loading ? (
@@ -813,6 +873,7 @@ export default function HypothesisEvidenceExportView() {
               <h3 className="text-white text-xl font-bold">Auditoría de datos significativos</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-base mt-4">
                 <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-white/80 leading-7">
+                  <p>Modo de alcance: <span className="text-white font-semibold">{audit?.scopeMode === 'my' ? 'Mi cuenta' : 'Global app'}</span></p>
                   <p>Usuarios traídos: <span className="text-white font-semibold">{audit?.usersFetched ?? 0}</span></p>
                   <p>Usuarios activos detectados: <span className="text-white font-semibold">{audit?.usersActive ?? 0}</span></p>
                   <p>Follows traídos: <span className="text-white font-semibold">{audit?.followsFetched ?? 0}</span></p>

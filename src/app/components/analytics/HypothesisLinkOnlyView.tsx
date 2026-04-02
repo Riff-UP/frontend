@@ -5,7 +5,7 @@ import Header from '@/app/components/layout/Header';
 import Footer from '@/app/components/layout/Footer';
 import SafeResponsiveChart from '@/app/components/analytics/SafeResponsiveChart';
 import { API_BASE_URL } from '@/app/config/api';
-import { getValidToken } from '@/app/utils/jwt';
+import { getUserFromToken, getValidToken } from '@/app/utils/jwt';
 import type { FollowerGrowthData, InteractionData } from '@/app/types';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from 'recharts';
 
@@ -31,6 +31,7 @@ interface ReactionRecord {
 }
 
 interface DataAudit {
+  scopeMode: 'global' | 'my';
   usersFetched: number;
   usersActive: number;
   followsFetched: number;
@@ -299,6 +300,7 @@ function formatReadableChange(pct: number | null): { main: string; detail: strin
 }
 
 export default function HypothesisLinkOnlyView() {
+  const [scopeMode, setScopeMode] = useState<'global' | 'my'>('global');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [followersSeries, setFollowersSeries] = useState<FollowerGrowthData[]>([]);
@@ -347,6 +349,17 @@ export default function HypothesisLinkOnlyView() {
             .filter((id) => id.length > 0)
         );
 
+        const currentUserId = getUserFromToken(token)?.id || '';
+        const targetUserIds = scopeMode === 'my'
+          ? (currentUserId ? [currentUserId] : [])
+          : Array.from(activeUserIds);
+
+        if (targetUserIds.length === 0) {
+          throw new Error('No se encontraron usuarios objetivo para el alcance seleccionado.');
+        }
+
+        const targetUserIdSet = new Set(targetUserIds);
+
         const dedupedFollowers = dedupeRecords(rawFollowers, 'follow');
         const dedupedPosts = dedupeRecords(rawPosts, 'post');
         const dedupedReactions = dedupeRecords(rawReactions, 'reaction');
@@ -354,10 +367,22 @@ export default function HypothesisLinkOnlyView() {
         const followersWithoutSoftDelete = dedupedFollowers
           .filter((record) => !isSoftDeletedRecord(record)) as FollowRecord[];
 
-        const followerRecords = followersWithoutSoftDelete
+        let effectiveFollowers = followersWithoutSoftDelete as FollowRecord[];
+        if (scopeMode === 'global' && effectiveFollowers.length < Math.max(targetUserIds.length / 3, 10)) {
+          const followChunks = await Promise.allSettled(
+            targetUserIds.map((userId) => fetchJson(`/follows?followedId=${encodeURIComponent(userId)}`, token))
+          );
+          const expanded = followChunks
+            .filter((result): result is PromiseFulfilledResult<unknown> => result.status === 'fulfilled')
+            .flatMap((result) => toRecordArray(result.value));
+          effectiveFollowers = dedupeRecords(expanded, 'follow-expanded')
+            .filter((record) => !isSoftDeletedRecord(record)) as FollowRecord[];
+        }
+
+        const followerRecords = effectiveFollowers
           .filter((record) => {
             if (activeUserIds.size === 0) {
-              return true;
+              return targetUserIdSet.has(extractFollowTargetId(record));
             }
 
             const followerId = extractFollowFollowerId(record);
@@ -367,18 +392,38 @@ export default function HypothesisLinkOnlyView() {
               return false;
             }
 
-            return activeUserIds.has(followerId) && activeUserIds.has(targetId);
+            return activeUserIds.has(followerId) && activeUserIds.has(targetId) && targetUserIdSet.has(targetId);
           });
 
-        const followsDroppedByInactiveUsers = Math.max(followersWithoutSoftDelete.length - followerRecords.length, 0);
+        const followsDroppedByInactiveUsers = Math.max(effectiveFollowers.length - followerRecords.length, 0);
 
-        const posts = dedupedPosts
+        let posts = dedupedPosts
           .filter((record) => !isSoftDeletedRecord(record))
+          .filter((record) => {
+            const authorId = String(record.sql_user_id ?? record.authorId ?? record.userId ?? '');
+            return targetUserIdSet.has(authorId);
+          })
           .map((post) => ({
             ...post,
             postId: extractId(post._id ?? post.id),
             createdAt: post.createdAt ?? post.created_at ?? post.date,
           }));
+
+        if (scopeMode === 'global' && posts.length < Math.max(targetUserIds.length / 4, 8)) {
+          const perUserPosts = await Promise.allSettled(
+            targetUserIds.map((userId) => fetchJson(`/posts?userId=${encodeURIComponent(userId)}`, token))
+          );
+          const expandedPosts = perUserPosts
+            .filter((result): result is PromiseFulfilledResult<unknown> => result.status === 'fulfilled')
+            .flatMap((result) => toRecordArray(result.value));
+          posts = dedupeRecords(expandedPosts, 'post-expanded')
+            .filter((record) => !isSoftDeletedRecord(record))
+            .map((post) => ({
+              ...post,
+              postId: extractId(post._id ?? post.id),
+              createdAt: post.createdAt ?? post.created_at ?? post.date,
+            }));
+        }
 
         const reactions = dedupedReactions
           .filter((record) => !isSoftDeletedRecord(record)) as ReactionRecord[];
@@ -454,6 +499,7 @@ export default function HypothesisLinkOnlyView() {
           setFollowersSeries(builtFollowersSeries);
           setInteractionsSeries(builtInteractionsSeries);
           setAudit({
+            scopeMode,
             usersFetched: rawUsers.length,
             usersActive: activeUserIds.size,
             followsFetched: rawFollowers.length,
@@ -484,7 +530,7 @@ export default function HypothesisLinkOnlyView() {
     return () => {
       cancelled = true;
     };
-  }, [dayBuckets]);
+  }, [dayBuckets, scopeMode]);
 
   const analysis = useMemo(() => {
     const totalDays = dayBuckets.length;
@@ -560,6 +606,22 @@ export default function HypothesisLinkOnlyView() {
               Última actualización con datos del backend: {new Date(lastUpdated).toLocaleString('es-MX')}
             </p>
           ) : null}
+          <div className="mt-4 inline-flex rounded-lg border border-white/15 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setScopeMode('global')}
+              className={`px-4 py-2 text-sm font-semibold ${scopeMode === 'global' ? 'bg-riff-primary text-white' : 'bg-white/5 text-white/75 hover:bg-white/10'}`}
+            >
+              Global app
+            </button>
+            <button
+              type="button"
+              onClick={() => setScopeMode('my')}
+              className={`px-4 py-2 text-sm font-semibold ${scopeMode === 'my' ? 'bg-riff-primary text-white' : 'bg-white/5 text-white/75 hover:bg-white/10'}`}
+            >
+              Mi cuenta
+            </button>
+          </div>
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -732,6 +794,7 @@ export default function HypothesisLinkOnlyView() {
               <h3 className="text-white text-lg font-bold mb-3">Auditoría de datos (origen de métricas)</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-white/80">
+                  <p>Modo de alcance: <span className="text-white font-semibold">{audit?.scopeMode === 'my' ? 'Mi cuenta' : 'Global app'}</span></p>
                   <p>Usuarios traídos: <span className="text-white font-semibold">{audit?.usersFetched ?? 0}</span></p>
                   <p>Usuarios activos detectados: <span className="text-white font-semibold">{audit?.usersActive ?? 0}</span></p>
                   <p>Follows traídos: <span className="text-white font-semibold">{audit?.followsFetched ?? 0}</span></p>
