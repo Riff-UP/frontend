@@ -341,6 +341,9 @@ export default function HypothesisEvidenceExportView() {
   const trendChartRef = useRef<HTMLDivElement | null>(null);
   const comparisonChartRef = useRef<HTMLDivElement | null>(null);
   const growthChartRef = useRef<HTMLDivElement | null>(null);
+  const trendPlotRef = useRef<HTMLDivElement | null>(null);
+  const comparisonPlotRef = useRef<HTMLDivElement | null>(null);
+  const growthPlotRef = useRef<HTMLDivElement | null>(null);
 
   const dayBuckets = useMemo(() => getDayBuckets(), []);
 
@@ -843,7 +846,7 @@ export default function HypothesisEvidenceExportView() {
             >
               <h3 className="text-white text-2xl font-bold">Tendencia diaria global (seguidores e interacción)</h3>
               <p className="text-white/70 text-base mt-2">Leyenda en tamaño grande para lectura en PDF.</p>
-              <div className="mt-4">
+              <div ref={trendPlotRef} className="mt-4 rounded-xl bg-[#0B1220] p-3">
                 <SafeResponsiveChart>
                   <LineChart data={series} margin={{ top: 16, right: 20, left: 0, bottom: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334" opacity={0.35} />
@@ -868,7 +871,7 @@ export default function HypothesisEvidenceExportView() {
               <div className="flex gap-3 mt-4">
                 <button
                   type="button"
-                  onClick={() => void exportNodeAs(trendChartRef, 'png', 'evidencia_tendencia_diaria')}
+                  onClick={() => void exportNodeAs(trendPlotRef, 'png', 'evidencia_tendencia_diaria')}
                   className="rounded-lg bg-riff-primary hover:bg-riff-secondary text-white px-4 py-2 text-sm font-semibold"
                   disabled={busyDownload !== null}
                 >
@@ -876,7 +879,7 @@ export default function HypothesisEvidenceExportView() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => void exportNodeAs(trendChartRef, 'svg', 'evidencia_tendencia_diaria')}
+                  onClick={() => void exportNodeAs(trendPlotRef, 'svg', 'evidencia_tendencia_diaria')}
                   className="rounded-lg bg-riff-registro hover:brightness-110 text-white px-4 py-2 text-sm font-semibold"
                   disabled={busyDownload !== null}
                 >
@@ -892,7 +895,7 @@ export default function HypothesisEvidenceExportView() {
               >
                 <h3 className="text-white text-xl font-bold">Comparativa Pre vs Post</h3>
                 <p className="text-white/70 text-base mt-2">Valores absolutos para visibilidad e interacción.</p>
-                <div className="mt-4">
+                <div ref={comparisonPlotRef} className="mt-4 rounded-xl bg-[#0B1220] p-3">
                   <SafeResponsiveChart>
                     <BarChart data={analysis.comparisonChartData} margin={{ top: 16, right: 20, left: 0, bottom: 8 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#334" opacity={0.35} />
@@ -916,7 +919,7 @@ export default function HypothesisEvidenceExportView() {
                 <div className="flex gap-3 mt-4">
                   <button
                     type="button"
-                    onClick={() => void exportNodeAs(comparisonChartRef, 'png', 'evidencia_pre_post')}
+                    onClick={() => void exportNodeAs(comparisonPlotRef, 'png', 'evidencia_pre_post')}
                     className="rounded-lg bg-riff-primary hover:bg-riff-secondary text-white px-4 py-2 text-sm font-semibold"
                     disabled={busyDownload !== null}
                   >
@@ -924,7 +927,7 @@ export default function HypothesisEvidenceExportView() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void exportNodeAs(comparisonChartRef, 'svg', 'evidencia_pre_post')}
+                    onClick={() => void exportNodeAs(comparisonPlotRef, 'svg', 'evidencia_pre_post')}
                     className="rounded-lg bg-riff-registro hover:brightness-110 text-white px-4 py-2 text-sm font-semibold"
                     disabled={busyDownload !== null}
                   >
@@ -939,7 +942,7 @@ export default function HypothesisEvidenceExportView() {
               >
                 <h3 className="text-white text-xl font-bold">Crecimiento relativo (x) vs Umbral</h3>
                 <p className="text-white/70 text-base mt-2">Representación compacta para evitar porcentajes visualmente gigantes.</p>
-                <div className="mt-4">
+                <div ref={growthPlotRef} className="mt-4 rounded-xl bg-[#0B1220] p-3">
                   <SafeResponsiveChart>
                     <BarChart data={analysis.growthChartData} margin={{ top: 16, right: 20, left: 0, bottom: 8 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#334" opacity={0.35} />
@@ -975,7 +978,7 @@ export default function HypothesisEvidenceExportView() {
                 <div className="flex gap-3 mt-4">
                   <button
                     type="button"
-                    onClick={() => void exportNodeAs(growthChartRef, 'png', 'evidencia_crecimiento_relativo')}
+                    onClick={() => void exportNodeAs(growthPlotRef, 'png', 'evidencia_crecimiento_relativo')}
                     className="rounded-lg bg-riff-primary hover:bg-riff-secondary text-white px-4 py-2 text-sm font-semibold"
                     disabled={busyDownload !== null}
                   >
@@ -983,7 +986,7 @@ export default function HypothesisEvidenceExportView() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void exportNodeAs(growthChartRef, 'svg', 'evidencia_crecimiento_relativo')}
+                    onClick={() => void exportNodeAs(growthPlotRef, 'svg', 'evidencia_crecimiento_relativo')}
                     className="rounded-lg bg-riff-registro hover:brightness-110 text-white px-4 py-2 text-sm font-semibold"
                     disabled={busyDownload !== null}
                   >
