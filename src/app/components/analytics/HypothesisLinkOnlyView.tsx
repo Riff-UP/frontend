@@ -30,8 +30,18 @@ interface ReactionRecord {
   created_at?: string;
 }
 
+interface DailyMetricsPayload {
+  usersByDay: number[];
+  followsByDay: number[];
+  usersBaseline: number;
+  followsBaseline: number;
+  rows: number;
+}
+
 interface DataAudit {
   scopeMode: 'global' | 'my';
+  dailyEndpointUsed: boolean;
+  dailyRows: number;
   usersFetched: number;
   usersActive: number;
   usersCreatedPre: number;
@@ -201,6 +211,66 @@ function formatDayLabel(value: Date): string {
   return value.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' });
 }
 
+function getCurrentMonthRangeIso(): { from: string; to: string } {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const from = new Date(year, month, 1);
+  const to = new Date(year, month, Math.min(MAX_ANALYSIS_DAY, new Date(year, month + 1, 0).getDate()));
+  from.setHours(0, 0, 0, 0);
+  to.setHours(0, 0, 0, 0);
+  return { from: toDayKey(from), to: toDayKey(to) };
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+}
+
+function normalizeDailyMetricsPayload(payload: unknown, buckets: DayBucket[]): DailyMetricsPayload | null {
+  const rows = toRecordArray(payload);
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const usersByDay = buckets.map(() => 0);
+  const followsByDay = buckets.map(() => 0);
+
+  rows.forEach((row) => {
+    const rowDate = toDate(row.date ?? row.metric_date ?? row.day ?? row.dayKey);
+    const index = findDayIndex(rowDate, buckets);
+    if (index < 0) return;
+
+    const users = toNumber(row.newUsers ?? row.users ?? row.usersCreated ?? row.new_users);
+    const follows = toNumber(row.newFollows ?? row.follows ?? row.new_follows ?? row.followsCreated);
+
+    usersByDay[index] += users;
+    followsByDay[index] += follows;
+  });
+
+  const source = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+  const usersBaseline = toNumber(
+    source.usersBaseline ?? source.users_baseline ?? source.totalUsersBeforeFrom ?? source.total_users_before_from,
+    0,
+  );
+  const followsBaseline = toNumber(
+    source.followsBaseline ?? source.follows_baseline ?? source.totalFollowsBeforeFrom ?? source.total_follows_before_from,
+    0,
+  );
+
+  return {
+    usersByDay,
+    followsByDay,
+    usersBaseline,
+    followsBaseline,
+    rows: rows.length,
+  };
+}
+
 function getDayBuckets(): DayBucket[] {
   const now = new Date();
   const year = now.getFullYear();
@@ -330,6 +400,17 @@ export default function HypothesisLinkOnlyView() {
       setError(null);
 
       try {
+        const currentUserId = getUserFromToken(token)?.id || '';
+        const range = getCurrentMonthRangeIso();
+        const scopeParam = scopeMode === 'my' ? 'user' : 'global';
+        const scopeQuery = scopeMode === 'my' && currentUserId ? `&userId=${encodeURIComponent(currentUserId)}` : '';
+
+        const dailyPayload = await fetchJson(
+          `/analytics/hypothesis/daily?from=${range.from}&to=${range.to}&scope=${scopeParam}${scopeQuery}`,
+          token,
+        ).catch(() => null);
+        const dailyMetrics = normalizeDailyMetricsPayload(dailyPayload, dayBuckets);
+
         const [usersResult, followersResult, postsResult, reactionsResult] = await Promise.all([
           fetchJson('/users?limit=5000&offset=0', token)
             .catch(() => fetchJson('/users/artists?limit=5000&offset=0', token))
@@ -351,7 +432,6 @@ export default function HypothesisLinkOnlyView() {
             .filter((id) => id.length > 0)
         );
 
-        const currentUserId = getUserFromToken(token)?.id || '';
         const targetUserIds = scopeMode === 'my'
           ? (currentUserId ? [currentUserId] : [])
           : Array.from(activeUserIds);
@@ -431,8 +511,8 @@ export default function HypothesisLinkOnlyView() {
         const reactions = dedupedReactions
           .filter((record) => !isSoftDeletedRecord(record)) as ReactionRecord[];
 
-        const newFollowersByDay = dayBuckets.map(() => 0);
-        const usersByDay = dayBuckets.map(() => 0);
+        let newFollowersByDay = dayBuckets.map(() => 0);
+        let usersByDay = dayBuckets.map(() => 0);
 
         targetUsers.forEach((record) => {
           const createdDate = toDate(record.createdAt ?? record.created_at ?? record.date);
@@ -450,10 +530,14 @@ export default function HypothesisLinkOnlyView() {
           }
         });
 
-        const followersBaseline = Math.max(
-          followerRecords.length - newFollowersByDay.reduce((sum, current) => sum + current, 0),
-          0
-        );
+        if (dailyMetrics) {
+          usersByDay = dailyMetrics.usersByDay;
+          newFollowersByDay = dailyMetrics.followsByDay;
+        }
+
+        const followersBaseline = dailyMetrics
+          ? dailyMetrics.followsBaseline
+          : Math.max(followerRecords.length - newFollowersByDay.reduce((sum, current) => sum + current, 0), 0);
 
         let cumulativeFollowers = followersBaseline;
         const builtFollowersSeries: FollowerGrowthData[] = dayBuckets.map((bucket, index) => {
@@ -515,6 +599,8 @@ export default function HypothesisLinkOnlyView() {
           setInteractionsSeries(builtInteractionsSeries);
           setAudit({
             scopeMode,
+            dailyEndpointUsed: dailyMetrics !== null,
+            dailyRows: dailyMetrics?.rows ?? 0,
             usersFetched: rawUsers.length,
             usersActive: activeUserIds.size,
             usersCreatedPre,
@@ -819,6 +905,8 @@ export default function HypothesisLinkOnlyView() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-white/80">
                   <p>Modo de alcance: <span className="text-white font-semibold">{audit?.scopeMode === 'my' ? 'Mi cuenta' : 'Global app'}</span></p>
+                  <p>Daily endpoint usado: <span className="text-white font-semibold">{audit?.dailyEndpointUsed ? 'Sí' : 'No (fallback)'}</span></p>
+                  <p>Filas daily recibidas: <span className="text-white font-semibold">{audit?.dailyRows ?? 0}</span></p>
                   <p>Usuarios traídos: <span className="text-white font-semibold">{audit?.usersFetched ?? 0}</span></p>
                   <p>Usuarios activos detectados: <span className="text-white font-semibold">{audit?.usersActive ?? 0}</span></p>
                   <p>Usuarios nuevos pre/post: <span className="text-white font-semibold">{audit?.usersCreatedPre ?? 0} / {audit?.usersCreatedPost ?? 0}</span></p>

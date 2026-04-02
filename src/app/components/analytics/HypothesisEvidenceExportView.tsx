@@ -29,6 +29,8 @@ interface DayBucket {
 
 interface DataAudit {
   scopeMode: 'global' | 'my';
+  dailyEndpointUsed: boolean;
+  dailyRows: number;
   usersFetched: number;
   usersActive: number;
   usersCreatedPre: number;
@@ -53,6 +55,14 @@ interface SeriesRow {
   users: number;
   followers: number;
   interactions: number;
+}
+
+interface DailyMetricsPayload {
+  usersByDay: number[];
+  followsByDay: number[];
+  usersBaseline: number;
+  followsBaseline: number;
+  rows: number;
 }
 
 function toRecordArray(payload: unknown): Record<string, unknown>[] {
@@ -100,6 +110,66 @@ function toDayKey(value: Date): string {
 
 function formatDayLabel(value: Date): string {
   return value.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' });
+}
+
+function getCurrentMonthRangeIso(): { from: string; to: string } {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const from = new Date(year, month, 1);
+  const to = new Date(year, month, Math.min(MAX_ANALYSIS_DAY, new Date(year, month + 1, 0).getDate()));
+  from.setHours(0, 0, 0, 0);
+  to.setHours(0, 0, 0, 0);
+  return { from: toDayKey(from), to: toDayKey(to) };
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+}
+
+function normalizeDailyMetricsPayload(payload: unknown, buckets: DayBucket[]): DailyMetricsPayload | null {
+  const rows = toRecordArray(payload);
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const usersByDay = buckets.map(() => 0);
+  const followsByDay = buckets.map(() => 0);
+
+  rows.forEach((row) => {
+    const rowDate = toDate(row.date ?? row.metric_date ?? row.day ?? row.dayKey);
+    const index = findDayIndex(rowDate, buckets);
+    if (index < 0) return;
+
+    const users = toNumber(row.newUsers ?? row.users ?? row.usersCreated ?? row.new_users);
+    const follows = toNumber(row.newFollows ?? row.follows ?? row.new_follows ?? row.followsCreated);
+
+    usersByDay[index] += users;
+    followsByDay[index] += follows;
+  });
+
+  const source = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+  const usersBaseline = toNumber(
+    source.usersBaseline ?? source.users_baseline ?? source.totalUsersBeforeFrom ?? source.total_users_before_from,
+    0,
+  );
+  const followsBaseline = toNumber(
+    source.followsBaseline ?? source.follows_baseline ?? source.totalFollowsBeforeFrom ?? source.total_follows_before_from,
+    0,
+  );
+
+  return {
+    usersByDay,
+    followsByDay,
+    usersBaseline,
+    followsBaseline,
+    rows: rows.length,
+  };
 }
 
 function getDayBuckets(): DayBucket[] {
@@ -294,6 +364,17 @@ export default function HypothesisEvidenceExportView() {
       setError(null);
 
       try {
+        const currentUserId = getUserFromToken(token)?.id || '';
+        const range = getCurrentMonthRangeIso();
+        const scopeParam = scopeMode === 'my' ? 'user' : 'global';
+        const scopeQuery = scopeMode === 'my' && currentUserId ? `&userId=${encodeURIComponent(currentUserId)}` : '';
+
+        const dailyPayload = await fetchJson(
+          `/analytics/hypothesis/daily?from=${range.from}&to=${range.to}&scope=${scopeParam}${scopeQuery}`,
+          token,
+        ).catch(() => null);
+        const dailyMetrics = normalizeDailyMetricsPayload(dailyPayload, dayBuckets);
+
         const [usersResult, followsResult, postsResult, reactionsResult] = await Promise.all([
           fetchJson('/users?limit=5000&offset=0', token)
             .catch(() => fetchJson('/users/artists?limit=5000&offset=0', token))
@@ -315,7 +396,6 @@ export default function HypothesisEvidenceExportView() {
             .filter((id) => id.length > 0)
         );
 
-        const currentUserId = getUserFromToken(token)?.id || '';
         const targetUserIds = scopeMode === 'my'
           ? (currentUserId ? [currentUserId] : [])
           : Array.from(activeUserIds);
@@ -375,8 +455,8 @@ export default function HypothesisEvidenceExportView() {
 
         const reactions = dedupedReactions.filter((record) => !isSoftDeletedRecord(record));
 
-        const followersByDay = dayBuckets.map(() => 0);
-        const usersByDay = dayBuckets.map(() => 0);
+        let followersByDay = dayBuckets.map(() => 0);
+        let usersByDay = dayBuckets.map(() => 0);
 
         targetUsers.forEach((record) => {
           const createdDate = toDate(record.createdAt ?? record.created_at ?? record.date);
@@ -392,15 +472,18 @@ export default function HypothesisEvidenceExportView() {
           if (index >= 0) followersByDay[index] += 1;
         });
 
-        const usersBaseline = Math.max(
-          targetUsers.length - usersByDay.reduce((sum, value) => sum + value, 0),
-          0
-        );
+        if (dailyMetrics) {
+          usersByDay = dailyMetrics.usersByDay;
+          followersByDay = dailyMetrics.followsByDay;
+        }
 
-        const followersBaseline = Math.max(
-          validFollows.length - followersByDay.reduce((sum, value) => sum + value, 0),
-          0
-        );
+        const usersBaseline = dailyMetrics
+          ? dailyMetrics.usersBaseline
+          : Math.max(targetUsers.length - usersByDay.reduce((sum, value) => sum + value, 0), 0);
+
+        const followersBaseline = dailyMetrics
+          ? dailyMetrics.followsBaseline
+          : Math.max(validFollows.length - followersByDay.reduce((sum, value) => sum + value, 0), 0);
 
         let accumulatedFollowers = followersBaseline;
         let accumulatedUsers = usersBaseline;
@@ -467,6 +550,8 @@ export default function HypothesisEvidenceExportView() {
           setSeries(builtSeries);
           setAudit({
             scopeMode,
+            dailyEndpointUsed: dailyMetrics !== null,
+            dailyRows: dailyMetrics?.rows ?? 0,
             usersFetched: rawUsers.length,
             usersActive: activeUserIds.size,
             usersCreatedPre,
