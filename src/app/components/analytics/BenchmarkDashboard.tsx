@@ -168,8 +168,9 @@ function hasOAuthSuccessSignal(raw: string): boolean {
 }
 
 function getOAuthErrorFromUrl(url: URL): string | null {
-  const errorCode = url.searchParams.get('error') || '';
-  const description = url.searchParams.get('error_description') || '';
+  const hashParams = new URLSearchParams(url.hash.startsWith('#') ? url.hash.slice(1) : url.hash);
+  const errorCode = url.searchParams.get('error') || hashParams.get('error') || '';
+  const description = url.searchParams.get('error_description') || hashParams.get('error_description') || '';
 
   if (!errorCode.trim() && !description.trim()) {
     return null;
@@ -388,6 +389,66 @@ export default function BenchmarkDashboard() {
   useEffect(() => {
     setOauthTokenDraft(analyticsAccessToken);
   }, [analyticsAccessToken]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const currentUrl = new URL(window.location.href);
+    const tokenFromCurrentUrl = getOAuthTokenFromUrl(currentUrl);
+    const oauthErrorFromCurrentUrl = getOAuthErrorFromUrl(currentUrl);
+    const hashParams = new URLSearchParams(currentUrl.hash.startsWith('#') ? currentUrl.hash.slice(1) : currentUrl.hash);
+    const callbackState = currentUrl.searchParams.get('state') || hashParams.get('state') || '';
+    const hasOAuthPayload = Boolean(tokenFromCurrentUrl || oauthErrorFromCurrentUrl);
+
+    if (!hasOAuthPayload) {
+      return;
+    }
+
+    const opener = window.opener;
+    const canMessageOpener = !!opener && opener !== window && !opener.closed;
+
+    if (canMessageOpener) {
+      opener.postMessage(
+        {
+          type: ANALYTICS_OAUTH_MESSAGE_TYPE,
+          payload: {
+            access_token: tokenFromCurrentUrl,
+            state: callbackState || ANALYTICS_OAUTH_STATE,
+            error: oauthErrorFromCurrentUrl || undefined,
+          },
+        },
+        window.location.origin,
+      );
+
+      window.setTimeout(() => {
+        window.close();
+      }, 120);
+      return;
+    }
+
+    if (tokenFromCurrentUrl) {
+      setAnalyticsAccessToken(tokenFromCurrentUrl);
+      setOauthError(null);
+      setOauthMessage('Token OAuth detectado desde callback en esta pestaña. Refrescando panel…');
+      void refreshDashboard().then(() => setOauthMessage(null));
+    }
+
+    if (oauthErrorFromCurrentUrl) {
+      setOauthMessage(null);
+      setOauthError(oauthErrorFromCurrentUrl);
+    }
+
+    if (tokenFromCurrentUrl || oauthErrorFromCurrentUrl) {
+      const cleanedUrl = new URL(window.location.href);
+      ['access_token', 'accessToken', 'token', 'jwt', 'state', 'error', 'error_description'].forEach((key) => {
+        cleanedUrl.searchParams.delete(key);
+      });
+      cleanedUrl.hash = '';
+      window.history.replaceState({}, document.title, `${cleanedUrl.pathname}${cleanedUrl.search}`);
+    }
+  }, [refreshDashboard, setAnalyticsAccessToken]);
 
   const effectiveSummary = useMemo(() => {
     const totalCallsFromMetrics = metrics.reduce((sum, metric) => sum + metric.calls, 0);
