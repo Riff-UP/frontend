@@ -182,6 +182,28 @@ function getOAuthErrorFromUrl(url: URL): string | null {
   return errorCode.trim();
 }
 
+function isPotentialOAuthCallbackUrl(url: URL): boolean {
+  if (url.pathname.startsWith('/api/analytics')) {
+    return true;
+  }
+
+  const hasOauthSearchParams = ['access_token', 'accessToken', 'token', 'jwt', 'state', 'error', 'error_description']
+    .some((key) => url.searchParams.has(key));
+
+  if (hasOauthSearchParams) {
+    return true;
+  }
+
+  const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash;
+  if (!hash) {
+    return false;
+  }
+
+  const hashParams = new URLSearchParams(hash);
+  return ['access_token', 'accessToken', 'token', 'jwt', 'state', 'error', 'error_description']
+    .some((key) => hashParams.has(key));
+}
+
 function formatNumber(value: number): string {
   return value.toLocaleString('es-MX');
 }
@@ -557,9 +579,8 @@ export default function BenchmarkDashboard() {
       try {
         const popupUrl = new URL(currentPopup.location.href);
         const sameOrigin = popupUrl.origin === window.location.origin;
-        const looksLikeAnalyticsProxy = popupUrl.pathname.startsWith('/api/analytics');
 
-        if (!sameOrigin || !looksLikeAnalyticsProxy) {
+        if (!sameOrigin || !isPotentialOAuthCallbackUrl(popupUrl)) {
           return;
         }
 
