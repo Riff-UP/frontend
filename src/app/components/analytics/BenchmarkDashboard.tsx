@@ -31,6 +31,61 @@ function extractTextValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return null;
+}
+
+function parseOAuthMessageRecord(raw: unknown): Record<string, unknown> | null {
+  const directRecord = toRecord(raw);
+  if (directRecord) {
+    return directRecord;
+  }
+
+  if (typeof raw !== 'string') {
+    return null;
+  }
+
+  const source = raw.trim();
+  if (!source) {
+    return null;
+  }
+
+  try {
+    return toRecord(JSON.parse(source));
+  } catch {
+    return null;
+  }
+}
+
+function extractTokenFromOAuthMessage(record: Record<string, unknown>): string {
+  const payload = parseOAuthMessageRecord(record.payload);
+
+  const token =
+    extractTextValue(payload?.access_token) ||
+    extractTextValue(payload?.accessToken) ||
+    extractTextValue(payload?.token) ||
+    extractTextValue(payload?.jwt) ||
+    extractTextValue(record.access_token) ||
+    extractTextValue(record.accessToken) ||
+    extractTextValue(record.token) ||
+    extractTextValue(record.jwt);
+
+  return token;
+}
+
+function extractStateFromOAuthMessage(record: Record<string, unknown>): string {
+  const payload = parseOAuthMessageRecord(record.payload);
+
+  return (
+    extractTextValue(payload?.state) ||
+    extractTextValue(record.state)
+  );
+}
+
 function formatOAuthPopupError(raw: string): string | null {
   const fallback = raw.trim();
   if (!fallback) {
@@ -277,6 +332,7 @@ export default function BenchmarkDashboard() {
   const [oauthMessage, setOauthMessage] = useState<string | null>(null);
   const oauthPopupRef = useRef<Window | null>(null);
   const oauthPopupWatcherRef = useRef<number | null>(null);
+  const oauthResolvedRef = useRef(false);
 
   const {
     health,
@@ -418,43 +474,38 @@ export default function BenchmarkDashboard() {
         return;
       }
 
-      const payload = event.data;
-      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      const record = parseOAuthMessageRecord(event.data);
+      if (!record) {
         return;
       }
 
-      const record = payload as Record<string, unknown>;
       if (record.type !== ANALYTICS_OAUTH_MESSAGE_TYPE) {
         return;
       }
 
-      const messagePayload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
-        ? record.payload as Record<string, unknown>
-        : null;
-      const messageState = typeof messagePayload?.state === 'string' ? messagePayload.state : undefined;
+      const messageState = extractStateFromOAuthMessage(record);
 
       if (messageState && messageState !== ANALYTICS_OAUTH_STATE) {
         return;
       }
 
-      const incomingToken =
-        typeof messagePayload?.access_token === 'string' ? messagePayload.access_token :
-        typeof messagePayload?.token === 'string' ? messagePayload.token :
-        typeof record.access_token === 'string' ? record.access_token :
-        typeof record.token === 'string' ? record.token :
-        '';
+      const incomingToken = extractTokenFromOAuthMessage(record);
+      oauthResolvedRef.current = true;
 
       clearOAuthPopupWatcher();
       oauthPopupRef.current = null;
       setOauthLoading(false);
-      setOauthError(null);
-      setOauthMessage('Callback OAuth recibido. Verificando conexión y refrescando panel…');
 
       if (incomingToken) {
+        setOauthError(null);
+        setOauthMessage('Callback OAuth recibido. Verificando conexión y refrescando panel…');
         setAnalyticsAccessToken(incomingToken);
+        void refreshDashboard().then(() => setOauthMessage(null));
+        return;
       }
 
-      void refreshDashboard().then(() => setOauthMessage(null));
+      setOauthMessage(null);
+      setOauthError('Se recibió el callback OAuth, pero llegó sin access_token. Verifica FRONTEND_URL en el gateway y el payload de postMessage.');
     };
 
     window.addEventListener('message', handleOAuthMessage);
@@ -472,6 +523,7 @@ export default function BenchmarkDashboard() {
   }, [oauthLoading]);
 
   const openOAuthFlow = () => {
+    oauthResolvedRef.current = false;
     setOauthLoading(true);
     setOauthError(null);
     setOauthMessage('Completa la autenticación en el popup de Google.');
@@ -496,6 +548,9 @@ export default function BenchmarkDashboard() {
         oauthPopupRef.current = null;
         setOauthLoading(false);
         setOauthMessage(null);
+        if (!oauthResolvedRef.current) {
+          setOauthError('El popup OAuth se cerró sin entregar token. Revisa que FRONTEND_URL del gateway coincida exactamente con este frontend y que postMessage incluya access_token.');
+        }
         return;
       }
 
@@ -515,6 +570,7 @@ export default function BenchmarkDashboard() {
 
         const tokenFromUrl = getOAuthTokenFromUrl(popupUrl);
         if (tokenFromUrl) {
+          oauthResolvedRef.current = true;
           clearOAuthPopupWatcher();
           currentPopup.close();
           oauthPopupRef.current = null;
@@ -528,6 +584,7 @@ export default function BenchmarkDashboard() {
 
         const oauthErrorFromUrl = getOAuthErrorFromUrl(popupUrl);
         if (oauthErrorFromUrl) {
+          oauthResolvedRef.current = true;
           clearOAuthPopupWatcher();
           currentPopup.close();
           oauthPopupRef.current = null;
@@ -545,6 +602,7 @@ export default function BenchmarkDashboard() {
         const recoveredToken = tokenFromBody || tokenFromHtml;
 
         if (recoveredToken) {
+          oauthResolvedRef.current = true;
           clearOAuthPopupWatcher();
           currentPopup.close();
           oauthPopupRef.current = null;
@@ -557,6 +615,7 @@ export default function BenchmarkDashboard() {
         }
 
         if (hasOAuthSuccessSignal(popupBody)) {
+          oauthResolvedRef.current = true;
           clearOAuthPopupWatcher();
           currentPopup.close();
           oauthPopupRef.current = null;
@@ -578,6 +637,7 @@ export default function BenchmarkDashboard() {
         oauthPopupRef.current = null;
         setOauthLoading(false);
         setOauthMessage(null);
+        oauthResolvedRef.current = true;
         setOauthError(popupError);
       } catch {
         // Mientras el popup esté en Google o en otra origin, no podemos inspeccionarlo.
