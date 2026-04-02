@@ -31,6 +31,8 @@ interface DataAudit {
   scopeMode: 'global' | 'my';
   usersFetched: number;
   usersActive: number;
+  usersCreatedPre: number;
+  usersCreatedPost: number;
   followsFetched: number;
   followsAfterFilter: number;
   followsDroppedByInactiveUsers: number;
@@ -48,6 +50,7 @@ interface DataAudit {
 interface SeriesRow {
   day: string;
   date: string;
+  users: number;
   followers: number;
   interactions: number;
 }
@@ -339,6 +342,7 @@ export default function HypothesisEvidenceExportView() {
         }
 
         const targetUserIdSet = new Set(targetUserIds);
+        const targetUsers = rawUsers.filter((record) => targetUserIdSet.has(extractUserIdFromAny(record)));
         const validFollows = followsWithoutSoftDelete.filter((record) => {
           const followerId = String(record.followerId ?? '');
           const followedId = String(record.followedId ?? record.followingId ?? '');
@@ -372,11 +376,26 @@ export default function HypothesisEvidenceExportView() {
         const reactions = dedupedReactions.filter((record) => !isSoftDeletedRecord(record));
 
         const followersByDay = dayBuckets.map(() => 0);
+        const usersByDay = dayBuckets.map(() => 0);
+
+        targetUsers.forEach((record) => {
+          const createdDate = toDate(record.createdAt ?? record.created_at ?? record.date);
+          const index = findDayIndex(createdDate, dayBuckets);
+          if (index >= 0) {
+            usersByDay[index] += 1;
+          }
+        });
+
         validFollows.forEach((record) => {
           const created = toDate(record.createdAt ?? record.created_at);
           const index = findDayIndex(created, dayBuckets);
           if (index >= 0) followersByDay[index] += 1;
         });
+
+        const usersBaseline = Math.max(
+          targetUsers.length - usersByDay.reduce((sum, value) => sum + value, 0),
+          0
+        );
 
         const followersBaseline = Math.max(
           validFollows.length - followersByDay.reduce((sum, value) => sum + value, 0),
@@ -384,11 +403,14 @@ export default function HypothesisEvidenceExportView() {
         );
 
         let accumulatedFollowers = followersBaseline;
+        let accumulatedUsers = usersBaseline;
         const followersSeries = dayBuckets.map((bucket, index) => {
           accumulatedFollowers += followersByDay[index];
+          accumulatedUsers += usersByDay[index];
           return {
             day: bucket.label,
             date: bucket.dayKey,
+            users: accumulatedUsers,
             followers: accumulatedFollowers,
             interactions: 0,
           };
@@ -436,6 +458,8 @@ export default function HypothesisEvidenceExportView() {
         const midpoint = Math.max(1, Math.floor(dayBuckets.length / 2));
         const followsPre = followersByDay.slice(0, midpoint).reduce((sum, value) => sum + value, 0);
         const followsPost = followersByDay.slice(midpoint).reduce((sum, value) => sum + value, 0);
+        const usersCreatedPre = usersByDay.slice(0, midpoint).reduce((sum, value) => sum + value, 0);
+        const usersCreatedPost = usersByDay.slice(midpoint).reduce((sum, value) => sum + value, 0);
         const reactionsPre = interactionsByDay.slice(0, midpoint).reduce((sum, value) => sum + value, 0);
         const reactionsPost = interactionsByDay.slice(midpoint).reduce((sum, value) => sum + value, 0);
 
@@ -445,6 +469,8 @@ export default function HypothesisEvidenceExportView() {
             scopeMode,
             usersFetched: rawUsers.length,
             usersActive: activeUserIds.size,
+            usersCreatedPre,
+            usersCreatedPost,
             followsFetched: rawFollows.length,
             followsAfterFilter: validFollows.length,
             followsDroppedByInactiveUsers,
@@ -481,6 +507,8 @@ export default function HypothesisEvidenceExportView() {
 
     const preFollowersDelta = series.length > 1 ? (series[midpoint - 1]?.followers ?? 0) - (series[0]?.followers ?? 0) : 0;
     const postFollowersDelta = series.length > midpoint ? (series[totalDays - 1]?.followers ?? 0) - (series[midpoint]?.followers ?? 0) : 0;
+    const preUsersDelta = series.length > 1 ? (series[midpoint - 1]?.users ?? 0) - (series[0]?.users ?? 0) : 0;
+    const postUsersDelta = series.length > midpoint ? (series[totalDays - 1]?.users ?? 0) - (series[midpoint]?.users ?? 0) : 0;
     const preInteractions = series.slice(0, midpoint).reduce((sum, row) => sum + row.interactions, 0);
     const postInteractions = series.slice(midpoint).reduce((sum, row) => sum + row.interactions, 0);
 
@@ -497,6 +525,7 @@ export default function HypothesisEvidenceExportView() {
     const interactionsMultiplier = toMultiplierFromPct(interactionsPct);
 
     const comparisonChartData = [
+      { metric: 'Usuarios', pre: preUsersDelta, post: postUsersDelta },
       { metric: 'Visibilidad', pre: preFollowersDelta, post: postFollowersDelta },
       { metric: 'Interacción', pre: preInteractions, post: postInteractions },
     ];
@@ -522,6 +551,8 @@ export default function HypothesisEvidenceExportView() {
       postDays: Math.max(totalDays - midpoint, 0),
       preFollowersDelta,
       postFollowersDelta,
+      preUsersDelta,
+      postUsersDelta,
       preInteractions,
       postInteractions,
       visibilityPct,
@@ -585,6 +616,8 @@ export default function HypothesisEvidenceExportView() {
       `- Dias post: ${analysis.postDays}`,
       `- Visibilidad pre: ${formatNum(analysis.preFollowersDelta)}`,
       `- Visibilidad post: ${formatNum(analysis.postFollowersDelta)}`,
+      `- Usuarios pre: ${formatNum(analysis.preUsersDelta)}`,
+      `- Usuarios post: ${formatNum(analysis.postUsersDelta)}`,
       `- Interaccion pre: ${formatNum(analysis.preInteractions)}`,
       `- Interaccion post: ${formatNum(analysis.postInteractions)}`,
       '',
@@ -592,6 +625,7 @@ export default function HypothesisEvidenceExportView() {
       '',
       `- Usuarios traidos: ${audit?.usersFetched ?? 0}`,
       `- Usuarios activos: ${audit?.usersActive ?? 0}`,
+      `- Usuarios nuevos pre/post: ${audit?.usersCreatedPre ?? 0} / ${audit?.usersCreatedPost ?? 0}`,
       `- Follows traidos: ${audit?.followsFetched ?? 0}`,
       `- Follows usados: ${audit?.followsAfterFilter ?? 0}`,
       `- Follows descartados por inactividad: ${audit?.followsDroppedByInactiveUsers ?? 0}`,
@@ -663,7 +697,14 @@ export default function HypothesisEvidenceExportView() {
 
         {!loading && !error ? (
           <>
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                <p className="text-white/60 text-xs uppercase tracking-[0.12em]">Cambio Usuarios</p>
+                <p className="text-white text-3xl font-bold mt-2">{formatNum(analysis.postUsersDelta - analysis.preUsersDelta)}</p>
+                <p className="text-white/55 text-xs mt-1">Pre: {formatNum(analysis.preUsersDelta)} | Post: {formatNum(analysis.postUsersDelta)}</p>
+                <p className="text-xs mt-2 text-white/70">Contexto de crecimiento de base de usuarios</p>
+              </div>
+
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                 <p className="text-white/60 text-xs uppercase tracking-[0.12em]">Cambio Visibilidad</p>
                 <p className="text-white text-3xl font-bold mt-2">{analysis.visibilityReadable.main}</p>
@@ -736,6 +777,7 @@ export default function HypothesisEvidenceExportView() {
                       }}
                     />
                     <Legend wrapperStyle={{ fontSize: 18, color: '#FFFFFF', paddingTop: 8 }} />
+                    <Line type="monotone" dataKey="users" name="Usuarios acumulados" stroke="#F5B32D" strokeWidth={4} dot={{ r: 3 }} />
                     <Line type="monotone" dataKey="followers" name="Seguidores acumulados" stroke="#22A6FF" strokeWidth={4} dot={{ r: 3 }} />
                     <Line type="monotone" dataKey="interactions" name="Interacciones por día" stroke="#2FE08A" strokeWidth={4} dot={{ r: 3 }} />
                   </LineChart>
@@ -876,6 +918,7 @@ export default function HypothesisEvidenceExportView() {
                   <p>Modo de alcance: <span className="text-white font-semibold">{audit?.scopeMode === 'my' ? 'Mi cuenta' : 'Global app'}</span></p>
                   <p>Usuarios traídos: <span className="text-white font-semibold">{audit?.usersFetched ?? 0}</span></p>
                   <p>Usuarios activos detectados: <span className="text-white font-semibold">{audit?.usersActive ?? 0}</span></p>
+                  <p>Usuarios nuevos pre/post: <span className="text-white font-semibold">{audit?.usersCreatedPre ?? 0} / {audit?.usersCreatedPost ?? 0}</span></p>
                   <p>Follows traídos: <span className="text-white font-semibold">{audit?.followsFetched ?? 0}</span></p>
                   <p>Follows usados: <span className="text-white font-semibold">{audit?.followsAfterFilter ?? 0}</span></p>
                   <p>Follows descartados por inactividad: <span className="text-white font-semibold">{audit?.followsDroppedByInactiveUsers ?? 0}</span></p>

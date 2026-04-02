@@ -34,6 +34,8 @@ interface DataAudit {
   scopeMode: 'global' | 'my';
   usersFetched: number;
   usersActive: number;
+  usersCreatedPre: number;
+  usersCreatedPost: number;
   followsFetched: number;
   followsAfterFilter: number;
   followsDroppedByInactiveUsers: number;
@@ -359,6 +361,7 @@ export default function HypothesisLinkOnlyView() {
         }
 
         const targetUserIdSet = new Set(targetUserIds);
+        const targetUsers = rawUsers.filter((record) => targetUserIdSet.has(extractUserIdFromAny(record)));
 
         const dedupedFollowers = dedupeRecords(rawFollowers, 'follow');
         const dedupedPosts = dedupeRecords(rawPosts, 'post');
@@ -429,6 +432,16 @@ export default function HypothesisLinkOnlyView() {
           .filter((record) => !isSoftDeletedRecord(record)) as ReactionRecord[];
 
         const newFollowersByDay = dayBuckets.map(() => 0);
+        const usersByDay = dayBuckets.map(() => 0);
+
+        targetUsers.forEach((record) => {
+          const createdDate = toDate(record.createdAt ?? record.created_at ?? record.date);
+          const dayIndex = findDayIndex(createdDate, dayBuckets);
+          if (dayIndex >= 0) {
+            usersByDay[dayIndex] += 1;
+          }
+        });
+
         followerRecords.forEach((record) => {
           const createdDate = toDate(record.createdAt ?? record.created_at);
           const dayIndex = findDayIndex(createdDate, dayBuckets);
@@ -492,6 +505,8 @@ export default function HypothesisLinkOnlyView() {
         const midpoint = Math.max(1, Math.floor(dayBuckets.length / 2));
         const followsPre = newFollowersByDay.slice(0, midpoint).reduce((sum, value) => sum + value, 0);
         const followsPost = newFollowersByDay.slice(midpoint).reduce((sum, value) => sum + value, 0);
+        const usersCreatedPre = usersByDay.slice(0, midpoint).reduce((sum, value) => sum + value, 0);
+        const usersCreatedPost = usersByDay.slice(midpoint).reduce((sum, value) => sum + value, 0);
         const reactionsPre = interactionsByDay.slice(0, midpoint).reduce((sum, value) => sum + value, 0);
         const reactionsPost = interactionsByDay.slice(midpoint).reduce((sum, value) => sum + value, 0);
 
@@ -502,6 +517,8 @@ export default function HypothesisLinkOnlyView() {
             scopeMode,
             usersFetched: rawUsers.length,
             usersActive: activeUserIds.size,
+            usersCreatedPre,
+            usersCreatedPost,
             followsFetched: rawFollowers.length,
             followsAfterFilter: followerRecords.length,
             followsDroppedByInactiveUsers,
@@ -660,7 +677,14 @@ export default function HypothesisLinkOnlyView() {
 
         {!loading && !error ? (
           <>
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                <p className="text-white/60 text-xs uppercase tracking-[0.12em]">Usuarios nuevos</p>
+                <p className="text-white text-3xl font-bold mt-2">{(audit?.usersCreatedPost ?? 0) - (audit?.usersCreatedPre ?? 0)}</p>
+                <p className="text-white/55 text-xs mt-1">Pre: {audit?.usersCreatedPre ?? 0} | Post: {audit?.usersCreatedPost ?? 0}</p>
+                <p className="text-xs mt-2 text-white/70">Contexto de crecimiento de base de usuarios</p>
+              </div>
+
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                 <p className="text-white/60 text-xs uppercase tracking-[0.12em]">Cambio Visibilidad</p>
                 <p className="text-white text-3xl font-bold mt-2">
@@ -797,6 +821,7 @@ export default function HypothesisLinkOnlyView() {
                   <p>Modo de alcance: <span className="text-white font-semibold">{audit?.scopeMode === 'my' ? 'Mi cuenta' : 'Global app'}</span></p>
                   <p>Usuarios traídos: <span className="text-white font-semibold">{audit?.usersFetched ?? 0}</span></p>
                   <p>Usuarios activos detectados: <span className="text-white font-semibold">{audit?.usersActive ?? 0}</span></p>
+                  <p>Usuarios nuevos pre/post: <span className="text-white font-semibold">{audit?.usersCreatedPre ?? 0} / {audit?.usersCreatedPost ?? 0}</span></p>
                   <p>Follows traídos: <span className="text-white font-semibold">{audit?.followsFetched ?? 0}</span></p>
                   <p>Follows usados (sin soft-delete/inactivos): <span className="text-white font-semibold">{audit?.followsAfterFilter ?? 0}</span></p>
                   <p>Follows descartados por cuentas inactivas: <span className="text-white font-semibold">{audit?.followsDroppedByInactiveUsers ?? 0}</span></p>
