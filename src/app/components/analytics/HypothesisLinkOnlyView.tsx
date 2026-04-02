@@ -9,7 +9,7 @@ import { getUserFromToken, getValidToken } from '@/app/utils/jwt';
 import type { FollowerGrowthData, InteractionData } from '@/app/types';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from 'recharts';
 
-const MAX_ANALYSIS_DAY = 30;
+const MID_MONTH_DAY = 15;
 const HYPOTHESIS_THRESHOLD = 15;
 
 interface DayBucket {
@@ -211,12 +211,12 @@ function formatDayLabel(value: Date): string {
   return value.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' });
 }
 
-function getCurrentMonthRangeIso(): { from: string; to: string } {
+function getHypothesisRangeIso(): { from: string; to: string } {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
-  const from = new Date(year, month, 1);
-  const to = new Date(year, month, Math.min(MAX_ANALYSIS_DAY, new Date(year, month + 1, 0).getDate()));
+  const from = new Date(year, month - 1, 1);
+  const to = new Date(year, month, Math.min(MID_MONTH_DAY, new Date(year, month + 1, 0).getDate()));
   from.setHours(0, 0, 0, 0);
   to.setHours(0, 0, 0, 0);
   return { from: toDayKey(from), to: toDayKey(to) };
@@ -272,20 +272,17 @@ function normalizeDailyMetricsPayload(payload: unknown, buckets: DayBucket[]): D
 }
 
 function getDayBuckets(): DayBucket[] {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
-  const endDay = Math.min(MAX_ANALYSIS_DAY, lastDayOfMonth);
-
   const buckets: DayBucket[] = [];
-  for (let dayNumber = 1; dayNumber <= endDay; dayNumber += 1) {
-    const day = new Date(year, month, dayNumber);
-    day.setHours(0, 0, 0, 0);
+  const { from, to } = getHypothesisRangeIso();
+  const cursor = new Date(from);
+  const toDate = new Date(to);
+
+  while (cursor <= toDate) {
     buckets.push({
-      label: formatDayLabel(day),
-      dayKey: toDayKey(day),
+      label: formatDayLabel(cursor),
+      dayKey: toDayKey(cursor),
     });
+    cursor.setDate(cursor.getDate() + 1);
   }
   return buckets;
 }
@@ -401,7 +398,7 @@ export default function HypothesisLinkOnlyView() {
 
       try {
         const currentUserId = getUserFromToken(token)?.id || '';
-        const range = getCurrentMonthRangeIso();
+        const range = getHypothesisRangeIso();
         const scopeParam = scopeMode === 'my' ? 'user' : 'global';
         const scopeQuery = scopeMode === 'my' && currentUserId ? `&userId=${encodeURIComponent(currentUserId)}` : '';
 
@@ -930,7 +927,7 @@ export default function HypothesisLinkOnlyView() {
             <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
               <h3 className="text-white text-lg font-bold mb-3">Síntesis metodológica</h3>
               <ul className="space-y-2 text-white/80 text-sm list-disc pl-5">
-                <li>Se usa el mes actual del día 01 al día 30 con datos globales de toda la plataforma.</li>
+                <li>Se usa el periodo desde el inicio del mes anterior hasta el día 15 del mes actual con datos globales de toda la plataforma.</li>
                 <li>Pre = primera mitad del mes ({analysis.preDays} días) y Post = segunda mitad ({analysis.postDays} días).</li>
                 <li>Visibilidad se aproxima con nuevos follows del sistema por periodo.</li>
                 <li>Interacción se aproxima con reacciones globales de publicaciones por periodo.</li>
