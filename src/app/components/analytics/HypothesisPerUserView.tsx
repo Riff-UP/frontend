@@ -348,6 +348,13 @@ function averageWeeksAfter(values: number[], baseIndex: number): number {
   return tail.reduce((sum, value) => sum + value, 0) / tail.length;
 }
 
+function growthFromWeeklyHalves(values: number[]): number {
+  const pre = (values[0] ?? 0) + (values[1] ?? 0);
+  const post = (values[2] ?? 0) + (values[3] ?? 0);
+  const pct = percentChange(pre, post);
+  return pct ?? 0;
+}
+
 function distributeAmountByWeights(amount: number, weights: number[]): number[] {
   const normalizedAmount = Math.max(0, Math.floor(amount));
   const result = weights.map(() => 0);
@@ -899,12 +906,9 @@ export default function HypothesisPerUserView() {
           }
         }
 
-        const likesBaseWeekIndex = findFirstActiveWeekIndex(weeklyLikes, baseWeekIndex);
-        const savesBaseWeekIndex = findFirstActiveWeekIndex(weeklySaves, baseWeekIndex);
-        const followersMetricBaseWeekIndex = findFirstActiveWeekIndex(weeklyFollowers, baseWeekIndex);
-        const likesGrowthPct = percentChange(weeklyLikes[likesBaseWeekIndex] ?? 0, averageWeeksAfter(weeklyLikes, likesBaseWeekIndex));
-        const savesGrowthPct = percentChange(weeklySaves[savesBaseWeekIndex] ?? 0, averageWeeksAfter(weeklySaves, savesBaseWeekIndex));
-        const followersGrowthPct = percentChange(weeklyFollowers[followersMetricBaseWeekIndex] ?? 0, averageWeeksAfter(weeklyFollowers, followersMetricBaseWeekIndex));
+        const likesGrowthPct = growthFromWeeklyHalves(weeklyLikes);
+        const savesGrowthPct = growthFromWeeklyHalves(weeklySaves);
+        const followersGrowthPct = growthFromWeeklyHalves(weeklyFollowers);
 
         const cumple =
           visibilityPct !== null && visibilityPct >= HYPOTHESIS_THRESHOLD &&
