@@ -346,12 +346,11 @@ function averageWeeksAfter(values: number[], baseIndex: number): number {
 }
 
 function growthFromWeeklyHalves(values: number[]): number {
-  const pre = (values[0] ?? 0) + (values[1] ?? 0);
-  const post = (values[2] ?? 0) + (values[3] ?? 0);
-  if (pre <= 0) {
-    return post > 0 ? 100 : 0;
-  }
-  return Math.max(0, ((post - pre) / pre) * 100);
+  const baseIndex = findFirstActiveWeekIndex(values, 0);
+  const pre = values[baseIndex] ?? 0;
+  const post = averageWeeksAfter(values, baseIndex);
+  const pct = percentChange(pre, post);
+  return pct ?? 0;
 }
 
 function distributeAmountByWeights(amount: number, weights: number[]): number[] {
