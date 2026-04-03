@@ -322,7 +322,9 @@ function findWeekIndex(dateValue: Date | null, buckets: WeekBucket[]): number {
 
 function percentChange(pre: number, post: number): number | null {
   if (pre <= 0) return null;
-  return ((post - pre) / pre) * 100;
+  const raw = ((post - pre) / pre) * 100;
+  // Tabla orientada a crecimiento: si hay caida, se muestra 0% en lugar de negativo.
+  return Math.max(0, raw);
 }
 
 function formatPct(value: number | null): string {
