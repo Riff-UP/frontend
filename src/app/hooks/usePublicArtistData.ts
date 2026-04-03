@@ -96,7 +96,8 @@ export function usePublicArtistData(artistId?: string) {
         .map(p => {
           const mongoId = extractId(p._id);
           const fallbackId = extractId(p.id);
-          const postId = mongoId || (fallbackId.length === 24 ? fallbackId : '');
+          const sqlFallbackId = extractId(p.sql_id);
+          const postId = mongoId || fallbackId || sqlFallbackId;
           if (!postId) return null;
           const normalizedType: 'image' | 'video' | 'audio' | undefined =
             p.type === 'video' || p.mediaType === 'video'
