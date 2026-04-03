@@ -556,6 +556,20 @@ export default function HypothesisPerUserView() {
           )
         );
 
+        const perPostSavesTotals = await Promise.allSettled(
+          postsForCounters.map((post) =>
+            fetchJson(`/posts/${encodeURIComponent(post.postId)}/saves/total`, token)
+          )
+        );
+
+        let saveTotalsEndpointAvailable = false;
+        let saveTotalsFromNewEndpoint = 0;
+        perPostSavesTotals.forEach((result) => {
+          if (result.status !== 'fulfilled') return;
+          saveTotalsEndpointAvailable = true;
+          saveTotalsFromNewEndpoint += toMetricNumber(result.value);
+        });
+
         const saveDetailKeys = new Set<string>();
         let saveMetricFallbackTotal = 0;
         let saveEndpointAvailable = false;
@@ -718,10 +732,10 @@ export default function HypothesisPerUserView() {
             : postLikesAggregate);
 
         const resolvedSaves = combinedSavedKeys.size > 0
-          ? combinedSavedKeys.size
+          ? (saveTotalsEndpointAvailable ? saveTotalsFromNewEndpoint : combinedSavedKeys.size)
           : (saveEndpointAvailable && saveMetricFallbackTotal > 0
             ? saveMetricFallbackTotal
-            : postSavedAggregate);
+            : (saveTotalsEndpointAvailable ? saveTotalsFromNewEndpoint : postSavedAggregate));
 
         return {
           userId,
