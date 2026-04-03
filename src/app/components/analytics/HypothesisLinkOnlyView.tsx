@@ -547,6 +547,7 @@ export default function HypothesisLinkOnlyView() {
         });
 
         const interactionsByDay = dayBuckets.map(() => 0);
+        const savesByDay = dayBuckets.map(() => 0);
         let reactionsSource: 'direct' | 'fallback-by-post' = 'direct';
 
         if (reactions.length > 0) {
@@ -575,6 +576,28 @@ export default function HypothesisLinkOnlyView() {
             const totalFromAggregate = readNumericMetric(result.value, ['totalReactions', 'count', 'total']);
             interactionsByDay[dayIndex] += typeof totalFromAggregate === 'number' ? totalFromAggregate : 0;
           });
+        }
+
+        const postsWithIdsForSaves = posts.filter((post) => post.postId.length > 0);
+        const savesResponses = await Promise.allSettled(
+          postsWithIdsForSaves.map((post) =>
+            fetchJson(`/posts/${encodeURIComponent(post.postId)}/saves/total`, token)
+          )
+        );
+
+        savesResponses.forEach((result, index) => {
+          if (result.status !== 'fulfilled') return;
+
+          const postDate = toDate(postsWithIdsForSaves[index]?.createdAt);
+          const dayIndex = findDayIndex(postDate, dayBuckets);
+          if (dayIndex < 0) return;
+
+          const totalFromAggregate = readNumericMetric(result.value, ['totalSaves', 'totalSaved', 'saves', 'saved', 'count', 'total']);
+          savesByDay[dayIndex] += typeof totalFromAggregate === 'number' ? totalFromAggregate : 0;
+        });
+
+        for (let i = 0; i < interactionsByDay.length; i += 1) {
+          interactionsByDay[i] += savesByDay[i];
         }
 
         const builtInteractionsSeries: InteractionData[] = dayBuckets.map((bucket, index) => ({
@@ -931,6 +954,7 @@ export default function HypothesisLinkOnlyView() {
                 <li>Pre = primera mitad del mes ({analysis.preDays} días) y Post = segunda mitad ({analysis.postDays} días).</li>
                 <li>Visibilidad se aproxima con nuevos follows del sistema por periodo.</li>
                 <li>Interacción se aproxima con reacciones globales de publicaciones por periodo.</li>
+                <li>Además se suman guardados por publicación (endpoint saves/total) como señal de interacción.</li>
                 <li>Se excluyen registros con soft-delete o estado inactivo para evitar ruido de pruebas.</li>
                 <li>Se aplica deduplicación por id/combinación de campos para prevenir conteos inflados.</li>
                 <li>La hipótesis se valida solo si ambos cambios porcentuales son mayores o iguales a 15%.</li>

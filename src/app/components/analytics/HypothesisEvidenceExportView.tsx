@@ -500,6 +500,7 @@ export default function HypothesisEvidenceExportView() {
         });
 
         const interactionsByDay = dayBuckets.map(() => 0);
+        const savesByDay = dayBuckets.map(() => 0);
         let reactionsSource: 'direct' | 'fallback-by-post' = 'direct';
 
         if (reactions.length > 0) {
@@ -531,6 +532,40 @@ export default function HypothesisEvidenceExportView() {
             const count = typeof direct === 'number' ? direct : typeof nestedValue === 'number' ? nestedValue : 0;
             interactionsByDay[dayIndex] += count;
           });
+        }
+
+        const postsWithIdForSaves = posts
+          .map((post) => ({ ...post, postId: extractId(post._id ?? post.id), createdAt: post.createdAt ?? post.created_at ?? post.date }))
+          .filter((post) => String(post.postId).length > 0);
+
+        const saveTotals = await Promise.allSettled(
+          postsWithIdForSaves.map((post) => fetchJson(`/posts/${encodeURIComponent(String(post.postId))}/saves/total`, token))
+        );
+
+        saveTotals.forEach((result, index) => {
+          if (result.status !== 'fulfilled') return;
+          const postDate = toDate(postsWithIdForSaves[index]?.createdAt);
+          const dayIndex = findDayIndex(postDate, dayBuckets);
+          if (dayIndex < 0) return;
+
+          const payload = result.value as Record<string, unknown>;
+          const direct = payload.totalSaves ?? payload.totalSaved ?? payload.saves ?? payload.saved ?? payload.count ?? payload.total;
+          const nestedData = payload.data && typeof payload.data === 'object' ? payload.data as Record<string, unknown> : {};
+          const nestedResult = payload.result && typeof payload.result === 'object' ? payload.result as Record<string, unknown> : {};
+          const nestedValue = nestedData.totalSaves ?? nestedData.totalSaved ?? nestedData.saves ?? nestedData.saved ?? nestedData.count ?? nestedData.total;
+          const nestedResultValue = nestedResult.totalSaves ?? nestedResult.totalSaved ?? nestedResult.saves ?? nestedResult.saved ?? nestedResult.count ?? nestedResult.total;
+          const count = typeof direct === 'number'
+            ? direct
+            : typeof nestedValue === 'number'
+              ? nestedValue
+              : typeof nestedResultValue === 'number'
+                ? nestedResultValue
+                : 0;
+          savesByDay[dayIndex] += count;
+        });
+
+        for (let i = 0; i < interactionsByDay.length; i += 1) {
+          interactionsByDay[i] += savesByDay[i];
         }
 
         const builtSeries = followersSeries.map((row, index) => ({
@@ -828,6 +863,9 @@ export default function HypothesisEvidenceExportView() {
               <p className="text-white/80 mt-3 leading-relaxed text-base">
                 Los resultados se estiman con datos globales de la plataforma, excluyendo registros soft-delete,
                 cuentas inactivas y posibles duplicados, con el fin de preservar evidencia significativa para comprobación de hipótesis.
+              </p>
+              <p className="text-white/80 mt-3 leading-relaxed text-base">
+                La interacción se estima como reacciones + guardados por publicación (saves/total), acumulados por día en el periodo analizado.
               </p>
               <div className="mt-4">
                 <button
