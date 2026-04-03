@@ -440,22 +440,22 @@ export default function HypothesisPerUserView() {
           return isDateInRange(created, rangeStart, rangeEnd);
         });
 
-        const postLikesAggregate = userPosts.reduce((sum, post) => {
-          return sum + getPostMetricNumber(post, ['likesCount', 'likes_count', 'totalReactions', 'reactionsCount', 'reactions_count']);
+        const postLikesAggregate = userPostsAll.reduce((sum, post) => {
+          return sum + getPostMetricNumber(post, ['likes', 'likesCount', 'likes_count', 'totalReactions', 'reactionsCount', 'reactions_count']);
         }, 0);
 
-        const postSavedAggregate = userPosts.reduce((sum, post) => {
+        const postSavedAggregate = userPostsAll.reduce((sum, post) => {
           return sum + getPostMetricNumber(post, ['savedCount', 'saved_count', 'bookmarksCount', 'bookmarkCount', 'favoritesCount']);
         }, 0);
 
-        const postsInRange = userPosts
+        const postsForCounters = userPostsAll
           .map((post) => ({
             postId: extractId(post.id ?? post._id),
             createdAt: toDate(post.createdAt ?? post.created_at ?? post.date),
           }))
           .filter((post) => post.postId.length > 0);
 
-        const postIdSet = new Set(postsInRange.map((post) => post.postId));
+        const postIdSet = new Set(postsForCounters.map((post) => post.postId));
 
         const userReactions = reactions.filter((reaction) => {
           const postId = extractId(reaction.post_id ?? reaction.postId ?? reaction.post ?? reaction.publicationId);
@@ -467,7 +467,7 @@ export default function HypothesisPerUserView() {
         let fallbackReactionTotal = 0;
 
         const perPostReactions = await Promise.allSettled(
-          postsInRange.map((post) =>
+          postsForCounters.map((post) =>
             fetchJson(`/posts/reactions?postId=${encodeURIComponent(post.postId)}&limit=5000&offset=0`, token)
               .then((payload) => ({ payload, createdAt: post.createdAt }))
           )
@@ -499,7 +499,7 @@ export default function HypothesisPerUserView() {
         });
 
         const perPostSaves = await Promise.allSettled(
-          postsInRange.map((post) =>
+          postsForCounters.map((post) =>
             fetchJson(`/posts/saved?postId=${encodeURIComponent(post.postId)}&limit=5000&offset=0`, token)
           )
         );
@@ -522,14 +522,9 @@ export default function HypothesisPerUserView() {
           return savedPostId.length > 0 && postIdSet.has(savedPostId);
         }).length;
 
-        if (userReactions.length === 0 && userPosts.length > 0) {
+        if (userReactions.length === 0 && postsForCounters.length > 0) {
           const postReactionsTotals = await Promise.allSettled(
-            userPosts
-              .map((post) => ({
-                postId: extractId(post.id ?? post._id),
-                createdAt: toDate(post.createdAt ?? post.created_at ?? post.date),
-              }))
-              .filter((post) => post.postId.length > 0)
+            postsForCounters
               .map((post) => fetchJson(`/posts/${encodeURIComponent(post.postId)}/reactions/total`, token)
                 .then((payload) => ({ payload, createdAt: post.createdAt })))
           );
@@ -597,7 +592,7 @@ export default function HypothesisPerUserView() {
 
         if (postLikesAggregate > 0 && detailedReactionCount === 0 && userReactions.length === 0 && fallbackReactionTotal === 0) {
           userPosts.forEach((post) => {
-            const likesFromPost = getPostMetricNumber(post, ['likesCount', 'likes_count', 'totalReactions', 'reactionsCount', 'reactions_count']);
+            const likesFromPost = getPostMetricNumber(post, ['likes', 'likesCount', 'likes_count', 'totalReactions', 'reactionsCount', 'reactions_count']);
             if (likesFromPost <= 0) return;
             const weekIndex = findWeekIndex(toDate(post.createdAt ?? post.created_at ?? post.date), weekBuckets);
             if (weekIndex >= 0) {
