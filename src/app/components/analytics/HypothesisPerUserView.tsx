@@ -528,6 +528,19 @@ export default function HypothesisPerUserView() {
 
       const userIds = users.map((record) => getUserId(record)).filter((id) => id.length > 0);
 
+      const perUserFollowersTotalResults = await Promise.allSettled(
+        userIds.map(async (userId) => {
+          const payload = await fetchJson(`/users/${encodeURIComponent(userId)}/followers/total`, token);
+          return { userId, total: toMetricNumber(payload) };
+        })
+      );
+
+      const followerTotalByUserId = new Map<string, number>();
+      perUserFollowersTotalResults.forEach((result) => {
+        if (result.status !== 'fulfilled') return;
+        followerTotalByUserId.set(result.value.userId, Math.max(0, result.value.total));
+      });
+
       const perUserReactionResults = await Promise.allSettled(
         userIds.map(async (userId) => {
           const encoded = encodeURIComponent(userId);
@@ -968,7 +981,8 @@ export default function HypothesisPerUserView() {
         const displayedSaves = savesWeeklyObservedTotal > 0
           ? savesWeeklyObservedTotal
           : Math.max(resolvedSaves, guardados);
-        const displayedFollowers = followersWeeklyObservedTotal;
+        const followersTotalCurrent = followerTotalByUserId.get(userId)
+          ?? follows.filter((follow) => getFollowedId(follow) === userId).length;
 
         const cumple =
           visibilityPct !== null && visibilityPct >= HYPOTHESIS_THRESHOLD &&
@@ -980,7 +994,7 @@ export default function HypothesisPerUserView() {
           publicaciones: userPostsAll.length,
           reacciones: displayedReactions,
           guardados: displayedSaves,
-          seguidores: displayedFollowers,
+          seguidores: followersTotalCurrent,
           eventos: userEvents.length,
           semana1,
           semana2,
