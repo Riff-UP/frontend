@@ -33,6 +33,12 @@ interface UserHypothesisRow {
   visibilityPct: number | null;
   interactionPct: number | null;
   cumple: boolean;
+  likesByWeek: number[];
+  savesByWeek: number[];
+  followersByWeek: number[];
+  likesGrowthPct: number | null;
+  savesGrowthPct: number | null;
+  followersGrowthPct: number | null;
 }
 
 function toRecordArray(payload: unknown): Record<string, unknown>[] {
@@ -677,6 +683,8 @@ export default function HypothesisPerUserView() {
         const weeklyScore = weekBuckets.map(() => 0);
         const weeklyFollowers = weekBuckets.map(() => 0);
         const weeklyInteraction = weekBuckets.map(() => 0);
+        const weeklyLikes = weekBuckets.map(() => 0);
+        const weeklySaves = weekBuckets.map(() => 0);
 
         userPosts.forEach((post) => {
           const weekIndex = findWeekIndex(toDate(post.createdAt ?? post.created_at ?? post.date), weekBuckets);
@@ -698,7 +706,14 @@ export default function HypothesisPerUserView() {
         userReactionsInRange.forEach((reaction) => {
           const type = normalizeReactionType(reaction);
           const weekIndex = findWeekIndex(toDate(reaction.createdAt ?? reaction.created_at ?? reaction.date), weekBuckets);
-          if (isSavedType(type)) guardados += 1;
+          if (isSavedType(type)) {
+            guardados += 1;
+            if (weekIndex >= 0) {
+              weeklySaves[weekIndex] += 1;
+            }
+          } else if (weekIndex >= 0) {
+            weeklyLikes[weekIndex] += 1;
+          }
           if (weekIndex >= 0) {
             weeklyInteraction[weekIndex] += 1;
             weeklyScore[weekIndex] += 1;
@@ -708,6 +723,7 @@ export default function HypothesisPerUserView() {
         fallbackReactionTotalsByWeek.forEach((count, index) => {
           if (count <= 0) return;
           weeklyInteraction[index] += count;
+          weeklyLikes[index] += count;
           weeklyScore[index] += count;
         });
 
@@ -719,6 +735,7 @@ export default function HypothesisPerUserView() {
             const weekIndex = findWeekIndex(toDate(post.createdAt ?? post.created_at ?? post.date), weekBuckets);
             if (weekIndex >= 0) {
               weeklyInteraction[weekIndex] += likesFromPost;
+              weeklyLikes[weekIndex] += likesFromPost;
               weeklyScore[weekIndex] += likesFromPost;
             }
           });
@@ -729,6 +746,7 @@ export default function HypothesisPerUserView() {
             if (detailedInteractionByWeek[i] > weeklyInteraction[i]) {
               const diff = detailedInteractionByWeek[i] - weeklyInteraction[i];
               weeklyInteraction[i] = detailedInteractionByWeek[i];
+              weeklyLikes[i] += diff;
               weeklyScore[i] += diff;
             }
           }
@@ -800,6 +818,13 @@ export default function HypothesisPerUserView() {
           }
         }
 
+        const likesBaseWeekIndex = findFirstActiveWeekIndex(weeklyLikes, baseWeekIndex);
+        const savesBaseWeekIndex = findFirstActiveWeekIndex(weeklySaves, baseWeekIndex);
+        const followersMetricBaseWeekIndex = findFirstActiveWeekIndex(weeklyFollowers, baseWeekIndex);
+        const likesGrowthPct = percentChange(weeklyLikes[likesBaseWeekIndex] ?? 0, averageWeeksAfter(weeklyLikes, likesBaseWeekIndex));
+        const savesGrowthPct = percentChange(weeklySaves[savesBaseWeekIndex] ?? 0, averageWeeksAfter(weeklySaves, savesBaseWeekIndex));
+        const followersGrowthPct = percentChange(weeklyFollowers[followersMetricBaseWeekIndex] ?? 0, averageWeeksAfter(weeklyFollowers, followersMetricBaseWeekIndex));
+
         const cumple =
           visibilityPct !== null && visibilityPct >= HYPOTHESIS_THRESHOLD &&
           interactionPct !== null && interactionPct >= HYPOTHESIS_THRESHOLD;
@@ -819,6 +844,12 @@ export default function HypothesisPerUserView() {
           visibilityPct,
           interactionPct,
           cumple,
+          likesByWeek: weeklyLikes,
+          savesByWeek: weeklySaves,
+          followersByWeek: weeklyFollowers,
+          likesGrowthPct,
+          savesGrowthPct,
+          followersGrowthPct,
         };
       }));
 
@@ -931,6 +962,17 @@ export default function HypothesisPerUserView() {
     triggerDownload('hipotesis_por_usuario_tabla.xls', url);
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }, [highlightedUserIds, isSoftPass, rows]);
+
+  const metricTableRows = useMemo(() => rows.map((row) => ({
+    userId: row.userId,
+    usuario: row.usuario,
+    likesByWeek: row.likesByWeek,
+    savesByWeek: row.savesByWeek,
+    followersByWeek: row.followersByWeek,
+    likesGrowthPct: row.likesGrowthPct,
+    savesGrowthPct: row.savesGrowthPct,
+    followersGrowthPct: row.followersGrowthPct,
+  })), [rows]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-riff-bg via-riff-card to-riff-header">
@@ -1067,6 +1109,94 @@ export default function HypothesisPerUserView() {
                 );})}
               </tbody>
             </table>
+            </div>
+          </section>
+        ) : null}
+
+        {!loading && !error ? (
+          <section className="rounded-2xl border border-white/10 bg-white/5 p-4 overflow-x-auto space-y-6">
+            <div>
+              <h3 className="text-white text-lg font-bold mb-2">Tabla semanal: Likes</h3>
+              <table className="min-w-[900px] w-full text-sm">
+                <thead>
+                  <tr className="text-left text-cyan-100 border-b border-white/20">
+                    <th className="py-3 px-3">Usuario</th>
+                    <th className="py-3 px-3">Semana 1</th>
+                    <th className="py-3 px-3">Semana 2</th>
+                    <th className="py-3 px-3">Semana 3</th>
+                    <th className="py-3 px-3">Semana 4</th>
+                    <th className="py-3 px-3">Crecimiento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {metricTableRows.map((row) => (
+                    <tr key={`likes-${row.userId}`} className="border-b border-white/10 text-white/90">
+                      <td className="py-2 px-3 font-semibold">{row.usuario}</td>
+                      <td className="py-2 px-3">{row.likesByWeek[0] ?? 0}</td>
+                      <td className="py-2 px-3">{row.likesByWeek[1] ?? 0}</td>
+                      <td className="py-2 px-3">{row.likesByWeek[2] ?? 0}</td>
+                      <td className="py-2 px-3">{row.likesByWeek[3] ?? 0}</td>
+                      <td className="py-2 px-3">{formatPct(row.likesGrowthPct)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              <h3 className="text-white text-lg font-bold mb-2">Tabla semanal: Guardados</h3>
+              <table className="min-w-[900px] w-full text-sm">
+                <thead>
+                  <tr className="text-left text-cyan-100 border-b border-white/20">
+                    <th className="py-3 px-3">Usuario</th>
+                    <th className="py-3 px-3">Semana 1</th>
+                    <th className="py-3 px-3">Semana 2</th>
+                    <th className="py-3 px-3">Semana 3</th>
+                    <th className="py-3 px-3">Semana 4</th>
+                    <th className="py-3 px-3">Crecimiento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {metricTableRows.map((row) => (
+                    <tr key={`saves-${row.userId}`} className="border-b border-white/10 text-white/90">
+                      <td className="py-2 px-3 font-semibold">{row.usuario}</td>
+                      <td className="py-2 px-3">{row.savesByWeek[0] ?? 0}</td>
+                      <td className="py-2 px-3">{row.savesByWeek[1] ?? 0}</td>
+                      <td className="py-2 px-3">{row.savesByWeek[2] ?? 0}</td>
+                      <td className="py-2 px-3">{row.savesByWeek[3] ?? 0}</td>
+                      <td className="py-2 px-3">{formatPct(row.savesGrowthPct)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              <h3 className="text-white text-lg font-bold mb-2">Tabla semanal: Seguidores</h3>
+              <table className="min-w-[900px] w-full text-sm">
+                <thead>
+                  <tr className="text-left text-cyan-100 border-b border-white/20">
+                    <th className="py-3 px-3">Usuario</th>
+                    <th className="py-3 px-3">Semana 1</th>
+                    <th className="py-3 px-3">Semana 2</th>
+                    <th className="py-3 px-3">Semana 3</th>
+                    <th className="py-3 px-3">Semana 4</th>
+                    <th className="py-3 px-3">Crecimiento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {metricTableRows.map((row) => (
+                    <tr key={`followers-${row.userId}`} className="border-b border-white/10 text-white/90">
+                      <td className="py-2 px-3 font-semibold">{row.usuario}</td>
+                      <td className="py-2 px-3">{row.followersByWeek[0] ?? 0}</td>
+                      <td className="py-2 px-3">{row.followersByWeek[1] ?? 0}</td>
+                      <td className="py-2 px-3">{row.followersByWeek[2] ?? 0}</td>
+                      <td className="py-2 px-3">{row.followersByWeek[3] ?? 0}</td>
+                      <td className="py-2 px-3">{formatPct(row.followersGrowthPct)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </section>
         ) : null}
