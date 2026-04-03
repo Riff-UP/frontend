@@ -6,9 +6,6 @@ import Footer from '@/app/components/layout/Footer';
 import { API_BASE_URL } from '@/app/config/api';
 import { getValidToken } from '@/app/utils/jwt';
 
-const ANALYSIS_MONTH_INDEX = 2;
-const ANALYSIS_FROM_DAY = 1;
-const ANALYSIS_TO_DAY = 30;
 const HYPOTHESIS_THRESHOLD = 15;
 const MAX_DEFAULT_USERS = 20;
 
@@ -81,8 +78,11 @@ function toDayKey(value: Date): string {
 function getHypothesisRangeIso(): { from: string; to: string } {
   const now = new Date();
   const year = now.getFullYear();
-  const from = new Date(year, ANALYSIS_MONTH_INDEX, ANALYSIS_FROM_DAY);
-  const to = new Date(year, ANALYSIS_MONTH_INDEX, ANALYSIS_TO_DAY);
+  const month = now.getMonth();
+  const dayOfMonth = now.getDate();
+
+  const from = new Date(year, month - 1, 1);
+  const to = new Date(year, month, dayOfMonth);
   from.setHours(0, 0, 0, 0);
   to.setHours(0, 0, 0, 0);
   return { from: toDayKey(from), to: toDayKey(to) };
@@ -94,15 +94,21 @@ function buildWeeklyBuckets(fromIso: string, toIso: string): WeekBucket[] {
   start.setHours(0, 0, 0, 0);
   end.setHours(23, 59, 59, 999);
 
+  const millisPerDay = 24 * 60 * 60 * 1000;
+  const totalDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / millisPerDay) + 1);
+  const segmentDays = Math.max(1, Math.ceil(totalDays / 4));
+
   return Array.from({ length: 4 }, (_, index) => {
     const bucketStart = new Date(start);
-    bucketStart.setDate(start.getDate() + (index * 7));
-    const bucketEnd = index < 3
-      ? new Date(bucketStart)
-      : new Date(end);
-    if (index < 3) {
-      bucketEnd.setDate(bucketStart.getDate() + 6);
-      bucketEnd.setHours(23, 59, 59, 999);
+    bucketStart.setDate(start.getDate() + (index * segmentDays));
+    const bucketEnd = new Date(bucketStart);
+    bucketEnd.setDate(bucketStart.getDate() + segmentDays - 1);
+    if (bucketEnd > end || index === 3) {
+      bucketEnd.setTime(end.getTime());
+    }
+
+    if (bucketStart > end) {
+      bucketStart.setTime(end.getTime());
     }
 
     return {
