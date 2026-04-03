@@ -346,19 +346,29 @@ function averageWeeksAfter(values: number[], baseIndex: number): number {
   return tail.reduce((sum, value) => sum + value, 0) / tail.length;
 }
 
-function growthFromArtistStart(values: number[], baseWeekIndex: number): number {
+function growthFromArtistStart(values: number[], baseWeekIndex: number): number | null {
   if (values.length === 0) return 0;
 
   const startWeek = Math.max(0, Math.min(values.length - 1, baseWeekIndex));
-  const baseWeek = findFirstActiveWeekIndex(values, startWeek);
-  const baseValue = values[baseWeek] ?? 0;
+  const baseValue = values[startWeek] ?? 0;
 
+  // Si la semana base es 0, usar transformacion suavizada para evitar porcentajes irreales.
   if (baseValue <= 0) {
-    return 0;
+    const totalAfterBase = values
+      .slice(startWeek + 1)
+      .reduce((sum, value) => sum + Math.max(0, value ?? 0), 0);
+
+    if (totalAfterBase <= 0) {
+      return 0;
+    }
+
+    // Escala logaritmica con tope para representar arranque sin inflar el crecimiento.
+    const transformedGrowth = Math.log10(1 + totalAfterBase) * 25;
+    return Math.min(45, transformedGrowth);
   }
 
   const growthRates: number[] = [];
-  for (let i = baseWeek + 1; i < values.length; i += 1) {
+  for (let i = startWeek + 1; i < values.length; i += 1) {
     const currentValue = values[i] ?? 0;
     const raw = ((currentValue - baseValue) / baseValue) * 100;
     growthRates.push(Math.max(0, raw));
@@ -371,7 +381,8 @@ function growthFromArtistStart(values: number[], baseWeekIndex: number): number 
   return growthRates.reduce((sum, value) => sum + value, 0) / growthRates.length;
 }
 
-function formatGrowthPct(value: number): string {
+function formatGrowthPct(value: number | null): string {
+  if (value === null) return '0.0%';
   return `${value.toFixed(1)}%`;
 }
 
@@ -517,23 +528,6 @@ export default function HypothesisPerUserView() {
 
       const userIds = users.map((record) => getUserId(record)).filter((id) => id.length > 0);
 
-      const perUserPostsResults = await Promise.allSettled(
-        userIds.map(async (userId) => {
-          const encoded = encodeURIComponent(userId);
-          const candidates = [
-            `/posts?userId=${encoded}&limit=5000&offset=0`,
-            `/posts?userId=${encoded}&page=1&limit=5000`,
-            `/posts?sql_user_id=${encoded}&limit=5000&offset=0`,
-            `/posts?authorId=${encoded}&limit=5000&offset=0`,
-            `/posts?userId=${encoded}`,
-          ];
-
-          const settled = await Promise.allSettled(candidates.map((path) => fetchJson(path, token)));
-          return settled
-            .filter((result): result is PromiseFulfilledResult<unknown> => result.status === 'fulfilled')
-            .flatMap((result) => toRecordArray(result.value));
-        })
-      );
       const perUserReactionResults = await Promise.allSettled(
         userIds.map(async (userId) => {
           const encoded = encodeURIComponent(userId);
@@ -553,8 +547,6 @@ export default function HypothesisPerUserView() {
       const posts = dedupeById(
         [
           ...toRecordArray(postsResult),
-          ...perUserPostsResults
-            .flatMap((result) => result.status === 'fulfilled' ? result.value : []),
         ],
         'post',
       ).filter((record) => !isSoftDeletedRecord(record));
