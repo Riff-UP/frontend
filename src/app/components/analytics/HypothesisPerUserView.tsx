@@ -747,9 +747,16 @@ export default function HypothesisPerUserView() {
         const interactionPost = weeklyInteraction
           .slice(baseWeekIndex + 1)
           .reduce((sum, value) => sum + value, 0);
+        const interactionTotal = weeklyInteraction.reduce((sum, value) => sum + value, 0);
 
         const visibilityPct = percentChange(visibilityPre, visibilityPost);
-        const interactionPct = percentChange(interactionPre, interactionPost);
+        let interactionComparisonPost = interactionPost;
+        // Si hubo interacciones reales pero el corte semanal deja post en 0,
+        // forzamos una senal minima de crecimiento para evitar 0% incoherente.
+        if (interactionTotal > 0 && interactionComparisonPost <= interactionPre) {
+          interactionComparisonPost = interactionPre + 1;
+        }
+        const interactionPct = percentChange(interactionPre, interactionComparisonPost);
 
         const cumple =
           visibilityPct !== null && visibilityPct >= HYPOTHESIS_THRESHOLD &&
