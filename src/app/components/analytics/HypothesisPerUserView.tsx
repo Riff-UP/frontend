@@ -914,8 +914,10 @@ export default function HypothesisPerUserView() {
 
         const likesWeeklyObservedTotal = weeklyLikes.reduce((sum, value) => sum + value, 0);
         const savesWeeklyObservedTotal = weeklySaves.reduce((sum, value) => sum + value, 0);
+        const followersWeeklyObservedTotal = weeklyFollowers.reduce((sum, value) => sum + value, 0);
+        const hasPostWeightSignal = postWeightsByWeek.some((value) => value > 0);
 
-        if (resolvedReactions > likesWeeklyObservedTotal) {
+        if (resolvedReactions > likesWeeklyObservedTotal && likesWeeklyObservedTotal === 0 && hasPostWeightSignal) {
           const missingLikes = resolvedReactions - likesWeeklyObservedTotal;
           const likesTopUp = distributeAmountByWeights(missingLikes, postWeightsByWeek);
           likesTopUp.forEach((count, index) => {
@@ -925,7 +927,7 @@ export default function HypothesisPerUserView() {
           });
         }
 
-        if (resolvedSaves > savesWeeklyObservedTotal) {
+        if (resolvedSaves > savesWeeklyObservedTotal && savesWeeklyObservedTotal === 0 && hasPostWeightSignal) {
           const missingSaves = resolvedSaves - savesWeeklyObservedTotal;
           const savesTopUp = distributeAmountByWeights(missingSaves, postWeightsByWeek);
           savesTopUp.forEach((count, index) => {
@@ -949,6 +951,12 @@ export default function HypothesisPerUserView() {
         const savesGrowthPct = growthFromArtistStart(weeklySaves, baseWeekIndex);
         const followersGrowthPct = growthFromArtistStart(weeklyFollowers, baseWeekIndex);
 
+        const displayedReactions = likesWeeklyObservedTotal > 0 ? likesWeeklyObservedTotal : resolvedReactions;
+        const displayedSaves = savesWeeklyObservedTotal > 0
+          ? savesWeeklyObservedTotal
+          : Math.max(resolvedSaves, guardados);
+        const displayedFollowers = followersWeeklyObservedTotal;
+
         const cumple =
           visibilityPct !== null && visibilityPct >= HYPOTHESIS_THRESHOLD &&
           interactionPct !== null && interactionPct >= HYPOTHESIS_THRESHOLD;
@@ -957,9 +965,9 @@ export default function HypothesisPerUserView() {
           userId,
           usuario,
           publicaciones: userPostsAll.length,
-          reacciones: resolvedReactions,
-          guardados: Math.max(resolvedSaves, guardados),
-          seguidores: userFollows.length,
+          reacciones: displayedReactions,
+          guardados: displayedSaves,
+          seguidores: displayedFollowers,
           eventos: userEvents.length,
           semana1,
           semana2,
