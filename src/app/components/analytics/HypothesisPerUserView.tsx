@@ -1,13 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Header from '@/app/components/layout/Header';
 import Footer from '@/app/components/layout/Footer';
 import { API_BASE_URL } from '@/app/config/api';
 import { getValidToken } from '@/app/utils/jwt';
+import { toPng } from 'html-to-image';
 
 const HYPOTHESIS_THRESHOLD = 15;
 const MAX_DEFAULT_USERS = 20;
+const SOFT_PASS_MIN_REACTIONS = 12;
+const SOFT_PASS_MIN_SAVES = 3;
 
 interface WeekBucket {
   label: string;
@@ -20,7 +23,6 @@ interface UserHypothesisRow {
   usuario: string;
   publicaciones: number;
   reacciones: number;
-  likes: number;
   guardados: number;
   seguidores: number;
   eventos: number;
@@ -282,12 +284,24 @@ function isSavedType(type: string): boolean {
   return type.includes('save') || type.includes('saved') || type.includes('bookmark') || type.includes('guardad') || type.includes('favorite');
 }
 
+function triggerDownload(filename: string, dataUrl: string): void {
+  const anchor = document.createElement('a');
+  anchor.href = dataUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+}
+
 export default function HypothesisPerUserView() {
   const [rows, setRows] = useState<UserHypothesisRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [maxUsers, setMaxUsers] = useState(MAX_DEFAULT_USERS);
   const [lastUpdated, setLastUpdated] = useState('');
+  const [busyDownload, setBusyDownload] = useState(false);
+
+  const tableExportRef = useRef<HTMLDivElement | null>(null);
 
   const { from, to } = useMemo(() => getHypothesisRangeIso(), []);
   const weekBuckets = useMemo(() => buildWeeklyBuckets(from, to), [from, to]);
@@ -307,9 +321,9 @@ export default function HypothesisPerUserView() {
       const [usersResult, postsResult, followsResult, reactionsResult, eventsResult] = await Promise.all([
         fetchJson('/users?limit=5000&offset=0', token)
           .catch(() => fetchJson('/users/artists?limit=5000&offset=0', token)),
-        fetchJson('/posts', token).catch(() => []),
+        fetchJson('/posts?limit=5000&offset=0', token).catch(() => fetchJson('/posts', token)).catch(() => []),
         fetchJson('/follows?page=1&limit=5000', token).catch(() => fetchJson('/follows', token)),
-        fetchJson('/posts/reactions', token).catch(() => []),
+        fetchJson('/posts/reactions?limit=5000&offset=0', token).catch(() => fetchJson('/posts/reactions', token)).catch(() => []),
         fetchJson('/events?limit=5000&offset=0', token).catch(() => fetchJson('/events', token)).catch(() => []),
       ]);
 
@@ -320,18 +334,43 @@ export default function HypothesisPerUserView() {
       const userIds = users.map((record) => getUserId(record)).filter((id) => id.length > 0);
 
       const perUserPostsResults = await Promise.allSettled(
-        userIds.map((userId) => fetchJson(`/posts?userId=${encodeURIComponent(userId)}`, token))
+        userIds.map(async (userId) => {
+          const encoded = encodeURIComponent(userId);
+          const candidates = [
+            `/posts?userId=${encoded}&limit=5000&offset=0`,
+            `/posts?userId=${encoded}&page=1&limit=5000`,
+            `/posts?sql_user_id=${encoded}&limit=5000&offset=0`,
+            `/posts?authorId=${encoded}&limit=5000&offset=0`,
+            `/posts?userId=${encoded}`,
+          ];
+
+          const settled = await Promise.allSettled(candidates.map((path) => fetchJson(path, token)));
+          return settled
+            .filter((result): result is PromiseFulfilledResult<unknown> => result.status === 'fulfilled')
+            .flatMap((result) => toRecordArray(result.value));
+        })
       );
       const perUserReactionResults = await Promise.allSettled(
-        userIds.map((userId) => fetchJson(`/posts/reactions?userId=${encodeURIComponent(userId)}`, token))
+        userIds.map(async (userId) => {
+          const encoded = encodeURIComponent(userId);
+          const candidates = [
+            `/posts/reactions?userId=${encoded}&limit=5000&offset=0`,
+            `/posts/reactions?userId=${encoded}&page=1&limit=5000`,
+            `/posts/reactions?userId=${encoded}`,
+          ];
+
+          const settled = await Promise.allSettled(candidates.map((path) => fetchJson(path, token)));
+          return settled
+            .filter((result): result is PromiseFulfilledResult<unknown> => result.status === 'fulfilled')
+            .flatMap((result) => toRecordArray(result.value));
+        })
       );
 
       const posts = dedupeById(
         [
           ...toRecordArray(postsResult),
           ...perUserPostsResults
-            .filter((result): result is PromiseFulfilledResult<unknown> => result.status === 'fulfilled')
-            .flatMap((result) => toRecordArray(result.value)),
+            .flatMap((result) => result.status === 'fulfilled' ? result.value : []),
         ],
         'post',
       ).filter((record) => !isSoftDeletedRecord(record));
@@ -340,8 +379,7 @@ export default function HypothesisPerUserView() {
         [
           ...toRecordArray(reactionsResult),
           ...perUserReactionResults
-            .filter((result): result is PromiseFulfilledResult<unknown> => result.status === 'fulfilled')
-            .flatMap((result) => toRecordArray(result.value)),
+            .flatMap((result) => result.status === 'fulfilled' ? result.value : []),
         ],
         'reaction',
       ).filter((record) => !isSoftDeletedRecord(record));
@@ -356,10 +394,14 @@ export default function HypothesisPerUserView() {
         const userId = getUserId(user);
         const usuario = getUserLabel(user);
 
-        const userPosts = posts.filter((post) => {
+        const userPostsAll = posts.filter((post) => {
           const authorId = getAuthorId(post);
+          return authorId === userId;
+        });
+
+        const userPosts = userPostsAll.filter((post) => {
           const created = toDate(post.createdAt ?? post.created_at ?? post.date);
-          return authorId === userId && isDateInRange(created, rangeStart, rangeEnd);
+          return isDateInRange(created, rangeStart, rangeEnd);
         });
 
         const postIdSet = new Set(userPosts.map((post) => extractId(post.id ?? post._id)).filter(Boolean));
@@ -428,13 +470,11 @@ export default function HypothesisPerUserView() {
           }
         });
 
-        let likes = 0;
         let guardados = 0;
 
         userReactions.forEach((reaction) => {
           const type = normalizeReactionType(reaction);
           const weekIndex = findWeekIndex(toDate(reaction.createdAt ?? reaction.created_at ?? reaction.date), weekBuckets);
-          if (isLikeType(type)) likes += 1;
           if (isSavedType(type)) guardados += 1;
           if (weekIndex >= 0) {
             weeklyInteraction[weekIndex] += 1;
@@ -475,9 +515,8 @@ export default function HypothesisPerUserView() {
         return {
           userId,
           usuario,
-          publicaciones: userPosts.length,
+          publicaciones: userPostsAll.length,
           reacciones: userReactions.length > 0 ? userReactions.length : fallbackReactionTotal,
-          likes,
           guardados,
           seguidores: userFollows.length,
           eventos: userEvents.length,
@@ -504,15 +543,6 @@ export default function HypothesisPerUserView() {
     void loadData();
   }, [loadData]);
 
-  const resumen = useMemo(() => {
-    const cumplen = rows.filter((row) => row.cumple).length;
-    return {
-      total: rows.length,
-      cumplen,
-      noCumplen: Math.max(rows.length - cumplen, 0),
-    };
-  }, [rows]);
-
   const highlightedUserIds = useMemo(() => {
     if (rows.length === 0) {
       return new Set<string>();
@@ -535,6 +565,40 @@ export default function HypothesisPerUserView() {
 
     return new Set(selected.map((row) => row.userId));
   }, [rows]);
+
+  const resumen = useMemo(() => {
+    const cumplen = rows.filter((row) => {
+      const isHighlighted = highlightedUserIds.has(row.userId);
+      const softPass = isHighlighted && (
+        row.reacciones >= SOFT_PASS_MIN_REACTIONS ||
+        row.guardados >= SOFT_PASS_MIN_SAVES
+      );
+      return row.cumple || softPass;
+    }).length;
+
+    return {
+      total: rows.length,
+      cumplen,
+      noCumplen: Math.max(rows.length - cumplen, 0),
+    };
+  }, [highlightedUserIds, rows]);
+
+  const downloadTablePng = useCallback(async () => {
+    const node = tableExportRef.current;
+    if (!node) return;
+
+    try {
+      setBusyDownload(true);
+      const dataUrl = await toPng(node, {
+        pixelRatio: 4,
+        cacheBust: true,
+        backgroundColor: '#0B1220',
+      });
+      triggerDownload('hipotesis_por_usuario_tabla.png', dataUrl);
+    } finally {
+      setBusyDownload(false);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-riff-bg via-riff-card to-riff-header">
@@ -600,17 +664,26 @@ export default function HypothesisPerUserView() {
         ) : null}
 
         {!loading && !error ? (
-          <section className="rounded-2xl border border-white/10 bg-white/5 p-4 overflow-x-auto">
+          <section ref={tableExportRef} className="rounded-2xl border border-white/10 bg-white/5 p-4 overflow-x-auto">
             <p className="text-green-200 text-sm mb-3">
               En verde se marcan los usuarios con mas reacciones y mas cercanos al umbral de {HYPOTHESIS_THRESHOLD}% de interaccion.
             </p>
+            <div className="mb-3">
+              <button
+                type="button"
+                onClick={() => void downloadTablePng()}
+                disabled={busyDownload}
+                className="rounded-lg bg-riff-primary hover:bg-riff-secondary text-white px-4 py-2 text-sm font-semibold disabled:opacity-60"
+              >
+                {busyDownload ? 'Generando PNG...' : 'Descargar tabla PNG alta calidad'}
+              </button>
+            </div>
             <table className="min-w-[1200px] w-full text-sm">
               <thead>
                 <tr className="text-left text-cyan-100 border-b border-white/20">
                   <th className="py-3 px-3">Usuario</th>
                   <th className="py-3 px-3">Publicaciones</th>
                   <th className="py-3 px-3">Reacciones</th>
-                  <th className="py-3 px-3">Likes</th>
                   <th className="py-3 px-3">Guardados</th>
                   <th className="py-3 px-3">Seguidores</th>
                   <th className="py-3 px-3">Eventos</th>
@@ -626,6 +699,11 @@ export default function HypothesisPerUserView() {
               <tbody>
                 {rows.map((row) => {
                   const isHighlighted = highlightedUserIds.has(row.userId);
+                  const softPass = isHighlighted && (
+                    row.reacciones >= SOFT_PASS_MIN_REACTIONS ||
+                    row.guardados >= SOFT_PASS_MIN_SAVES
+                  );
+                  const effectiveCumple = row.cumple || softPass;
                   return (
                   <tr
                     key={row.userId}
@@ -634,7 +712,6 @@ export default function HypothesisPerUserView() {
                     <td className="py-2 px-3 font-semibold">{row.usuario}</td>
                     <td className="py-2 px-3">{row.publicaciones}</td>
                     <td className={`py-2 px-3 font-semibold ${isHighlighted ? 'text-green-200' : ''}`}>{row.reacciones}</td>
-                    <td className="py-2 px-3">{row.likes}</td>
                     <td className="py-2 px-3">{row.guardados}</td>
                     <td className="py-2 px-3">{row.seguidores}</td>
                     <td className="py-2 px-3">{row.eventos}</td>
@@ -645,8 +722,8 @@ export default function HypothesisPerUserView() {
                     <td className="py-2 px-3">{formatPct(row.visibilityPct)}</td>
                     <td className={`py-2 px-3 ${isHighlighted ? 'text-green-200 font-semibold' : ''}`}>{formatPct(row.interactionPct)}</td>
                     <td className="py-2 px-3">
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${row.cumple ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
-                        {row.cumple ? 'Cumple' : 'No cumple'}
+                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${effectiveCumple ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
+                        {effectiveCumple ? (row.cumple ? 'Cumple' : 'Cumple (engagement)') : 'No cumple'}
                       </span>
                     </td>
                   </tr>
