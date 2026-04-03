@@ -364,6 +364,16 @@ function formatGrowthPct(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
+function toCumulativeCounts(values: number[]): number[] {
+  const result = values.map(() => 0);
+  let running = 0;
+  for (let i = 0; i < values.length; i += 1) {
+    running += values[i] ?? 0;
+    result[i] = running;
+  }
+  return result;
+}
+
 function distributeAmountByWeights(amount: number, weights: number[]): number[] {
   const normalizedAmount = Math.max(0, Math.floor(amount));
   const result = weights.map(() => 0);
@@ -1058,17 +1068,23 @@ export default function HypothesisPerUserView() {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }, [highlightedUserIds, isSoftPass, rows]);
 
-  const metricTableRows = useMemo(() => rows.map((row) => ({
-    userId: row.userId,
-    usuario: row.usuario,
-    likesByWeek: row.likesByWeek,
-    savesByWeek: row.savesByWeek,
-    followersByWeek: row.followersByWeek,
-    likesGrowthPct: row.likesGrowthPct,
-    savesGrowthPct: row.savesGrowthPct,
-    followersGrowthPct: row.followersGrowthPct,
-    metricBaseWeekIndex: row.metricBaseWeekIndex,
-  })), [rows]);
+  const metricTableRows = useMemo(() => rows.map((row) => {
+    const likesCumulative = toCumulativeCounts(row.likesByWeek);
+    const savesCumulative = toCumulativeCounts(row.savesByWeek);
+    const followersCumulative = toCumulativeCounts(row.followersByWeek);
+
+    return {
+      userId: row.userId,
+      usuario: row.usuario,
+      likesByWeek: row.likesByWeek,
+      savesByWeek: row.savesByWeek,
+      followersByWeek: row.followersByWeek,
+      likesGrowthPct: growthFromArtistStart(likesCumulative, row.metricBaseWeekIndex),
+      savesGrowthPct: growthFromArtistStart(savesCumulative, row.metricBaseWeekIndex),
+      followersGrowthPct: growthFromArtistStart(followersCumulative, row.metricBaseWeekIndex),
+      metricBaseWeekIndex: row.metricBaseWeekIndex,
+    };
+  }), [rows]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-riff-bg via-riff-card to-riff-header">
@@ -1232,7 +1248,7 @@ export default function HypothesisPerUserView() {
                       <td className="py-2 px-3">{row.likesByWeek[1] ?? 0}</td>
                       <td className="py-2 px-3">{row.likesByWeek[2] ?? 0}</td>
                       <td className="py-2 px-3">{row.likesByWeek[3] ?? 0}</td>
-                      <td className="py-2 px-3">{formatGrowthPct(growthFromArtistStart(row.likesByWeek, row.metricBaseWeekIndex))}</td>
+                      <td className="py-2 px-3">{formatGrowthPct(row.likesGrowthPct)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1260,7 +1276,7 @@ export default function HypothesisPerUserView() {
                       <td className="py-2 px-3">{row.savesByWeek[1] ?? 0}</td>
                       <td className="py-2 px-3">{row.savesByWeek[2] ?? 0}</td>
                       <td className="py-2 px-3">{row.savesByWeek[3] ?? 0}</td>
-                      <td className="py-2 px-3">{formatGrowthPct(growthFromArtistStart(row.savesByWeek, row.metricBaseWeekIndex))}</td>
+                      <td className="py-2 px-3">{formatGrowthPct(row.savesGrowthPct)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1288,7 +1304,7 @@ export default function HypothesisPerUserView() {
                       <td className="py-2 px-3">{row.followersByWeek[1] ?? 0}</td>
                       <td className="py-2 px-3">{row.followersByWeek[2] ?? 0}</td>
                       <td className="py-2 px-3">{row.followersByWeek[3] ?? 0}</td>
-                      <td className="py-2 px-3">{formatGrowthPct(growthFromArtistStart(row.followersByWeek, row.metricBaseWeekIndex))}</td>
+                      <td className="py-2 px-3">{formatGrowthPct(row.followersGrowthPct)}</td>
                     </tr>
                   ))}
                 </tbody>
