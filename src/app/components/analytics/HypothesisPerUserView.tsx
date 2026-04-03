@@ -86,12 +86,9 @@ function toDayKey(value: Date): string {
 
 function getHypothesisRangeIso(): { from: string; to: string } {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const dayOfMonth = now.getDate();
-
-  const from = new Date(year, month - 1, 1);
-  const to = new Date(year, month, dayOfMonth);
+  const to = new Date(now);
+  to.setDate(to.getDate() - 1);
+  const from = new Date(to.getFullYear(), to.getMonth() - 1, 1);
   from.setHours(0, 0, 0, 0);
   to.setHours(0, 0, 0, 0);
   return { from: toDayKey(from), to: toDayKey(to) };
@@ -351,8 +348,10 @@ function averageWeeksAfter(values: number[], baseIndex: number): number {
 function growthFromWeeklyHalves(values: number[]): number {
   const pre = (values[0] ?? 0) + (values[1] ?? 0);
   const post = (values[2] ?? 0) + (values[3] ?? 0);
-  const pct = percentChange(pre, post);
-  return pct ?? 0;
+  if (pre <= 0) {
+    return post > 0 ? 100 : 0;
+  }
+  return Math.max(0, ((post - pre) / pre) * 100);
 }
 
 function distributeAmountByWeights(amount: number, weights: number[]): number[] {
@@ -1221,7 +1220,7 @@ export default function HypothesisPerUserView() {
                       <td className="py-2 px-3">{row.likesByWeek[1] ?? 0}</td>
                       <td className="py-2 px-3">{row.likesByWeek[2] ?? 0}</td>
                       <td className="py-2 px-3">{row.likesByWeek[3] ?? 0}</td>
-                      <td className="py-2 px-3">{formatPct(row.likesGrowthPct)}</td>
+                      <td className="py-2 px-3">{formatPct(growthFromWeeklyHalves(row.likesByWeek))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1249,7 +1248,7 @@ export default function HypothesisPerUserView() {
                       <td className="py-2 px-3">{row.savesByWeek[1] ?? 0}</td>
                       <td className="py-2 px-3">{row.savesByWeek[2] ?? 0}</td>
                       <td className="py-2 px-3">{row.savesByWeek[3] ?? 0}</td>
-                      <td className="py-2 px-3">{formatPct(row.savesGrowthPct)}</td>
+                      <td className="py-2 px-3">{formatPct(growthFromWeeklyHalves(row.savesByWeek))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1277,7 +1276,7 @@ export default function HypothesisPerUserView() {
                       <td className="py-2 px-3">{row.followersByWeek[1] ?? 0}</td>
                       <td className="py-2 px-3">{row.followersByWeek[2] ?? 0}</td>
                       <td className="py-2 px-3">{row.followersByWeek[3] ?? 0}</td>
-                      <td className="py-2 px-3">{formatPct(row.followersGrowthPct)}</td>
+                      <td className="py-2 px-3">{formatPct(growthFromWeeklyHalves(row.followersByWeek))}</td>
                     </tr>
                   ))}
                 </tbody>
