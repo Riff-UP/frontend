@@ -1145,14 +1145,34 @@ export default function HypothesisPerUserView() {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }, [highlightedUserIds, isSoftPass, rows]);
 
-  const metricTableRows = useMemo(() => rows.map((row) => ({
-    userId: row.userId,
-    usuario: row.usuario,
-    likesByWeek: row.likesByWeek,
-    savesByWeek: row.savesByWeek,
-    followersByWeek: row.followersByWeek,
-    followersCurrentTotal: row.seguidores,
-  })), [rows]);
+  const metricTableRows = useMemo(() => rows.map((row) => {
+    const normalizeWeeklyByTotal = (total: number, weeklyValues: number[]): number[] => {
+      const normalizedTotal = Math.max(0, Math.floor(total));
+      if (normalizedTotal <= 0) {
+        return [0, 0, 0, 0];
+      }
+
+      const weights = weeklyValues.length >= 4
+        ? weeklyValues.slice(0, 4)
+        : [
+            weeklyValues[0] ?? 0,
+            weeklyValues[1] ?? 0,
+            weeklyValues[2] ?? 0,
+            weeklyValues[3] ?? 0,
+          ];
+
+      return distributeAmountByWeights(normalizedTotal, weights);
+    };
+
+    return {
+      userId: row.userId,
+      usuario: row.usuario,
+      likesByWeek: normalizeWeeklyByTotal(row.reacciones, row.likesByWeek),
+      savesByWeek: normalizeWeeklyByTotal(row.guardados, row.savesByWeek),
+      followersByWeek: row.followersByWeek,
+      followersCurrentTotal: row.seguidores,
+    };
+  }), [rows]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-riff-bg via-riff-card to-riff-header">
