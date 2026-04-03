@@ -348,6 +348,46 @@ function averageWeeksAfter(values: number[], baseIndex: number): number {
   return tail.reduce((sum, value) => sum + value, 0) / tail.length;
 }
 
+function distributeAmountByWeights(amount: number, weights: number[]): number[] {
+  const normalizedAmount = Math.max(0, Math.floor(amount));
+  const result = weights.map(() => 0);
+  if (normalizedAmount <= 0 || weights.length === 0) {
+    return result;
+  }
+
+  const safeWeights = [...weights];
+  const totalWeight = safeWeights.reduce((sum, value) => sum + Math.max(0, value), 0);
+  if (totalWeight <= 0) {
+    const base = Math.floor(normalizedAmount / safeWeights.length);
+    let remainder = normalizedAmount % safeWeights.length;
+    for (let i = 0; i < safeWeights.length; i += 1) {
+      result[i] = base + (remainder > 0 ? 1 : 0);
+      if (remainder > 0) remainder -= 1;
+    }
+    return result;
+  }
+
+  let assigned = 0;
+  for (let i = 0; i < safeWeights.length; i += 1) {
+    const portion = Math.floor((normalizedAmount * Math.max(0, safeWeights[i])) / totalWeight);
+    result[i] = portion;
+    assigned += portion;
+  }
+
+  let remainder = normalizedAmount - assigned;
+  let cursor = 0;
+  while (remainder > 0 && safeWeights.length > 0) {
+    const idx = cursor % safeWeights.length;
+    if (safeWeights[idx] > 0) {
+      result[idx] += 1;
+      remainder -= 1;
+    }
+    cursor += 1;
+  }
+
+  return result;
+}
+
 function formatPct(value: number | null): string {
   if (value === null) return 'N/A';
   return `${value.toFixed(1)}%`;
@@ -547,6 +587,14 @@ export default function HypothesisPerUserView() {
             createdAt: toDate(post.createdAt ?? post.created_at ?? post.date),
           }))
           .filter((post) => post.postId.length > 0);
+
+        const postWeightsByWeek = weekBuckets.map(() => 0);
+        postsForCounters.forEach((post) => {
+          const weekIndex = findWeekIndex(post.createdAt, weekBuckets);
+          if (weekIndex >= 0) {
+            postWeightsByWeek[weekIndex] += 1;
+          }
+        });
 
         const postIdSet = new Set(postsForCounters.map((post) => post.postId));
 
@@ -817,6 +865,29 @@ export default function HypothesisPerUserView() {
           : (saveEndpointAvailable && saveMetricFallbackTotal > 0
             ? saveMetricFallbackTotal
             : (saveTotalsEndpointAvailable ? saveTotalsFromNewEndpoint : postSavedAggregate));
+
+        const likesWeeklyObservedTotal = weeklyLikes.reduce((sum, value) => sum + value, 0);
+        const savesWeeklyObservedTotal = weeklySaves.reduce((sum, value) => sum + value, 0);
+
+        if (resolvedReactions > likesWeeklyObservedTotal) {
+          const missingLikes = resolvedReactions - likesWeeklyObservedTotal;
+          const likesTopUp = distributeAmountByWeights(missingLikes, postWeightsByWeek);
+          likesTopUp.forEach((count, index) => {
+            weeklyLikes[index] += count;
+            weeklyInteraction[index] += count;
+            weeklyScore[index] += count;
+          });
+        }
+
+        if (resolvedSaves > savesWeeklyObservedTotal) {
+          const missingSaves = resolvedSaves - savesWeeklyObservedTotal;
+          const savesTopUp = distributeAmountByWeights(missingSaves, postWeightsByWeek);
+          savesTopUp.forEach((count, index) => {
+            weeklySaves[index] += count;
+            weeklyInteraction[index] += count;
+            weeklyScore[index] += count;
+          });
+        }
 
         const resolvedInteractionTotal = resolvedReactions + Math.max(resolvedSaves, guardados);
         let interactionPct = interactionPctWeekly ?? 0;
