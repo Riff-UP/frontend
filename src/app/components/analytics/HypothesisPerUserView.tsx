@@ -676,10 +676,29 @@ export default function HypothesisPerUserView() {
           )
         );
 
+        const fetchPostSavesTotal = async (postId: string): Promise<unknown> => {
+          const encodedPostId = encodeURIComponent(postId);
+          const candidates = [
+            `/posts/${encodedPostId}/saves/total`,
+            `/posts/${encodedPostId}/saved/total`,
+          ];
+
+          let lastError: unknown = null;
+          for (const path of candidates) {
+            try {
+              return await fetchJson(path, token);
+            } catch (error) {
+              lastError = error;
+            }
+          }
+
+          throw lastError instanceof Error
+            ? lastError
+            : new Error(`No fue posible obtener saves/total para post ${postId}`);
+        };
+
         const perPostSavesTotals = await Promise.allSettled(
-          postsForCounters.map((post) =>
-            fetchJson(`/posts/${encodeURIComponent(post.postId)}/saves/total`, token)
-          )
+          postsForCounters.map((post) => fetchPostSavesTotal(post.postId))
         );
 
         let saveTotalsEndpointAvailable = false;
@@ -689,6 +708,14 @@ export default function HypothesisPerUserView() {
           saveTotalsEndpointAvailable = true;
           saveTotalsFromNewEndpoint += toMetricNumber(result.value);
         });
+
+        if (postsForCounters.length > 0 && !saveTotalsEndpointAvailable) {
+          console.warn('[HypothesisPerUserView] saves/total no disponible para usuario', {
+            userId,
+            postsWithCounters: postsForCounters.length,
+            rejectedCalls: perPostSavesTotals.filter((entry) => entry.status === 'rejected').length,
+          });
+        }
 
         const saveDetailKeys = new Set<string>();
         const saveDetailByWeek = weekBuckets.map(() => 0);
