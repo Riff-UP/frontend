@@ -768,7 +768,11 @@ export default function HypothesisPerUserView() {
           ...saveGlobalKeys,
         ]);
 
-        if (reactionsOnArtistPosts.length === 0 && postsForCounters.length > 0) {
+        const hasDetailedLikeData =
+          detailedLikesByWeek.some((value) => value > 0)
+          || userReactionsInRange.some((reaction) => !isSavedType(normalizeReactionType(reaction)));
+
+        if (!hasDetailedLikeData && postsForCounters.length > 0) {
           const postReactionsTotals = await Promise.allSettled(
             postsForCounters
               .map((post) => fetchJson(`/posts/${encodeURIComponent(post.postId)}/reactions/total`, token)
@@ -849,10 +853,6 @@ export default function HypothesisPerUserView() {
           weeklyLikes[index] += count;
           weeklyScore[index] += count;
         });
-
-        const hasDetailedLikeData =
-          detailedLikesByWeek.some((value) => value > 0)
-          || userReactionsInRange.some((reaction) => !isSavedType(normalizeReactionType(reaction)));
 
         if (postLikesAggregate > 0 && !hasDetailedLikeData && fallbackReactionTotal === 0) {
           userPosts.forEach((post) => {
@@ -1089,12 +1089,8 @@ export default function HypothesisPerUserView() {
   }, []);
 
   const downloadExcelTable = useCallback(() => {
-    const headers = ['Usuario', 'Publicaciones', 'Reacciones', 'Guardados', 'Seguidores actuales', 'Eventos', 'Semana 1', 'Semana 2', 'Semana 3', 'Semana 4', 'Visibilidad', 'Interacción', 'Hipótesis'];
+    const headers = ['Usuario', 'Publicaciones', 'Reacciones', 'Guardados', 'Seguidores actuales', 'Eventos'];
     const bodyRows = rows.map((row) => {
-      const isHighlighted = highlightedUserIds.has(row.userId);
-      const softPass = isSoftPass(row, isHighlighted);
-      const effectiveCumple = row.cumple || softPass;
-      const status = effectiveCumple ? (row.cumple ? 'Cumple' : 'Cumple (engagement)') : 'No cumple';
       return [
         row.usuario,
         String(row.publicaciones),
@@ -1102,13 +1098,6 @@ export default function HypothesisPerUserView() {
         String(row.guardados),
         String(row.seguidores),
         String(row.eventos),
-        row.semana1,
-        row.semana2,
-        row.semana3,
-        row.semana4,
-        formatPct(row.visibilityPct),
-        formatPct(row.interactionPct),
-        status,
       ];
     });
 
@@ -1130,10 +1119,6 @@ export default function HypothesisPerUserView() {
     savesByWeek: row.savesByWeek,
     followersByWeek: row.followersByWeek,
     followersCurrentTotal: row.seguidores,
-    likesGrowthPct: growthFromArtistStart(row.likesByWeek, row.metricBaseWeekIndex),
-    savesGrowthPct: growthFromArtistStart(row.savesByWeek, row.metricBaseWeekIndex),
-    followersGrowthPct: growthFromArtistStart(row.followersByWeek, row.metricBaseWeekIndex),
-    metricBaseWeekIndex: row.metricBaseWeekIndex,
   })), [rows]);
 
   return (
@@ -1231,20 +1216,11 @@ export default function HypothesisPerUserView() {
                   <th className="py-3 px-3">Guardados</th>
                   <th className="py-3 px-3">Seguidores actuales</th>
                   <th className="py-3 px-3">Eventos</th>
-                  <th className="py-3 px-3">Semana 1</th>
-                  <th className="py-3 px-3">Semana 2</th>
-                  <th className="py-3 px-3">Semana 3</th>
-                  <th className="py-3 px-3">Semana 4</th>
-                  <th className="py-3 px-3">Visibilidad</th>
-                  <th className="py-3 px-3">Interacción</th>
-                  <th className="py-3 px-3">Hipótesis</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => {
                   const isHighlighted = highlightedUserIds.has(row.userId);
-                  const softPass = isSoftPass(row, isHighlighted);
-                  const effectiveCumple = row.cumple || softPass;
                   return (
                   <tr
                     key={row.userId}
@@ -1256,17 +1232,6 @@ export default function HypothesisPerUserView() {
                     <td className="py-2 px-3">{row.guardados}</td>
                     <td className="py-2 px-3">{row.seguidores}</td>
                     <td className="py-2 px-3">{row.eventos}</td>
-                    <td className="py-2 px-3">{row.semana1}</td>
-                    <td className="py-2 px-3">{row.semana2}</td>
-                    <td className="py-2 px-3">{row.semana3}</td>
-                    <td className="py-2 px-3">{row.semana4}</td>
-                    <td className="py-2 px-3">{formatPct(row.visibilityPct)}</td>
-                    <td className={`py-2 px-3 ${isHighlighted ? 'text-green-200 font-semibold' : ''}`}>{formatPct(row.interactionPct)}</td>
-                    <td className="py-2 px-3">
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${effectiveCumple ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
-                        {effectiveCumple ? (row.cumple ? 'Cumple' : 'Cumple (engagement)') : 'No cumple'}
-                      </span>
-                    </td>
                   </tr>
                 );})}
               </tbody>
@@ -1287,7 +1252,6 @@ export default function HypothesisPerUserView() {
                     <th className="py-3 px-3">Semana 2</th>
                     <th className="py-3 px-3">Semana 3</th>
                     <th className="py-3 px-3">Semana 4</th>
-                    <th className="py-3 px-3">Crecimiento</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1298,7 +1262,6 @@ export default function HypothesisPerUserView() {
                       <td className="py-2 px-3">{row.likesByWeek[1] ?? 0}</td>
                       <td className="py-2 px-3">{row.likesByWeek[2] ?? 0}</td>
                       <td className="py-2 px-3">{row.likesByWeek[3] ?? 0}</td>
-                      <td className="py-2 px-3">{formatGrowthPct(row.likesGrowthPct)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1315,7 +1278,6 @@ export default function HypothesisPerUserView() {
                     <th className="py-3 px-3">Semana 2</th>
                     <th className="py-3 px-3">Semana 3</th>
                     <th className="py-3 px-3">Semana 4</th>
-                    <th className="py-3 px-3">Crecimiento</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1326,7 +1288,6 @@ export default function HypothesisPerUserView() {
                       <td className="py-2 px-3">{row.savesByWeek[1] ?? 0}</td>
                       <td className="py-2 px-3">{row.savesByWeek[2] ?? 0}</td>
                       <td className="py-2 px-3">{row.savesByWeek[3] ?? 0}</td>
-                      <td className="py-2 px-3">{formatGrowthPct(row.savesGrowthPct)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1345,7 +1306,6 @@ export default function HypothesisPerUserView() {
                     <th className="py-3 px-3">Semana 3</th>
                     <th className="py-3 px-3">Semana 4</th>
                     <th className="py-3 px-3">Total actual</th>
-                    <th className="py-3 px-3">Crecimiento</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1357,7 +1317,6 @@ export default function HypothesisPerUserView() {
                       <td className="py-2 px-3">{row.followersByWeek[2] ?? 0}</td>
                       <td className="py-2 px-3">{row.followersByWeek[3] ?? 0}</td>
                       <td className="py-2 px-3">{row.followersCurrentTotal}</td>
-                      <td className="py-2 px-3">{formatGrowthPct(row.followersGrowthPct)}</td>
                     </tr>
                   ))}
                 </tbody>
