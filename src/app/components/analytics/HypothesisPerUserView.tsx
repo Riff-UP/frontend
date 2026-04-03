@@ -349,29 +349,30 @@ function averageWeeksAfter(values: number[], baseIndex: number): number {
 function growthFromArtistStart(values: number[], baseWeekIndex: number): number {
   if (values.length === 0) return 0;
 
-  const clampedBaseWeek = Math.max(0, Math.min(values.length - 1, baseWeekIndex));
-  const pre = values[clampedBaseWeek] ?? 0;
-  const post = values[values.length - 1] ?? pre;
+  const startWeek = Math.max(0, Math.min(values.length - 1, baseWeekIndex));
+  const baseWeek = findFirstActiveWeekIndex(values, startWeek);
+  const baseValue = values[baseWeek] ?? 0;
 
-  if (pre <= 0) {
-    return post > 0 ? Number.POSITIVE_INFINITY : 0;
+  if (baseValue <= 0) {
+    return 0;
   }
-  return ((post - pre) / pre) * 100;
+
+  const growthRates: number[] = [];
+  for (let i = baseWeek + 1; i < values.length; i += 1) {
+    const currentValue = values[i] ?? 0;
+    const raw = ((currentValue - baseValue) / baseValue) * 100;
+    growthRates.push(Math.max(0, raw));
+  }
+
+  if (growthRates.length === 0) {
+    return 0;
+  }
+
+  return growthRates.reduce((sum, value) => sum + value, 0) / growthRates.length;
 }
 
 function formatGrowthPct(value: number): string {
-  if (!Number.isFinite(value)) return 'Nuevo';
   return `${value.toFixed(1)}%`;
-}
-
-function toCumulativeCounts(values: number[]): number[] {
-  const result = values.map(() => 0);
-  let running = 0;
-  for (let i = 0; i < values.length; i += 1) {
-    running += values[i] ?? 0;
-    result[i] = running;
-  }
-  return result;
 }
 
 function distributeAmountByWeights(amount: number, weights: number[]): number[] {
@@ -1068,23 +1069,17 @@ export default function HypothesisPerUserView() {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }, [highlightedUserIds, isSoftPass, rows]);
 
-  const metricTableRows = useMemo(() => rows.map((row) => {
-    const likesCumulative = toCumulativeCounts(row.likesByWeek);
-    const savesCumulative = toCumulativeCounts(row.savesByWeek);
-    const followersCumulative = toCumulativeCounts(row.followersByWeek);
-
-    return {
-      userId: row.userId,
-      usuario: row.usuario,
-      likesByWeek: row.likesByWeek,
-      savesByWeek: row.savesByWeek,
-      followersByWeek: row.followersByWeek,
-      likesGrowthPct: growthFromArtistStart(likesCumulative, row.metricBaseWeekIndex),
-      savesGrowthPct: growthFromArtistStart(savesCumulative, row.metricBaseWeekIndex),
-      followersGrowthPct: growthFromArtistStart(followersCumulative, row.metricBaseWeekIndex),
-      metricBaseWeekIndex: row.metricBaseWeekIndex,
-    };
-  }), [rows]);
+  const metricTableRows = useMemo(() => rows.map((row) => ({
+    userId: row.userId,
+    usuario: row.usuario,
+    likesByWeek: row.likesByWeek,
+    savesByWeek: row.savesByWeek,
+    followersByWeek: row.followersByWeek,
+    likesGrowthPct: growthFromArtistStart(row.likesByWeek, row.metricBaseWeekIndex),
+    savesGrowthPct: growthFromArtistStart(row.savesByWeek, row.metricBaseWeekIndex),
+    followersGrowthPct: growthFromArtistStart(row.followersByWeek, row.metricBaseWeekIndex),
+    metricBaseWeekIndex: row.metricBaseWeekIndex,
+  })), [rows]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-riff-bg via-riff-card to-riff-header">
