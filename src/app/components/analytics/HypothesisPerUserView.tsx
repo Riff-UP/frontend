@@ -268,7 +268,7 @@ function toMetricNumber(payload: unknown): number {
   if (!payload || typeof payload !== 'object') return 0;
 
   const record = payload as Record<string, unknown>;
-  const directCandidates = [record.totalReactions, record.count, record.total, record.reactions];
+  const directCandidates = [record.totalReactions, record.count, record.total, record.reactions, record.totalSaved, record.saves, record.saved];
   for (const candidate of directCandidates) {
     if (typeof candidate === 'number' && Number.isFinite(candidate)) {
       return candidate;
@@ -277,7 +277,7 @@ function toMetricNumber(payload: unknown): number {
 
   if (record.data && typeof record.data === 'object') {
     const nested = record.data as Record<string, unknown>;
-    const nestedCandidates = [nested.totalReactions, nested.count, nested.total, nested.reactions];
+    const nestedCandidates = [nested.totalReactions, nested.count, nested.total, nested.reactions, nested.totalSaved, nested.saves, nested.saved];
     for (const candidate of nestedCandidates) {
       if (typeof candidate === 'number' && Number.isFinite(candidate)) {
         return candidate;
@@ -551,6 +551,8 @@ export default function HypothesisPerUserView() {
         const perPostSaves = await Promise.allSettled(
           postsForCounters.map((post) =>
             fetchJson(`/posts/saved?postId=${encodeURIComponent(post.postId)}&limit=5000&offset=0`, token)
+              .catch(() => fetchJson(`/posts/saved?post_id=${encodeURIComponent(post.postId)}&limit=5000&offset=0`, token))
+              .then((payload) => ({ payload, postId: post.postId }))
           )
         );
 
@@ -560,14 +562,19 @@ export default function HypothesisPerUserView() {
         perPostSaves.forEach((result) => {
           if (result.status !== 'fulfilled') return;
           saveEndpointAvailable = true;
-          const rows = toRecordArray(result.value)
-            .filter((record) => !isSoftDeletedRecord(record))
-            .filter((record) => postIdSet.has(extractSavedPostId(record)));
+          const rows = toRecordArray(result.value.payload)
+            .filter((record) => !isSoftDeletedRecord(record));
           if (rows.length > 0) {
-            rows.forEach((row) => saveDetailKeys.add(buildSavedKey(row)));
+            rows.forEach((row) => {
+              const savedPostId = extractSavedPostId(row);
+              const effectivePostId = savedPostId || result.value.postId;
+              const actorId = getSavedActorId(row);
+              const createdAt = String(row.createdAt ?? row.created_at ?? row.saved_at ?? row.date ?? '').trim();
+              saveDetailKeys.add(`saved:${effectivePostId}:${actorId}:${createdAt}`);
+            });
             return;
           }
-          saveMetricFallbackTotal += toMetricNumber(result.value);
+          saveMetricFallbackTotal += toMetricNumber(result.value.payload);
         });
 
         const globalSavedRows = savedPosts
