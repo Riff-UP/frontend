@@ -597,7 +597,7 @@ export default function HypothesisPerUserView() {
           postsForCounters.map((post) =>
             fetchJson(`/posts/saved?postId=${encodeURIComponent(post.postId)}&limit=5000&offset=0`, token)
               .catch(() => fetchJson(`/posts/saved?post_id=${encodeURIComponent(post.postId)}&limit=5000&offset=0`, token))
-              .then((payload) => ({ payload, postId: post.postId }))
+              .then((payload) => ({ payload, postId: post.postId, postCreatedAt: post.createdAt }))
           )
         );
 
@@ -616,6 +616,7 @@ export default function HypothesisPerUserView() {
         });
 
         const saveDetailKeys = new Set<string>();
+        const saveDetailByWeek = weekBuckets.map(() => 0);
         let saveMetricFallbackTotal = 0;
         let saveEndpointAvailable = false;
         perPostSaves.forEach((result) => {
@@ -630,6 +631,11 @@ export default function HypothesisPerUserView() {
               const actorId = getSavedActorId(row);
               const createdAt = String(row.createdAt ?? row.created_at ?? row.saved_at ?? row.date ?? '').trim();
               saveDetailKeys.add(`saved:${effectivePostId}:${actorId}:${createdAt}`);
+              const saveDate = toDate(createdAt) ?? result.value.postCreatedAt;
+              const weekIndex = findWeekIndex(saveDate, weekBuckets);
+              if (weekIndex >= 0) {
+                saveDetailByWeek[weekIndex] += 1;
+              }
             });
             return;
           }
@@ -685,6 +691,10 @@ export default function HypothesisPerUserView() {
         const weeklyInteraction = weekBuckets.map(() => 0);
         const weeklyLikes = weekBuckets.map(() => 0);
         const weeklySaves = weekBuckets.map(() => 0);
+
+        saveDetailByWeek.forEach((count, index) => {
+          weeklySaves[index] += count;
+        });
 
         userPosts.forEach((post) => {
           const weekIndex = findWeekIndex(toDate(post.createdAt ?? post.created_at ?? post.date), weekBuckets);
