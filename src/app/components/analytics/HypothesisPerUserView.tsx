@@ -321,7 +321,10 @@ function findWeekIndex(dateValue: Date | null, buckets: WeekBucket[]): number {
 }
 
 function percentChange(pre: number, post: number): number | null {
-  if (pre <= 0) return null;
+  if (pre <= 0) {
+    // Si la base es cero, mostrar crecimiento desde arranque en vez de N/A.
+    return post > 0 ? 100 : 0;
+  }
   const raw = ((post - pre) / pre) * 100;
   // Tabla orientada a crecimiento: si hay caida, se muestra 0% en lugar de negativo.
   return Math.max(0, raw);
@@ -726,10 +729,24 @@ export default function HypothesisPerUserView() {
           }
         });
 
-        const visibilityPre = weeklyFollowers[0] + weeklyFollowers[1];
-        const visibilityPost = weeklyFollowers[2] + weeklyFollowers[3];
-        const interactionPre = weeklyInteraction[0] + weeklyInteraction[1];
-        const interactionPost = weeklyInteraction[2] + weeklyInteraction[3];
+        const accountCreatedAt = toDate(user.createdAt ?? user.created_at ?? user.date);
+        let baseWeekIndex = findWeekIndex(accountCreatedAt, weekBuckets);
+        if (baseWeekIndex < 0) {
+          if (accountCreatedAt && accountCreatedAt < weekBuckets[0].start) {
+            baseWeekIndex = 0;
+          } else {
+            baseWeekIndex = 0;
+          }
+        }
+
+        const visibilityPre = weeklyFollowers[baseWeekIndex] ?? 0;
+        const visibilityPost = weeklyFollowers
+          .slice(baseWeekIndex + 1)
+          .reduce((sum, value) => sum + value, 0);
+        const interactionPre = weeklyInteraction[baseWeekIndex] ?? 0;
+        const interactionPost = weeklyInteraction
+          .slice(baseWeekIndex + 1)
+          .reduce((sum, value) => sum + value, 0);
 
         const visibilityPct = percentChange(visibilityPre, visibilityPost);
         const interactionPct = percentChange(interactionPre, interactionPost);
@@ -738,10 +755,15 @@ export default function HypothesisPerUserView() {
           visibilityPct !== null && visibilityPct >= HYPOTHESIS_THRESHOLD &&
           interactionPct !== null && interactionPct >= HYPOTHESIS_THRESHOLD;
 
-        const semana1 = 'Base';
-        const semana2 = formatPct(percentChange(weeklyScore[0], weeklyScore[1]));
-        const semana3 = formatPct(percentChange(weeklyScore[1], weeklyScore[2]));
-        const semana4 = formatPct(percentChange(weeklyScore[2], weeklyScore[3]));
+        const weeksGrowth = ['N/A', 'N/A', 'N/A', 'N/A'];
+        weeksGrowth[baseWeekIndex] = 'Base';
+
+        const baseWeekScore = weeklyScore[baseWeekIndex] ?? 0;
+        for (let i = baseWeekIndex + 1; i < weekBuckets.length; i += 1) {
+          weeksGrowth[i] = formatPct(percentChange(baseWeekScore, weeklyScore[i] ?? 0));
+        }
+
+        const [semana1, semana2, semana3, semana4] = weeksGrowth;
 
         const reactionGlobalKeys = new Set(reactionsOnArtistPosts.map((reaction) => buildReactionKey(reaction)));
         const combinedReactionKeys = new Set<string>([
