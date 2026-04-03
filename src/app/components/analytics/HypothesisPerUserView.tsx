@@ -321,13 +321,25 @@ function findWeekIndex(dateValue: Date | null, buckets: WeekBucket[]): number {
 }
 
 function percentChange(pre: number, post: number): number | null {
-  if (pre <= 0) {
-    // Si la base es cero, mostrar crecimiento desde arranque en vez de N/A.
-    return post > 0 ? 100 : 0;
-  }
+  if (pre <= 0) return 0;
   const raw = ((post - pre) / pre) * 100;
   // Tabla orientada a crecimiento: si hay caida, se muestra 0% en lugar de negativo.
   return Math.max(0, raw);
+}
+
+function findFirstActiveWeekIndex(values: number[], startIndex: number): number {
+  for (let i = startIndex; i < values.length; i += 1) {
+    if ((values[i] ?? 0) > 0) {
+      return i;
+    }
+  }
+  return startIndex;
+}
+
+function averageWeeksAfter(values: number[], baseIndex: number): number {
+  const tail = values.slice(baseIndex + 1);
+  if (tail.length === 0) return 0;
+  return tail.reduce((sum, value) => sum + value, 0) / tail.length;
 }
 
 function formatPct(value: number | null): string {
@@ -739,24 +751,16 @@ export default function HypothesisPerUserView() {
           }
         }
 
-        const visibilityPre = weeklyFollowers[baseWeekIndex] ?? 0;
-        const visibilityPost = weeklyFollowers
-          .slice(baseWeekIndex + 1)
-          .reduce((sum, value) => sum + value, 0);
-        const interactionPre = weeklyInteraction[baseWeekIndex] ?? 0;
-        const interactionPost = weeklyInteraction
-          .slice(baseWeekIndex + 1)
-          .reduce((sum, value) => sum + value, 0);
-        const interactionTotal = weeklyInteraction.reduce((sum, value) => sum + value, 0);
+        const visibilityBaseWeekIndex = findFirstActiveWeekIndex(weeklyFollowers, baseWeekIndex);
+        const interactionBaseWeekIndex = findFirstActiveWeekIndex(weeklyInteraction, baseWeekIndex);
+
+        const visibilityPre = weeklyFollowers[visibilityBaseWeekIndex] ?? 0;
+        const visibilityPost = averageWeeksAfter(weeklyFollowers, visibilityBaseWeekIndex);
+        const interactionPre = weeklyInteraction[interactionBaseWeekIndex] ?? 0;
+        const interactionPost = averageWeeksAfter(weeklyInteraction, interactionBaseWeekIndex);
 
         const visibilityPct = percentChange(visibilityPre, visibilityPost);
-        let interactionComparisonPost = interactionPost;
-        // Si hubo interacciones reales pero el corte semanal deja post en 0,
-        // forzamos una senal minima de crecimiento para evitar 0% incoherente.
-        if (interactionTotal > 0 && interactionComparisonPost <= interactionPre) {
-          interactionComparisonPost = interactionPre + 1;
-        }
-        const interactionPct = percentChange(interactionPre, interactionComparisonPost);
+        const interactionPct = percentChange(interactionPre, interactionPost);
 
         const cumple =
           visibilityPct !== null && visibilityPct >= HYPOTHESIS_THRESHOLD &&
