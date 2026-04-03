@@ -224,6 +224,31 @@ function getFollowedId(record: Record<string, unknown>): string {
   return String(record.followedId ?? record.followingId ?? '');
 }
 
+function toMetricNumber(payload: unknown): number {
+  if (typeof payload === 'number' && Number.isFinite(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return 0;
+
+  const record = payload as Record<string, unknown>;
+  const directCandidates = [record.totalReactions, record.count, record.total, record.reactions];
+  for (const candidate of directCandidates) {
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+      return candidate;
+    }
+  }
+
+  if (record.data && typeof record.data === 'object') {
+    const nested = record.data as Record<string, unknown>;
+    const nestedCandidates = [nested.totalReactions, nested.count, nested.total, nested.reactions];
+    for (const candidate of nestedCandidates) {
+      if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  return 0;
+}
+
 function isDateInRange(value: Date | null, from: Date, to: Date): boolean {
   if (!value) return false;
   return value >= from && value <= to;
@@ -292,9 +317,34 @@ export default function HypothesisPerUserView() {
         .filter((record) => isActiveUserRecord(record))
         .slice(0, Math.max(1, maxUsers));
 
-      const posts = dedupeById(toRecordArray(postsResult), 'post').filter((record) => !isSoftDeletedRecord(record));
+      const userIds = users.map((record) => getUserId(record)).filter((id) => id.length > 0);
+
+      const perUserPostsResults = await Promise.allSettled(
+        userIds.map((userId) => fetchJson(`/posts?userId=${encodeURIComponent(userId)}`, token))
+      );
+      const perUserReactionResults = await Promise.allSettled(
+        userIds.map((userId) => fetchJson(`/posts/reactions?userId=${encodeURIComponent(userId)}`, token))
+      );
+
+      const posts = dedupeById(
+        [
+          ...toRecordArray(postsResult),
+          ...perUserPostsResults
+            .filter((result): result is PromiseFulfilledResult<unknown> => result.status === 'fulfilled')
+            .flatMap((result) => toRecordArray(result.value)),
+        ],
+        'post',
+      ).filter((record) => !isSoftDeletedRecord(record));
       const follows = dedupeById(toRecordArray(followsResult), 'follow').filter((record) => !isSoftDeletedRecord(record));
-      const reactions = dedupeById(toRecordArray(reactionsResult), 'reaction').filter((record) => !isSoftDeletedRecord(record));
+      const reactions = dedupeById(
+        [
+          ...toRecordArray(reactionsResult),
+          ...perUserReactionResults
+            .filter((result): result is PromiseFulfilledResult<unknown> => result.status === 'fulfilled')
+            .flatMap((result) => toRecordArray(result.value)),
+        ],
+        'reaction',
+      ).filter((record) => !isSoftDeletedRecord(record));
       const events = dedupeById(toRecordArray(eventsResult), 'event').filter((record) => !isSoftDeletedRecord(record));
 
       const rangeStart = new Date(from);
@@ -302,7 +352,7 @@ export default function HypothesisPerUserView() {
       const rangeEnd = new Date(to);
       rangeEnd.setHours(23, 59, 59, 999);
 
-      const computed: UserHypothesisRow[] = users.map((user) => {
+      const computed: UserHypothesisRow[] = await Promise.all(users.map(async (user) => {
         const userId = getUserId(user);
         const usuario = getUserLabel(user);
 
@@ -319,6 +369,33 @@ export default function HypothesisPerUserView() {
           const created = toDate(reaction.createdAt ?? reaction.created_at ?? reaction.date);
           return postIdSet.has(postId) && isDateInRange(created, rangeStart, rangeEnd);
         });
+
+        const fallbackReactionTotalsByWeek = weekBuckets.map(() => 0);
+        let fallbackReactionTotal = 0;
+
+        if (userReactions.length === 0 && userPosts.length > 0) {
+          const postReactionsTotals = await Promise.allSettled(
+            userPosts
+              .map((post) => ({
+                postId: extractId(post.id ?? post._id),
+                createdAt: toDate(post.createdAt ?? post.created_at ?? post.date),
+              }))
+              .filter((post) => post.postId.length > 0)
+              .map((post) => fetchJson(`/posts/${encodeURIComponent(post.postId)}/reactions/total`, token)
+                .then((payload) => ({ payload, createdAt: post.createdAt })))
+          );
+
+          postReactionsTotals.forEach((result) => {
+            if (result.status !== 'fulfilled') return;
+            const count = toMetricNumber(result.value.payload);
+            if (count <= 0) return;
+            fallbackReactionTotal += count;
+            const weekIndex = findWeekIndex(result.value.createdAt, weekBuckets);
+            if (weekIndex >= 0) {
+              fallbackReactionTotalsByWeek[weekIndex] += count;
+            }
+          });
+        }
 
         const userFollows = follows.filter((follow) => {
           const followedId = getFollowedId(follow);
@@ -365,6 +442,12 @@ export default function HypothesisPerUserView() {
           }
         });
 
+        fallbackReactionTotalsByWeek.forEach((count, index) => {
+          if (count <= 0) return;
+          weeklyInteraction[index] += count;
+          weeklyScore[index] += count;
+        });
+
         userEvents.forEach((event) => {
           const weekIndex = findWeekIndex(toDate(event.createdAt ?? event.created_at ?? event.date ?? event.startDate), weekBuckets);
           if (weekIndex >= 0) {
@@ -393,7 +476,7 @@ export default function HypothesisPerUserView() {
           userId,
           usuario,
           publicaciones: userPosts.length,
-          reacciones: userReactions.length,
+          reacciones: userReactions.length > 0 ? userReactions.length : fallbackReactionTotal,
           likes,
           guardados,
           seguidores: userFollows.length,
@@ -406,7 +489,7 @@ export default function HypothesisPerUserView() {
           interactionPct,
           cumple,
         };
-      });
+      }));
 
       setRows(computed);
       setLastUpdated(new Date().toISOString());
