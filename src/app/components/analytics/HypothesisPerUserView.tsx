@@ -75,6 +75,23 @@ function extractId(raw: unknown): string {
 }
 
 function toDate(value: unknown): Date | null {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value === 'number') {
+    const parsedFromNumber = new Date(value);
+    if (!Number.isNaN(parsedFromNumber.getTime())) return parsedFromNumber;
+    return null;
+  }
+
+  if (typeof value === 'object' && value !== null) {
+    const record = value as Record<string, unknown>;
+    if (typeof record.$date === 'string' || typeof record.$date === 'number') {
+      return toDate(record.$date);
+    }
+  }
+
   if (typeof value !== 'string' || !value.trim()) return null;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
@@ -235,7 +252,12 @@ function getFollowedId(record: Record<string, unknown>): string {
 }
 
 function getReactionPostId(record: Record<string, unknown>): string {
-  return normalizeId(record.post_id ?? record.postId ?? record.post ?? record.publicationId ?? record.publication_id);
+  const nestedPostId =
+    record.post && typeof record.post === 'object'
+      ? (record.post as Record<string, unknown>)._id ?? (record.post as Record<string, unknown>).id
+      : undefined;
+
+  return normalizeId(record.post_id ?? record.postId ?? record.post ?? nestedPostId ?? record.publicationId ?? record.publication_id);
 }
 
 function getReactionActorId(record: Record<string, unknown>): string {
@@ -941,11 +963,17 @@ export default function HypothesisPerUserView() {
         const likesWeeklyObservedTotal = weeklyLikes.reduce((sum, value) => sum + value, 0);
         const savesWeeklyObservedTotal = weeklySaves.reduce((sum, value) => sum + value, 0);
         const followersWeeklyObservedTotal = weeklyFollowers.reduce((sum, value) => sum + value, 0);
-        const hasPostWeightSignal = postWeightsByWeek.some((value) => value > 0);
 
-        if (resolvedReactions > likesWeeklyObservedTotal && likesWeeklyObservedTotal === 0 && hasPostWeightSignal) {
+        const reactionDistributionWeights =
+          detailedLikesByWeek.some((value) => value > 0)
+            ? detailedLikesByWeek
+            : (fallbackReactionTotalsByWeek.some((value) => value > 0)
+              ? fallbackReactionTotalsByWeek
+              : postWeightsByWeek);
+
+        if (resolvedReactions > likesWeeklyObservedTotal && likesWeeklyObservedTotal === 0) {
           const missingLikes = resolvedReactions - likesWeeklyObservedTotal;
-          const likesTopUp = distributeAmountByWeights(missingLikes, postWeightsByWeek);
+          const likesTopUp = distributeAmountByWeights(missingLikes, reactionDistributionWeights);
           likesTopUp.forEach((count, index) => {
             weeklyLikes[index] += count;
             weeklyInteraction[index] += count;
@@ -953,9 +981,14 @@ export default function HypothesisPerUserView() {
           });
         }
 
-        if (resolvedSaves > savesWeeklyObservedTotal && savesWeeklyObservedTotal === 0 && hasPostWeightSignal) {
+        const savesDistributionWeights =
+          saveDetailByWeek.some((value) => value > 0)
+            ? saveDetailByWeek
+            : postWeightsByWeek;
+
+        if (resolvedSaves > savesWeeklyObservedTotal && savesWeeklyObservedTotal === 0) {
           const missingSaves = resolvedSaves - savesWeeklyObservedTotal;
-          const savesTopUp = distributeAmountByWeights(missingSaves, postWeightsByWeek);
+          const savesTopUp = distributeAmountByWeights(missingSaves, savesDistributionWeights);
           savesTopUp.forEach((count, index) => {
             weeklySaves[index] += count;
             weeklyInteraction[index] += count;
