@@ -634,9 +634,10 @@ export default function HypothesisPerUserView() {
           )
         );
 
-        const detailedReactionKeys = new Set<string>();
+        const detailedLikeKeys = new Set<string>();
         const detailedSavedKeys = new Set<string>();
         const detailedInteractionByWeek = weekBuckets.map(() => 0);
+        const detailedLikesByWeek = weekBuckets.map(() => 0);
 
         perPostReactions.forEach((result) => {
           if (result.status !== 'fulfilled') return;
@@ -646,7 +647,7 @@ export default function HypothesisPerUserView() {
           if (reactionRows.length === 0) return;
 
           reactionRows.forEach((reaction) => {
-            detailedReactionKeys.add(buildReactionKey(reaction));
+            const reactionKey = buildReactionKey(reaction);
             const reactionDate = toDate(reaction.createdAt ?? reaction.created_at ?? reaction.date) ?? result.value.createdAt;
             const weekIndex = findWeekIndex(reactionDate, weekBuckets);
             if (weekIndex >= 0) {
@@ -656,6 +657,11 @@ export default function HypothesisPerUserView() {
             const reactionType = normalizeReactionType(reaction);
             if (isSavedType(reactionType)) {
               detailedSavedKeys.add(buildSavedKey(reaction));
+            } else {
+              detailedLikeKeys.add(reactionKey);
+              if (weekIndex >= 0) {
+                detailedLikesByWeek[weekIndex] += 1;
+              }
             }
           });
         });
@@ -831,8 +837,11 @@ export default function HypothesisPerUserView() {
           weeklyScore[index] += count;
         });
 
-        const hasDetailedReactionData = detailedReactionKeys.size > 0 || reactionsOnArtistPosts.length > 0;
-        if (postLikesAggregate > 0 && !hasDetailedReactionData && fallbackReactionTotal === 0) {
+        const hasDetailedLikeData =
+          detailedLikesByWeek.some((value) => value > 0)
+          || userReactionsInRange.some((reaction) => !isSavedType(normalizeReactionType(reaction)));
+
+        if (postLikesAggregate > 0 && !hasDetailedLikeData && fallbackReactionTotal === 0) {
           userPosts.forEach((post) => {
             const likesFromPost = getPostMetricNumber(post, ['likes', 'likesCount', 'likes_count', 'totalReactions', 'reactionsCount', 'reactions_count']);
             if (likesFromPost <= 0) return;
@@ -894,10 +903,14 @@ export default function HypothesisPerUserView() {
 
         const [semana1, semana2, semana3, semana4] = weeksGrowth;
 
-        const reactionGlobalKeys = new Set(reactionsOnArtistPosts.map((reaction) => buildReactionKey(reaction)));
+        const reactionGlobalKeys = new Set(
+          reactionsOnArtistPosts
+            .filter((reaction) => !isSavedType(normalizeReactionType(reaction)))
+            .map((reaction) => buildReactionKey(reaction))
+        );
         const combinedReactionKeys = new Set<string>([
           ...reactionGlobalKeys,
-          ...detailedReactionKeys,
+          ...detailedLikeKeys,
         ]);
 
         const resolvedReactions = combinedReactionKeys.size > 0
