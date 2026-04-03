@@ -39,6 +39,7 @@ interface UserHypothesisRow {
   likesGrowthPct: number | null;
   savesGrowthPct: number | null;
   followersGrowthPct: number | null;
+  metricBaseWeekIndex: number;
 }
 
 function toRecordArray(payload: unknown): Record<string, unknown>[] {
@@ -345,12 +346,22 @@ function averageWeeksAfter(values: number[], baseIndex: number): number {
   return tail.reduce((sum, value) => sum + value, 0) / tail.length;
 }
 
-function growthFromWeeklyHalves(values: number[]): number {
-  const baseIndex = findFirstActiveWeekIndex(values, 0);
-  const pre = values[baseIndex] ?? 0;
-  const post = averageWeeksAfter(values, baseIndex);
-  const pct = percentChange(pre, post);
-  return pct ?? 0;
+function growthFromArtistStart(values: number[], baseWeekIndex: number): number {
+  if (values.length === 0) return 0;
+
+  const clampedBaseWeek = Math.max(0, Math.min(values.length - 1, baseWeekIndex));
+  const pre = values[clampedBaseWeek] ?? 0;
+  const post = values[values.length - 1] ?? pre;
+
+  if (pre <= 0) {
+    return post > 0 ? Number.POSITIVE_INFINITY : 0;
+  }
+  return ((post - pre) / pre) * 100;
+}
+
+function formatGrowthPct(value: number): string {
+  if (!Number.isFinite(value)) return 'Nuevo';
+  return `${value.toFixed(1)}%`;
 }
 
 function distributeAmountByWeights(amount: number, weights: number[]): number[] {
@@ -904,9 +915,9 @@ export default function HypothesisPerUserView() {
           }
         }
 
-        const likesGrowthPct = growthFromWeeklyHalves(weeklyLikes);
-        const savesGrowthPct = growthFromWeeklyHalves(weeklySaves);
-        const followersGrowthPct = growthFromWeeklyHalves(weeklyFollowers);
+        const likesGrowthPct = growthFromArtistStart(weeklyLikes, baseWeekIndex);
+        const savesGrowthPct = growthFromArtistStart(weeklySaves, baseWeekIndex);
+        const followersGrowthPct = growthFromArtistStart(weeklyFollowers, baseWeekIndex);
 
         const cumple =
           visibilityPct !== null && visibilityPct >= HYPOTHESIS_THRESHOLD &&
@@ -933,6 +944,7 @@ export default function HypothesisPerUserView() {
           likesGrowthPct,
           savesGrowthPct,
           followersGrowthPct,
+          metricBaseWeekIndex: baseWeekIndex,
         };
       }));
 
@@ -1055,6 +1067,7 @@ export default function HypothesisPerUserView() {
     likesGrowthPct: row.likesGrowthPct,
     savesGrowthPct: row.savesGrowthPct,
     followersGrowthPct: row.followersGrowthPct,
+    metricBaseWeekIndex: row.metricBaseWeekIndex,
   })), [rows]);
 
   return (
@@ -1219,7 +1232,7 @@ export default function HypothesisPerUserView() {
                       <td className="py-2 px-3">{row.likesByWeek[1] ?? 0}</td>
                       <td className="py-2 px-3">{row.likesByWeek[2] ?? 0}</td>
                       <td className="py-2 px-3">{row.likesByWeek[3] ?? 0}</td>
-                      <td className="py-2 px-3">{formatPct(growthFromWeeklyHalves(row.likesByWeek))}</td>
+                      <td className="py-2 px-3">{formatGrowthPct(growthFromArtistStart(row.likesByWeek, row.metricBaseWeekIndex))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1247,7 +1260,7 @@ export default function HypothesisPerUserView() {
                       <td className="py-2 px-3">{row.savesByWeek[1] ?? 0}</td>
                       <td className="py-2 px-3">{row.savesByWeek[2] ?? 0}</td>
                       <td className="py-2 px-3">{row.savesByWeek[3] ?? 0}</td>
-                      <td className="py-2 px-3">{formatPct(growthFromWeeklyHalves(row.savesByWeek))}</td>
+                      <td className="py-2 px-3">{formatGrowthPct(growthFromArtistStart(row.savesByWeek, row.metricBaseWeekIndex))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1275,7 +1288,7 @@ export default function HypothesisPerUserView() {
                       <td className="py-2 px-3">{row.followersByWeek[1] ?? 0}</td>
                       <td className="py-2 px-3">{row.followersByWeek[2] ?? 0}</td>
                       <td className="py-2 px-3">{row.followersByWeek[3] ?? 0}</td>
-                      <td className="py-2 px-3">{formatPct(growthFromWeeklyHalves(row.followersByWeek))}</td>
+                      <td className="py-2 px-3">{formatGrowthPct(growthFromArtistStart(row.followersByWeek, row.metricBaseWeekIndex))}</td>
                     </tr>
                   ))}
                 </tbody>
