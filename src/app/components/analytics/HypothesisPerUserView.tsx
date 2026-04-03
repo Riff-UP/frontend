@@ -190,8 +190,12 @@ function dedupeById(records: Record<string, unknown>[], prefix: string): Record<
   return result;
 }
 
+function normalizeId(raw: unknown): string {
+  return extractId(raw).trim();
+}
+
 function getUserId(record: Record<string, unknown>): string {
-  return String(record.id ?? record._id ?? record.userId ?? record.sql_user_id ?? '');
+  return normalizeId(record.id ?? record._id ?? record.userId ?? record.sql_user_id);
 }
 
 function getUserLabel(record: Record<string, unknown>): string {
@@ -215,15 +219,48 @@ function getUserLabel(record: Record<string, unknown>): string {
 }
 
 function getAuthorId(record: Record<string, unknown>): string {
-  return String(record.sql_user_id ?? record.authorId ?? record.userId ?? '');
+  return normalizeId(record.sql_user_id ?? record.authorId ?? record.author_id ?? record.userId);
 }
 
 function getEventOwnerId(record: Record<string, unknown>): string {
-  return String(record.sql_user_id ?? record.organizerId ?? record.userId ?? '');
+  return normalizeId(record.sql_user_id ?? record.organizerId ?? record.organizer_id ?? record.ownerId ?? record.userId);
 }
 
 function getFollowedId(record: Record<string, unknown>): string {
-  return String(record.followedId ?? record.followingId ?? '');
+  return normalizeId(record.followedId ?? record.followed_id ?? record.followingId ?? record.following_id);
+}
+
+function getReactionPostId(record: Record<string, unknown>): string {
+  return normalizeId(record.post_id ?? record.postId ?? record.post ?? record.publicationId ?? record.publication_id);
+}
+
+function getReactionActorId(record: Record<string, unknown>): string {
+  return normalizeId(record.sql_user_id ?? record.userId ?? record.user_id ?? record.reactedBy ?? record.actorId);
+}
+
+function getSavedActorId(record: Record<string, unknown>): string {
+  return normalizeId(record.sql_user_id ?? record.userId ?? record.user_id ?? record.savedBy ?? record.actorId);
+}
+
+function buildReactionKey(record: Record<string, unknown>): string {
+  const id = normalizeId(record.id ?? record._id);
+  if (id) return `reaction:${id}`;
+
+  const postId = getReactionPostId(record);
+  const actorId = getReactionActorId(record);
+  const createdAt = String(record.createdAt ?? record.created_at ?? record.date ?? '').trim();
+  const reactionType = normalizeReactionType(record);
+  return `reaction:${postId}:${actorId}:${reactionType}:${createdAt}`;
+}
+
+function buildSavedKey(record: Record<string, unknown>): string {
+  const id = normalizeId(record.id ?? record._id ?? record.savedPostId ?? record.savedId);
+  if (id) return `saved:${id}`;
+
+  const postId = extractSavedPostId(record);
+  const actorId = getSavedActorId(record);
+  const createdAt = String(record.createdAt ?? record.created_at ?? record.saved_at ?? record.date ?? '').trim();
+  return `saved:${postId}:${actorId}:${createdAt}`;
 }
 
 function toMetricNumber(payload: unknown): number {
@@ -430,10 +467,21 @@ export default function HypothesisPerUserView() {
         const userId = getUserId(user);
         const usuario = getUserLabel(user);
 
-        const userPostsAll = posts.filter((post) => {
+        const userPostsAllRaw = posts.filter((post) => {
           const authorId = getAuthorId(post);
           return authorId === userId;
         });
+
+        const userPostsById = new Map<string, Record<string, unknown>>();
+        userPostsAllRaw.forEach((post, index) => {
+          const postId = normalizeId(post.id ?? post._id);
+          const fallbackKey = `post-fallback:${index}:${String(post.createdAt ?? post.created_at ?? post.date ?? '')}`;
+          const key = postId || fallbackKey;
+          if (!userPostsById.has(key)) {
+            userPostsById.set(key, post);
+          }
+        });
+        const userPostsAll = Array.from(userPostsById.values());
 
         const userPosts = userPostsAll.filter((post) => {
           const created = toDate(post.createdAt ?? post.created_at ?? post.date);
@@ -450,17 +498,18 @@ export default function HypothesisPerUserView() {
 
         const postsForCounters = userPostsAll
           .map((post) => ({
-            postId: extractId(post.id ?? post._id),
+            postId: normalizeId(post.id ?? post._id),
             createdAt: toDate(post.createdAt ?? post.created_at ?? post.date),
           }))
           .filter((post) => post.postId.length > 0);
 
         const postIdSet = new Set(postsForCounters.map((post) => post.postId));
 
-        const userReactions = reactions.filter((reaction) => {
-          const postId = extractId(reaction.post_id ?? reaction.postId ?? reaction.post ?? reaction.publicationId);
+        const reactionsOnArtistPosts = reactions.filter((reaction) => postIdSet.has(getReactionPostId(reaction)));
+
+        const userReactionsInRange = reactionsOnArtistPosts.filter((reaction) => {
           const created = toDate(reaction.createdAt ?? reaction.created_at ?? reaction.date);
-          return postIdSet.has(postId) && isDateInRange(created, rangeStart, rangeEnd);
+          return isDateInRange(created, rangeStart, rangeEnd);
         });
 
         const fallbackReactionTotalsByWeek = weekBuckets.map(() => 0);
@@ -473,18 +522,19 @@ export default function HypothesisPerUserView() {
           )
         );
 
-        let detailedReactionCount = 0;
-        let detailedSavedCount = 0;
+        const detailedReactionKeys = new Set<string>();
+        const detailedSavedKeys = new Set<string>();
         const detailedInteractionByWeek = weekBuckets.map(() => 0);
 
         perPostReactions.forEach((result) => {
           if (result.status !== 'fulfilled') return;
           const reactionRows = dedupeById(toRecordArray(result.value.payload), 'reaction-post')
-            .filter((record) => !isSoftDeletedRecord(record));
+            .filter((record) => !isSoftDeletedRecord(record))
+            .filter((record) => postIdSet.has(getReactionPostId(record)));
           if (reactionRows.length === 0) return;
 
-          detailedReactionCount += reactionRows.length;
           reactionRows.forEach((reaction) => {
+            detailedReactionKeys.add(buildReactionKey(reaction));
             const reactionDate = toDate(reaction.createdAt ?? reaction.created_at ?? reaction.date) ?? result.value.createdAt;
             const weekIndex = findWeekIndex(reactionDate, weekBuckets);
             if (weekIndex >= 0) {
@@ -493,7 +543,7 @@ export default function HypothesisPerUserView() {
 
             const reactionType = normalizeReactionType(reaction);
             if (isSavedType(reactionType)) {
-              detailedSavedCount += 1;
+              detailedSavedKeys.add(buildSavedKey(reaction));
             }
           });
         });
@@ -504,25 +554,36 @@ export default function HypothesisPerUserView() {
           )
         );
 
-        let saveCountFromEndpoint = 0;
+        const saveDetailKeys = new Set<string>();
+        let saveMetricFallbackTotal = 0;
         let saveEndpointAvailable = false;
         perPostSaves.forEach((result) => {
           if (result.status !== 'fulfilled') return;
           saveEndpointAvailable = true;
-          const rows = toRecordArray(result.value);
+          const rows = toRecordArray(result.value)
+            .filter((record) => !isSoftDeletedRecord(record))
+            .filter((record) => postIdSet.has(extractSavedPostId(record)));
           if (rows.length > 0) {
-            saveCountFromEndpoint += rows.length;
+            rows.forEach((row) => saveDetailKeys.add(buildSavedKey(row)));
             return;
           }
-          saveCountFromEndpoint += toMetricNumber(result.value);
+          saveMetricFallbackTotal += toMetricNumber(result.value);
         });
 
-        const saveRelationsByArtistPosts = savedPosts.filter((saved) => {
-          const savedPostId = extractSavedPostId(saved);
-          return savedPostId.length > 0 && postIdSet.has(savedPostId);
-        }).length;
+        const globalSavedRows = savedPosts
+          .filter((saved) => {
+            const savedPostId = extractSavedPostId(saved);
+            return savedPostId.length > 0 && postIdSet.has(savedPostId);
+          });
+        const saveGlobalKeys = new Set(globalSavedRows.map((row) => buildSavedKey(row)));
 
-        if (userReactions.length === 0 && postsForCounters.length > 0) {
+        const combinedSavedKeys = new Set<string>([
+          ...detailedSavedKeys,
+          ...saveDetailKeys,
+          ...saveGlobalKeys,
+        ]);
+
+        if (reactionsOnArtistPosts.length === 0 && postsForCounters.length > 0) {
           const postReactionsTotals = await Promise.allSettled(
             postsForCounters
               .map((post) => fetchJson(`/posts/${encodeURIComponent(post.postId)}/reactions/total`, token)
@@ -574,7 +635,7 @@ export default function HypothesisPerUserView() {
 
         let guardados = 0;
 
-        userReactions.forEach((reaction) => {
+        userReactionsInRange.forEach((reaction) => {
           const type = normalizeReactionType(reaction);
           const weekIndex = findWeekIndex(toDate(reaction.createdAt ?? reaction.created_at ?? reaction.date), weekBuckets);
           if (isSavedType(type)) guardados += 1;
@@ -590,7 +651,8 @@ export default function HypothesisPerUserView() {
           weeklyScore[index] += count;
         });
 
-        if (postLikesAggregate > 0 && detailedReactionCount === 0 && userReactions.length === 0 && fallbackReactionTotal === 0) {
+        const hasDetailedReactionData = detailedReactionKeys.size > 0 || reactionsOnArtistPosts.length > 0;
+        if (postLikesAggregate > 0 && !hasDetailedReactionData && fallbackReactionTotal === 0) {
           userPosts.forEach((post) => {
             const likesFromPost = getPostMetricNumber(post, ['likes', 'likesCount', 'likes_count', 'totalReactions', 'reactionsCount', 'reactions_count']);
             if (likesFromPost <= 0) return;
@@ -602,9 +664,13 @@ export default function HypothesisPerUserView() {
           });
         }
 
-        if (detailedReactionCount > 0) {
+        if (detailedInteractionByWeek.some((value) => value > 0)) {
           for (let i = 0; i < detailedInteractionByWeek.length; i += 1) {
-            weeklyInteraction[i] = detailedInteractionByWeek[i];
+            if (detailedInteractionByWeek[i] > weeklyInteraction[i]) {
+              const diff = detailedInteractionByWeek[i] - weeklyInteraction[i];
+              weeklyInteraction[i] = detailedInteractionByWeek[i];
+              weeklyScore[i] += diff;
+            }
           }
         }
 
@@ -632,23 +698,30 @@ export default function HypothesisPerUserView() {
         const semana3 = formatPct(percentChange(weeklyScore[1], weeklyScore[2]));
         const semana4 = formatPct(percentChange(weeklyScore[2], weeklyScore[3]));
 
+        const reactionGlobalKeys = new Set(reactionsOnArtistPosts.map((reaction) => buildReactionKey(reaction)));
+        const combinedReactionKeys = new Set<string>([
+          ...reactionGlobalKeys,
+          ...detailedReactionKeys,
+        ]);
+
+        const resolvedReactions = combinedReactionKeys.size > 0
+          ? combinedReactionKeys.size
+          : (fallbackReactionTotal > 0
+            ? fallbackReactionTotal
+            : postLikesAggregate);
+
+        const resolvedSaves = combinedSavedKeys.size > 0
+          ? combinedSavedKeys.size
+          : (saveEndpointAvailable && saveMetricFallbackTotal > 0
+            ? saveMetricFallbackTotal
+            : postSavedAggregate);
+
         return {
           userId,
           usuario,
           publicaciones: userPostsAll.length,
-          reacciones: Math.max(
-            detailedReactionCount,
-            userReactions.length > 0 ? userReactions.length : 0,
-            fallbackReactionTotal,
-            postLikesAggregate,
-          ),
-          guardados: Math.max(
-            saveEndpointAvailable ? saveCountFromEndpoint : 0,
-            saveRelationsByArtistPosts,
-            postSavedAggregate,
-            guardados,
-            detailedSavedCount,
-          ),
+          reacciones: resolvedReactions,
+          guardados: Math.max(resolvedSaves, guardados),
           seguidores: userFollows.length,
           eventos: userEvents.length,
           semana1,
