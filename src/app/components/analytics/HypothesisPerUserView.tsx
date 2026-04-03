@@ -1089,7 +1089,7 @@ export default function HypothesisPerUserView() {
   }, []);
 
   const downloadExcelTable = useCallback(() => {
-    const headers = ['Usuario', 'Publicaciones', 'Reacciones', 'Guardados', 'Seguidores', 'Eventos', 'Semana 1', 'Semana 2', 'Semana 3', 'Semana 4', 'Visibilidad', 'Interacción', 'Hipótesis'];
+    const headers = ['Usuario', 'Publicaciones', 'Reacciones', 'Guardados', 'Seguidores actuales', 'Eventos', 'Semana 1', 'Semana 2', 'Semana 3', 'Semana 4', 'Visibilidad', 'Interacción', 'Hipótesis'];
     const bodyRows = rows.map((row) => {
       const isHighlighted = highlightedUserIds.has(row.userId);
       const softPass = isSoftPass(row, isHighlighted);
@@ -1129,6 +1129,7 @@ export default function HypothesisPerUserView() {
     likesByWeek: row.likesByWeek,
     savesByWeek: row.savesByWeek,
     followersByWeek: row.followersByWeek,
+    followersCurrentTotal: row.seguidores,
     likesGrowthPct: growthFromArtistStart(row.likesByWeek, row.metricBaseWeekIndex),
     savesGrowthPct: growthFromArtistStart(row.savesByWeek, row.metricBaseWeekIndex),
     followersGrowthPct: growthFromArtistStart(row.followersByWeek, row.metricBaseWeekIndex),
@@ -1228,7 +1229,7 @@ export default function HypothesisPerUserView() {
                   <th className="py-3 px-3">Publicaciones</th>
                   <th className="py-3 px-3">Reacciones</th>
                   <th className="py-3 px-3">Guardados</th>
-                  <th className="py-3 px-3">Seguidores</th>
+                  <th className="py-3 px-3">Seguidores actuales</th>
                   <th className="py-3 px-3">Eventos</th>
                   <th className="py-3 px-3">Semana 1</th>
                   <th className="py-3 px-3">Semana 2</th>
@@ -1333,7 +1334,8 @@ export default function HypothesisPerUserView() {
             </div>
 
             <div>
-              <h3 className="text-white text-lg font-bold mb-2">Tabla semanal: Seguidores</h3>
+              <h3 className="text-white text-lg font-bold mb-2">Tabla semanal: Seguidores nuevos</h3>
+              <p className="text-white/60 text-xs mb-2">Las semanas muestran seguidores nuevos del periodo. "Total actual" coincide con el contador del perfil.</p>
               <table className="min-w-[900px] w-full text-sm">
                 <thead>
                   <tr className="text-left text-cyan-100 border-b border-white/20">
@@ -1342,6 +1344,7 @@ export default function HypothesisPerUserView() {
                     <th className="py-3 px-3">Semana 2</th>
                     <th className="py-3 px-3">Semana 3</th>
                     <th className="py-3 px-3">Semana 4</th>
+                    <th className="py-3 px-3">Total actual</th>
                     <th className="py-3 px-3">Crecimiento</th>
                   </tr>
                 </thead>
@@ -1353,6 +1356,7 @@ export default function HypothesisPerUserView() {
                       <td className="py-2 px-3">{row.followersByWeek[1] ?? 0}</td>
                       <td className="py-2 px-3">{row.followersByWeek[2] ?? 0}</td>
                       <td className="py-2 px-3">{row.followersByWeek[3] ?? 0}</td>
+                      <td className="py-2 px-3">{row.followersCurrentTotal}</td>
                       <td className="py-2 px-3">{formatGrowthPct(row.followersGrowthPct)}</td>
                     </tr>
                   ))}
