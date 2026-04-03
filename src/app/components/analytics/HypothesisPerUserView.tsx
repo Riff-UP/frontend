@@ -19,6 +19,7 @@ interface UserHypothesisRow {
   userId: string;
   usuario: string;
   publicaciones: number;
+  reacciones: number;
   likes: number;
   guardados: number;
   seguidores: number;
@@ -392,6 +393,7 @@ export default function HypothesisPerUserView() {
           userId,
           usuario,
           publicaciones: userPosts.length,
+          reacciones: userReactions.length,
           likes,
           guardados,
           seguidores: userFollows.length,
@@ -426,6 +428,29 @@ export default function HypothesisPerUserView() {
       cumplen,
       noCumplen: Math.max(rows.length - cumplen, 0),
     };
+  }, [rows]);
+
+  const highlightedUserIds = useMemo(() => {
+    if (rows.length === 0) {
+      return new Set<string>();
+    }
+
+    const topReactionLimit = Math.max(1, Math.min(8, Math.ceil(rows.length * 0.3)));
+    const topByReactions = [...rows]
+      .sort((a, b) => b.reacciones - a.reacciones)
+      .slice(0, topReactionLimit)
+      .filter((row) => row.reacciones > 0);
+
+    const closestToThreshold = [...topByReactions]
+      .filter((row) => row.interactionPct !== null)
+      .sort((a, b) => Math.abs((a.interactionPct ?? 0) - HYPOTHESIS_THRESHOLD) - Math.abs((b.interactionPct ?? 0) - HYPOTHESIS_THRESHOLD))
+      .slice(0, Math.min(4, topByReactions.length));
+
+    const selected = closestToThreshold.length > 0
+      ? closestToThreshold
+      : topByReactions.slice(0, Math.min(4, topByReactions.length));
+
+    return new Set(selected.map((row) => row.userId));
   }, [rows]);
 
   return (
@@ -493,11 +518,15 @@ export default function HypothesisPerUserView() {
 
         {!loading && !error ? (
           <section className="rounded-2xl border border-white/10 bg-white/5 p-4 overflow-x-auto">
+            <p className="text-green-200 text-sm mb-3">
+              En verde se marcan los usuarios con mas reacciones y mas cercanos al umbral de {HYPOTHESIS_THRESHOLD}% de interaccion.
+            </p>
             <table className="min-w-[1200px] w-full text-sm">
               <thead>
                 <tr className="text-left text-cyan-100 border-b border-white/20">
                   <th className="py-3 px-3">Usuario</th>
                   <th className="py-3 px-3">Publicaciones</th>
+                  <th className="py-3 px-3">Reacciones</th>
                   <th className="py-3 px-3">Likes</th>
                   <th className="py-3 px-3">Guardados</th>
                   <th className="py-3 px-3">Seguidores</th>
@@ -512,10 +541,16 @@ export default function HypothesisPerUserView() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr key={row.userId} className="border-b border-white/10 text-white/90">
+                {rows.map((row) => {
+                  const isHighlighted = highlightedUserIds.has(row.userId);
+                  return (
+                  <tr
+                    key={row.userId}
+                    className={`border-b border-white/10 text-white/90 ${isHighlighted ? 'bg-green-500/10' : ''}`}
+                  >
                     <td className="py-2 px-3 font-semibold">{row.usuario}</td>
                     <td className="py-2 px-3">{row.publicaciones}</td>
+                    <td className={`py-2 px-3 font-semibold ${isHighlighted ? 'text-green-200' : ''}`}>{row.reacciones}</td>
                     <td className="py-2 px-3">{row.likes}</td>
                     <td className="py-2 px-3">{row.guardados}</td>
                     <td className="py-2 px-3">{row.seguidores}</td>
@@ -525,14 +560,14 @@ export default function HypothesisPerUserView() {
                     <td className="py-2 px-3">{row.semana3}</td>
                     <td className="py-2 px-3">{row.semana4}</td>
                     <td className="py-2 px-3">{formatPct(row.visibilityPct)}</td>
-                    <td className="py-2 px-3">{formatPct(row.interactionPct)}</td>
+                    <td className={`py-2 px-3 ${isHighlighted ? 'text-green-200 font-semibold' : ''}`}>{formatPct(row.interactionPct)}</td>
                     <td className="py-2 px-3">
                       <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${row.cumple ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
                         {row.cumple ? 'Cumple' : 'No cumple'}
                       </span>
                     </td>
                   </tr>
-                ))}
+                );})}
               </tbody>
             </table>
           </section>
