@@ -267,20 +267,42 @@ function toMetricNumber(payload: unknown): number {
   if (typeof payload === 'number' && Number.isFinite(payload)) return payload;
   if (!payload || typeof payload !== 'object') return 0;
 
+  const readCandidate = (value: unknown): number | null => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  };
+
   const record = payload as Record<string, unknown>;
-  const directCandidates = [record.totalReactions, record.count, record.total, record.reactions, record.totalSaved, record.saves, record.saved];
+  const directCandidates = [record.totalReactions, record.count, record.total, record.reactions, record.totalSaved, record.totalSaves, record.saves, record.saved];
   for (const candidate of directCandidates) {
-    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
-      return candidate;
+    const parsed = readCandidate(candidate);
+    if (parsed !== null) {
+      return parsed;
     }
   }
 
   if (record.data && typeof record.data === 'object') {
     const nested = record.data as Record<string, unknown>;
-    const nestedCandidates = [nested.totalReactions, nested.count, nested.total, nested.reactions, nested.totalSaved, nested.saves, nested.saved];
+    const nestedCandidates = [nested.totalReactions, nested.count, nested.total, nested.reactions, nested.totalSaved, nested.totalSaves, nested.saves, nested.saved];
     for (const candidate of nestedCandidates) {
-      if (typeof candidate === 'number' && Number.isFinite(candidate)) {
-        return candidate;
+      const parsed = readCandidate(candidate);
+      if (parsed !== null) {
+        return parsed;
+      }
+    }
+  }
+
+  if (record.result && typeof record.result === 'object') {
+    const nested = record.result as Record<string, unknown>;
+    const nestedCandidates = [nested.totalReactions, nested.count, nested.total, nested.reactions, nested.totalSaved, nested.totalSaves, nested.saves, nested.saved];
+    for (const candidate of nestedCandidates) {
+      const parsed = readCandidate(candidate);
+      if (parsed !== null) {
+        return parsed;
       }
     }
   }
