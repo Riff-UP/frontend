@@ -142,8 +142,11 @@ function HomeContent() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [heroPosts, setHeroPosts] = useState<RawPost[]>([]);
+  const [heroPostsLoading, setHeroPostsLoading] = useState(true);
+  const [savedPostsLoading, setSavedPostsLoading] = useState(true);
+  const [reactionCountsLoading, setReactionCountsLoading] = useState(true);
   const { artists, loading, setSearch } = useArtists();
-  const { user } = useUser();
+  const { user, loading: userLoading } = useUser();
   const { isFollowing } = useFollow(user?.id);
   const {
     isLiked,
@@ -367,14 +370,18 @@ function HomeContent() {
   }, [selectedPublication, getLikeCountForPost, isLiked, isPostSaved]);
 
   const loadSavedPosts = async () => {
+    setSavedPostsLoading(true);
+
     if (!user?.id) {
       setSavedPosts([]);
+      setSavedPostsLoading(false);
       return;
     }
 
     const token = localStorage.getItem('token');
     if (!token) {
       setSavedPosts([]);
+      setSavedPostsLoading(false);
       return;
     }
 
@@ -410,6 +417,8 @@ function HomeContent() {
       setSavedPosts(normalized);
     } catch {
       setSavedPosts([]);
+    } finally {
+      setSavedPostsLoading(false);
     }
   };
 
@@ -536,6 +545,7 @@ function HomeContent() {
   // Cargar publicaciones para animar visualmente el hero
   useEffect(() => {
     const loadHeroPosts = async () => {
+      setHeroPostsLoading(true);
       try {
         const response = await fetch(`${API_URL}/posts`, { headers: getAuthHeaders(false) });
         if (!response.ok) return;
@@ -545,6 +555,8 @@ function HomeContent() {
         setHeroPosts(Array.isArray(posts) ? posts : []);
       } catch {
         setHeroPosts([]);
+      } finally {
+        setHeroPostsLoading(false);
       }
     };
 
@@ -552,15 +564,39 @@ function HomeContent() {
   }, []);
 
   useEffect(() => {
+    if (userLoading) {
+      setSavedPostsLoading(true);
+      return;
+    }
+
     loadSavedPosts();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id, userLoading]);
 
   useEffect(() => {
+    let active = true;
     const ids = allPublications.map((p) => p.id).filter(Boolean);
-    if (ids.length > 0) {
-      fetchPostReactionCounts(ids);
+    if (ids.length === 0) {
+      setReactionCountsLoading(false);
+      return () => {
+        active = false;
+      };
     }
+
+    setReactionCountsLoading(true);
+    void (async () => {
+      try {
+        await fetchPostReactionCounts(ids);
+      } finally {
+        if (active) {
+          setReactionCountsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, [allPublications, fetchPostReactionCounts]);
 
   useEffect(() => {
@@ -578,6 +614,30 @@ function HomeContent() {
   // Ya no le pasamos el arreglo falso 'attendedEvents', 
   // el hook se encarga solito de llamar a nuestro nuevo endpoint del backend
   const { eventToRate, handleRatingSubmit, handleRatingClose } = useEventRating();
+
+  const initialScreenLoading =
+    userLoading ||
+    loading ||
+    heroPostsLoading ||
+    savedPostsLoading ||
+    reactionCountsLoading;
+
+  if (initialScreenLoading) {
+    return (
+      <div className="min-h-screen bg-riff-background-b">
+        <Header onSearch={setSearchQuery} searchValue={searchQuery} />
+        <main className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
+          <section className="max-w-8xl mx-auto min-h-[65vh] flex items-center justify-center">
+            <svg className="animate-spin h-9 w-9 text-riff-primary" viewBox="0 0 24 24" aria-label="Cargando inicio">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          </section>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-riff-background-b">
