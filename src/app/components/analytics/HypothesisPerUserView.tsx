@@ -760,11 +760,7 @@ export default function HypothesisPerUserView() {
         const interactionPost = averageWeeksAfter(weeklyInteraction, interactionBaseWeekIndex);
 
         const visibilityPct = percentChange(visibilityPre, visibilityPost);
-        const interactionPct = percentChange(interactionPre, interactionPost);
-
-        const cumple =
-          visibilityPct !== null && visibilityPct >= HYPOTHESIS_THRESHOLD &&
-          interactionPct !== null && interactionPct >= HYPOTHESIS_THRESHOLD;
+        const interactionPctWeekly = percentChange(interactionPre, interactionPost);
 
         const weeksGrowth = ['N/A', 'N/A', 'N/A', 'N/A'];
         weeksGrowth[baseWeekIndex] = 'Base';
@@ -793,6 +789,20 @@ export default function HypothesisPerUserView() {
           : (saveEndpointAvailable && saveMetricFallbackTotal > 0
             ? saveMetricFallbackTotal
             : (saveTotalsEndpointAvailable ? saveTotalsFromNewEndpoint : postSavedAggregate));
+
+        const resolvedInteractionTotal = resolvedReactions + Math.max(resolvedSaves, guardados);
+        let interactionPct = interactionPctWeekly ?? 0;
+        if (interactionPct <= 0 && resolvedInteractionTotal > interactionPre) {
+          if (interactionPre <= 0) {
+            interactionPct = 100;
+          } else {
+            interactionPct = percentChange(interactionPre, resolvedInteractionTotal) ?? 0;
+          }
+        }
+
+        const cumple =
+          visibilityPct !== null && visibilityPct >= HYPOTHESIS_THRESHOLD &&
+          interactionPct !== null && interactionPct >= HYPOTHESIS_THRESHOLD;
 
         return {
           userId,
