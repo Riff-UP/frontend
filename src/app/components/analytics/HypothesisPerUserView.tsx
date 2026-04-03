@@ -284,6 +284,15 @@ function isSavedType(type: string): boolean {
   return type.includes('save') || type.includes('saved') || type.includes('bookmark') || type.includes('guardad') || type.includes('favorite');
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function triggerDownload(filename: string, dataUrl: string): void {
   const anchor = document.createElement('a');
   anchor.href = dataUrl;
@@ -404,7 +413,14 @@ export default function HypothesisPerUserView() {
           return isDateInRange(created, rangeStart, rangeEnd);
         });
 
-        const postIdSet = new Set(userPosts.map((post) => extractId(post.id ?? post._id)).filter(Boolean));
+        const postsInRange = userPosts
+          .map((post) => ({
+            postId: extractId(post.id ?? post._id),
+            createdAt: toDate(post.createdAt ?? post.created_at ?? post.date),
+          }))
+          .filter((post) => post.postId.length > 0);
+
+        const postIdSet = new Set(postsInRange.map((post) => post.postId));
 
         const userReactions = reactions.filter((reaction) => {
           const postId = extractId(reaction.post_id ?? reaction.postId ?? reaction.post ?? reaction.publicationId);
@@ -414,6 +430,57 @@ export default function HypothesisPerUserView() {
 
         const fallbackReactionTotalsByWeek = weekBuckets.map(() => 0);
         let fallbackReactionTotal = 0;
+
+        const perPostReactions = await Promise.allSettled(
+          postsInRange.map((post) =>
+            fetchJson(`/posts/reactions?postId=${encodeURIComponent(post.postId)}&limit=5000&offset=0`, token)
+              .then((payload) => ({ payload, createdAt: post.createdAt }))
+          )
+        );
+
+        let detailedReactionCount = 0;
+        let detailedSavedCount = 0;
+        const detailedInteractionByWeek = weekBuckets.map(() => 0);
+
+        perPostReactions.forEach((result) => {
+          if (result.status !== 'fulfilled') return;
+          const reactionRows = dedupeById(toRecordArray(result.value.payload), 'reaction-post')
+            .filter((record) => !isSoftDeletedRecord(record));
+          if (reactionRows.length === 0) return;
+
+          detailedReactionCount += reactionRows.length;
+          reactionRows.forEach((reaction) => {
+            const reactionDate = toDate(reaction.createdAt ?? reaction.created_at ?? reaction.date) ?? result.value.createdAt;
+            const weekIndex = findWeekIndex(reactionDate, weekBuckets);
+            if (weekIndex >= 0) {
+              detailedInteractionByWeek[weekIndex] += 1;
+            }
+
+            const reactionType = normalizeReactionType(reaction);
+            if (isSavedType(reactionType)) {
+              detailedSavedCount += 1;
+            }
+          });
+        });
+
+        const perPostSaves = await Promise.allSettled(
+          postsInRange.map((post) =>
+            fetchJson(`/posts/saved?postId=${encodeURIComponent(post.postId)}&limit=5000&offset=0`, token)
+          )
+        );
+
+        let saveCountFromEndpoint = 0;
+        let saveEndpointAvailable = false;
+        perPostSaves.forEach((result) => {
+          if (result.status !== 'fulfilled') return;
+          saveEndpointAvailable = true;
+          const rows = toRecordArray(result.value);
+          if (rows.length > 0) {
+            saveCountFromEndpoint += rows.length;
+            return;
+          }
+          saveCountFromEndpoint += toMetricNumber(result.value);
+        });
 
         if (userReactions.length === 0 && userPosts.length > 0) {
           const postReactionsTotals = await Promise.allSettled(
@@ -488,6 +555,12 @@ export default function HypothesisPerUserView() {
           weeklyScore[index] += count;
         });
 
+        if (detailedReactionCount > 0) {
+          for (let i = 0; i < detailedInteractionByWeek.length; i += 1) {
+            weeklyInteraction[i] = detailedInteractionByWeek[i];
+          }
+        }
+
         userEvents.forEach((event) => {
           const weekIndex = findWeekIndex(toDate(event.createdAt ?? event.created_at ?? event.date ?? event.startDate), weekBuckets);
           if (weekIndex >= 0) {
@@ -516,8 +589,10 @@ export default function HypothesisPerUserView() {
           userId,
           usuario,
           publicaciones: userPostsAll.length,
-          reacciones: userReactions.length > 0 ? userReactions.length : fallbackReactionTotal,
-          guardados,
+          reacciones: detailedReactionCount > 0
+            ? detailedReactionCount
+            : (userReactions.length > 0 ? userReactions.length : fallbackReactionTotal),
+          guardados: saveEndpointAvailable ? saveCountFromEndpoint : Math.max(guardados, detailedSavedCount),
           seguidores: userFollows.length,
           eventos: userEvents.length,
           semana1,
@@ -583,6 +658,11 @@ export default function HypothesisPerUserView() {
     };
   }, [highlightedUserIds, rows]);
 
+  const isSoftPass = useCallback((row: UserHypothesisRow, isHighlighted: boolean): boolean => {
+    if (!isHighlighted) return false;
+    return row.reacciones >= SOFT_PASS_MIN_REACTIONS || row.guardados >= SOFT_PASS_MIN_SAVES;
+  }, []);
+
   const downloadTablePng = useCallback(async () => {
     const node = tableExportRef.current;
     if (!node) return;
@@ -600,6 +680,41 @@ export default function HypothesisPerUserView() {
     }
   }, []);
 
+  const downloadExcelTable = useCallback(() => {
+    const headers = ['Usuario', 'Publicaciones', 'Reacciones', 'Guardados', 'Seguidores', 'Eventos', 'Semana 1', 'Semana 2', 'Semana 3', 'Semana 4', 'Visibilidad', 'Interacción', 'Hipótesis'];
+    const bodyRows = rows.map((row) => {
+      const isHighlighted = highlightedUserIds.has(row.userId);
+      const softPass = isSoftPass(row, isHighlighted);
+      const effectiveCumple = row.cumple || softPass;
+      const status = effectiveCumple ? (row.cumple ? 'Cumple' : 'Cumple (engagement)') : 'No cumple';
+      return [
+        row.usuario,
+        String(row.publicaciones),
+        String(row.reacciones),
+        String(row.guardados),
+        String(row.seguidores),
+        String(row.eventos),
+        row.semana1,
+        row.semana2,
+        row.semana3,
+        row.semana4,
+        formatPct(row.visibilityPct),
+        formatPct(row.interactionPct),
+        status,
+      ];
+    });
+
+    const headerHtml = headers.map((header) => `<th style="padding:10px;background:#0b5fa5;color:#ffffff;border:1px solid #9ec6e8;font-weight:700;">${escapeHtml(header)}</th>`).join('');
+    const rowsHtml = bodyRows.map((cells) => `<tr>${cells.map((cell) => `<td style="padding:8px;border:1px solid #d7e3f1;">${escapeHtml(cell)}</td>`).join('')}</tr>`).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8" /></head><body><table style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:12pt;">` +
+      `<thead><tr>${headerHtml}</tr></thead><tbody>${rowsHtml}</tbody></table></body></html>`;
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    triggerDownload('hipotesis_por_usuario_tabla.xls', url);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }, [highlightedUserIds, isSoftPass, rows]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-riff-bg via-riff-card to-riff-header">
       <Header />
@@ -609,7 +724,7 @@ export default function HypothesisPerUserView() {
           <h1 className="text-white text-2xl sm:text-3xl font-bold mt-2">Hipótesis por usuario: cumple o no cumple</h1>
           <p className="text-white/75 mt-3 leading-relaxed">
             Periodo analizado: del {new Date(from).toLocaleDateString('es-MX')} al {new Date(to).toLocaleDateString('es-MX')}.
-            Se calcula por usuario con métricas de publicaciones, likes, guardados, seguidores y eventos.
+            Se calcula por usuario con métricas de publicaciones, reacciones, guardados, seguidores y eventos.
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -664,7 +779,7 @@ export default function HypothesisPerUserView() {
         ) : null}
 
         {!loading && !error ? (
-          <section ref={tableExportRef} className="rounded-2xl border border-white/10 bg-white/5 p-4 overflow-x-auto">
+          <section className="rounded-2xl border border-white/10 bg-white/5 p-4 overflow-x-auto">
             <p className="text-green-200 text-sm mb-3">
               En verde se marcan los usuarios con mas reacciones y mas cercanos al umbral de {HYPOTHESIS_THRESHOLD}% de interaccion.
             </p>
@@ -677,7 +792,15 @@ export default function HypothesisPerUserView() {
               >
                 {busyDownload ? 'Generando PNG...' : 'Descargar tabla PNG alta calidad'}
               </button>
+              <button
+                type="button"
+                onClick={downloadExcelTable}
+                className="rounded-lg bg-riff-registro hover:brightness-110 text-white px-4 py-2 text-sm font-semibold ml-3"
+              >
+                Exportar tabla bonita a Excel
+              </button>
             </div>
+            <div ref={tableExportRef}>
             <table className="min-w-[1200px] w-full text-sm">
               <thead>
                 <tr className="text-left text-cyan-100 border-b border-white/20">
@@ -699,10 +822,7 @@ export default function HypothesisPerUserView() {
               <tbody>
                 {rows.map((row) => {
                   const isHighlighted = highlightedUserIds.has(row.userId);
-                  const softPass = isHighlighted && (
-                    row.reacciones >= SOFT_PASS_MIN_REACTIONS ||
-                    row.guardados >= SOFT_PASS_MIN_SAVES
-                  );
+                  const softPass = isSoftPass(row, isHighlighted);
                   const effectiveCumple = row.cumple || softPass;
                   return (
                   <tr
@@ -730,6 +850,7 @@ export default function HypothesisPerUserView() {
                 );})}
               </tbody>
             </table>
+            </div>
           </section>
         ) : null}
 
