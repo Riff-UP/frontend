@@ -770,7 +770,7 @@ export default function HypothesisPerUserView() {
 
         const hasDetailedLikeData =
           detailedLikesByWeek.some((value) => value > 0)
-          || userReactionsInRange.some((reaction) => !isSavedType(normalizeReactionType(reaction)));
+          || userReactionsInRange.some((reaction) => isLikeType(normalizeReactionType(reaction)));
 
         if (!hasDetailedLikeData && postsForCounters.length > 0) {
           const postReactionsTotals = await Promise.allSettled(
@@ -838,7 +838,7 @@ export default function HypothesisPerUserView() {
             if (weekIndex >= 0) {
               weeklySaves[weekIndex] += 1;
             }
-          } else if (weekIndex >= 0) {
+          } else if (isLikeType(type) && weekIndex >= 0) {
             weeklyLikes[weekIndex] += 1;
           }
           if (weekIndex >= 0) {
