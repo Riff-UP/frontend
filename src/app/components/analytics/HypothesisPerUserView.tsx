@@ -284,6 +284,31 @@ function isSavedType(type: string): boolean {
   return type.includes('save') || type.includes('saved') || type.includes('bookmark') || type.includes('guardad') || type.includes('favorite');
 }
 
+function getPostMetricNumber(post: Record<string, unknown>, keys: string[]): number {
+  for (const key of keys) {
+    const value = post[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+  return 0;
+}
+
+function extractSavedPostId(record: Record<string, unknown>): string {
+  return extractId(
+    record.postId ??
+    record.post_id ??
+    record.postID ??
+    (record.post && typeof record.post === 'object' ? (record.post as Record<string, unknown>)._id ?? (record.post as Record<string, unknown>).id : undefined)
+  );
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -327,13 +352,14 @@ export default function HypothesisPerUserView() {
     setError(null);
 
     try {
-      const [usersResult, postsResult, followsResult, reactionsResult, eventsResult] = await Promise.all([
+      const [usersResult, postsResult, followsResult, reactionsResult, eventsResult, savedPostsResult] = await Promise.all([
         fetchJson('/users?limit=5000&offset=0', token)
           .catch(() => fetchJson('/users/artists?limit=5000&offset=0', token)),
         fetchJson('/posts?limit=5000&offset=0', token).catch(() => fetchJson('/posts', token)).catch(() => []),
         fetchJson('/follows?page=1&limit=5000', token).catch(() => fetchJson('/follows', token)),
         fetchJson('/posts/reactions?limit=5000&offset=0', token).catch(() => fetchJson('/posts/reactions', token)).catch(() => []),
         fetchJson('/events?limit=5000&offset=0', token).catch(() => fetchJson('/events', token)).catch(() => []),
+        fetchJson('/posts/saved?limit=10000&offset=0', token).catch(() => fetchJson('/posts/saved', token)).catch(() => []),
       ]);
 
       const users = dedupeById(toRecordArray(usersResult), 'user')
@@ -393,6 +419,7 @@ export default function HypothesisPerUserView() {
         'reaction',
       ).filter((record) => !isSoftDeletedRecord(record));
       const events = dedupeById(toRecordArray(eventsResult), 'event').filter((record) => !isSoftDeletedRecord(record));
+      const savedPosts = dedupeById(toRecordArray(savedPostsResult), 'saved').filter((record) => !isSoftDeletedRecord(record));
 
       const rangeStart = new Date(from);
       rangeStart.setHours(0, 0, 0, 0);
@@ -412,6 +439,14 @@ export default function HypothesisPerUserView() {
           const created = toDate(post.createdAt ?? post.created_at ?? post.date);
           return isDateInRange(created, rangeStart, rangeEnd);
         });
+
+        const postLikesAggregate = userPosts.reduce((sum, post) => {
+          return sum + getPostMetricNumber(post, ['likesCount', 'likes_count', 'totalReactions', 'reactionsCount', 'reactions_count']);
+        }, 0);
+
+        const postSavedAggregate = userPosts.reduce((sum, post) => {
+          return sum + getPostMetricNumber(post, ['savedCount', 'saved_count', 'bookmarksCount', 'bookmarkCount', 'favoritesCount']);
+        }, 0);
 
         const postsInRange = userPosts
           .map((post) => ({
@@ -481,6 +516,11 @@ export default function HypothesisPerUserView() {
           }
           saveCountFromEndpoint += toMetricNumber(result.value);
         });
+
+        const saveRelationsByArtistPosts = savedPosts.filter((saved) => {
+          const savedPostId = extractSavedPostId(saved);
+          return savedPostId.length > 0 && postIdSet.has(savedPostId);
+        }).length;
 
         if (userReactions.length === 0 && userPosts.length > 0) {
           const postReactionsTotals = await Promise.allSettled(
@@ -555,6 +595,18 @@ export default function HypothesisPerUserView() {
           weeklyScore[index] += count;
         });
 
+        if (postLikesAggregate > 0 && detailedReactionCount === 0 && userReactions.length === 0 && fallbackReactionTotal === 0) {
+          userPosts.forEach((post) => {
+            const likesFromPost = getPostMetricNumber(post, ['likesCount', 'likes_count', 'totalReactions', 'reactionsCount', 'reactions_count']);
+            if (likesFromPost <= 0) return;
+            const weekIndex = findWeekIndex(toDate(post.createdAt ?? post.created_at ?? post.date), weekBuckets);
+            if (weekIndex >= 0) {
+              weeklyInteraction[weekIndex] += likesFromPost;
+              weeklyScore[weekIndex] += likesFromPost;
+            }
+          });
+        }
+
         if (detailedReactionCount > 0) {
           for (let i = 0; i < detailedInteractionByWeek.length; i += 1) {
             weeklyInteraction[i] = detailedInteractionByWeek[i];
@@ -589,10 +641,19 @@ export default function HypothesisPerUserView() {
           userId,
           usuario,
           publicaciones: userPostsAll.length,
-          reacciones: detailedReactionCount > 0
-            ? detailedReactionCount
-            : (userReactions.length > 0 ? userReactions.length : fallbackReactionTotal),
-          guardados: saveEndpointAvailable ? saveCountFromEndpoint : Math.max(guardados, detailedSavedCount),
+          reacciones: Math.max(
+            detailedReactionCount,
+            userReactions.length > 0 ? userReactions.length : 0,
+            fallbackReactionTotal,
+            postLikesAggregate,
+          ),
+          guardados: Math.max(
+            saveEndpointAvailable ? saveCountFromEndpoint : 0,
+            saveRelationsByArtistPosts,
+            postSavedAggregate,
+            guardados,
+            detailedSavedCount,
+          ),
           seguidores: userFollows.length,
           eventos: userEvents.length,
           semana1,
