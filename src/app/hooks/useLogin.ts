@@ -6,6 +6,8 @@ import { API_BASE_URL } from '../config/api';
 import { getValidToken, decodeJWT } from '../utils/jwt';
 
 const REQUEST_TIMEOUT_MS = 12000;
+const TWO_FACTOR_TEMP_TOKEN_KEY = 'riff_2fa_temp_token';
+const TWO_FACTOR_EXPIRES_AT_KEY = 'riff_2fa_expires_at';
 
 function normalizeLoginErrorMessage(message: string): string {
   const normalized = message.trim().toLowerCase();
@@ -58,10 +60,54 @@ function normalizeOAuthErrorMessage(errorCode: string): string {
   return 'No se pudo completar el acceso con Google.';
 }
 
+function normalizeTwoFactorErrorMessage(message: string): string {
+  const normalized = message.trim().toLowerCase();
+
+  if (
+    normalized.includes('invalid code') ||
+    normalized.includes('invalid totp') ||
+    normalized.includes('codigo invalido') ||
+    normalized.includes('código inválido') ||
+    normalized.includes('code is invalid')
+  ) {
+    return 'El código de autenticación no es válido. Revisa tu app y vuelve a intentarlo.';
+  }
+
+  if (
+    normalized.includes('expired') ||
+    normalized.includes('token expired') ||
+    normalized.includes('challenge expired')
+  ) {
+    return 'La verificación expiró. Inicia sesión de nuevo.';
+  }
+
+  if (
+    normalized.includes('too many') ||
+    normalized.includes('max attempts') ||
+    normalized.includes('demasiados intentos')
+  ) {
+    return 'Se alcanzó el límite de intentos. Espera un momento y vuelve a iniciar sesión.';
+  }
+
+  return message;
+}
+
+interface LoginResponseBody {
+  token?: string;
+  message?: string | string[];
+  requiresTwoFactor?: boolean;
+  tempToken?: string;
+  expiresInSeconds?: number;
+}
+
 export function useLogin() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
+  const [tempToken, setTempToken] = useState<string | null>(null);
+  const [twoFactorExpiresAt, setTwoFactorExpiresAt] = useState<number | null>(null);
+  const [twoFactorLoading, setTwoFactorLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -85,7 +131,7 @@ export function useLogin() {
       if (!raw) return {};
 
       try {
-        return JSON.parse(raw) as { token?: string; message?: string | string[] };
+        return JSON.parse(raw) as LoginResponseBody;
       } catch {
         return { message: raw };
       }
@@ -95,6 +141,22 @@ export function useLogin() {
 
   // Detectar errores de OAuth desde los parámetros de URL
   useEffect(() => {
+    const storedTempToken = sessionStorage.getItem(TWO_FACTOR_TEMP_TOKEN_KEY);
+    const storedExpiresAtRaw = sessionStorage.getItem(TWO_FACTOR_EXPIRES_AT_KEY);
+    const storedExpiresAt = storedExpiresAtRaw ? Number(storedExpiresAtRaw) : null;
+
+    if (storedTempToken) {
+      const isExpired = storedExpiresAt !== null && Number.isFinite(storedExpiresAt) && Date.now() >= storedExpiresAt;
+      if (isExpired) {
+        sessionStorage.removeItem(TWO_FACTOR_TEMP_TOKEN_KEY);
+        sessionStorage.removeItem(TWO_FACTOR_EXPIRES_AT_KEY);
+      } else {
+        setTempToken(storedTempToken);
+        setTwoFactorExpiresAt(storedExpiresAt);
+        setRequiresTwoFactor(true);
+      }
+    }
+
     const tokenFromUrl =
       searchParams.get('token') ||
       searchParams.get('access_token') ||
@@ -104,6 +166,35 @@ export function useLogin() {
       localStorage.setItem('token', tokenFromUrl);
       window.dispatchEvent(new Event('authChange'));
       router.replace('/profile');
+      return;
+    }
+
+    const requiresTwoFactorParam =
+      searchParams.get('requires2fa') ||
+      searchParams.get('requiresTwoFactor') ||
+      searchParams.get('requires2FA');
+    const tempTokenFromUrl = searchParams.get('tempToken');
+    const expiresInSecondsFromUrl = Number(searchParams.get('expiresInSeconds') || '0');
+
+    if (
+      requiresTwoFactorParam?.toLowerCase() === 'true' &&
+      tempTokenFromUrl
+    ) {
+      const expiresAt = Number.isFinite(expiresInSecondsFromUrl) && expiresInSecondsFromUrl > 0
+        ? Date.now() + expiresInSecondsFromUrl * 1000
+        : null;
+
+      sessionStorage.setItem(TWO_FACTOR_TEMP_TOKEN_KEY, tempTokenFromUrl);
+      if (expiresAt !== null) {
+        sessionStorage.setItem(TWO_FACTOR_EXPIRES_AT_KEY, String(expiresAt));
+      } else {
+        sessionStorage.removeItem(TWO_FACTOR_EXPIRES_AT_KEY);
+      }
+
+      setTempToken(tempTokenFromUrl);
+      setTwoFactorExpiresAt(expiresAt);
+      setRequiresTwoFactor(true);
+      router.replace('/login');
       return;
     }
 
@@ -145,6 +236,24 @@ export function useLogin() {
         return;
       }
 
+      if (data.requiresTwoFactor && data.tempToken) {
+        const expiresAt = Number.isFinite(data.expiresInSeconds) && (data.expiresInSeconds || 0) > 0
+          ? Date.now() + (data.expiresInSeconds || 0) * 1000
+          : null;
+
+        sessionStorage.setItem(TWO_FACTOR_TEMP_TOKEN_KEY, data.tempToken);
+        if (expiresAt !== null) {
+          sessionStorage.setItem(TWO_FACTOR_EXPIRES_AT_KEY, String(expiresAt));
+        } else {
+          sessionStorage.removeItem(TWO_FACTOR_EXPIRES_AT_KEY);
+        }
+
+        setTempToken(data.tempToken);
+        setTwoFactorExpiresAt(expiresAt);
+        setRequiresTwoFactor(true);
+        return;
+      }
+
       if (data.token) {
         localStorage.setItem('token', data.token);
         // Si el usuario pudo iniciar sesión con email+contraseña, definitivamente tiene contraseña.
@@ -175,12 +284,89 @@ export function useLogin() {
     window.location.href = `${API_BASE_URL}/auth/google`;
   };
 
+  const handleVerifyTwoFactor = async (code: string) => {
+    if (!tempToken) {
+      setError('Tu sesión de verificación expiró. Inicia sesión nuevamente.');
+      return false;
+    }
+
+    if (!/^\d{6}$/.test(code)) {
+      setError('Ingresa un código de 6 dígitos.');
+      return false;
+    }
+
+    setTwoFactorLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/auth/2fa/verify-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tempToken, code }),
+      });
+
+      const data = await readResponseBody(res);
+
+      if (!res.ok) {
+        const message = Array.isArray(data.message)
+          ? data.message.join(', ')
+          : (data.message || 'No se pudo validar el código de autenticación.');
+        setError(normalizeTwoFactorErrorMessage(message));
+        return false;
+      }
+
+      if (!data.token) {
+        setError('La verificación se completó, pero no se recibió un token de sesión.');
+        return false;
+      }
+
+      localStorage.setItem('token', data.token);
+      const payload = decodeJWT<{ id?: string }>(data.token);
+      if (payload?.id) {
+        localStorage.setItem(`riff_hp_${payload.id}`, '1');
+      }
+
+      sessionStorage.removeItem(TWO_FACTOR_TEMP_TOKEN_KEY);
+      sessionStorage.removeItem(TWO_FACTOR_EXPIRES_AT_KEY);
+      setTempToken(null);
+      setTwoFactorExpiresAt(null);
+      setRequiresTwoFactor(false);
+
+      window.dispatchEvent(new Event('authChange'));
+      router.replace('/profile');
+      return true;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('La verificación tardó demasiado. Intenta de nuevo.');
+      } else {
+        setError('No se pudo conectar con el servidor para validar el código.');
+      }
+      return false;
+    } finally {
+      setTwoFactorLoading(false);
+    }
+  };
+
+  const handleBackToLogin = () => {
+    setRequiresTwoFactor(false);
+    setTempToken(null);
+    setTwoFactorExpiresAt(null);
+    setError(null);
+    sessionStorage.removeItem(TWO_FACTOR_TEMP_TOKEN_KEY);
+    sessionStorage.removeItem(TWO_FACTOR_EXPIRES_AT_KEY);
+  };
+
   return {
     formData,
     error,
     loading,
+    requiresTwoFactor,
+    twoFactorLoading,
+    twoFactorExpiresAt,
     handleChange,
     handleSubmit,
     handleGoogleLogin,
+    handleVerifyTwoFactor,
+    handleBackToLogin,
   };
 }

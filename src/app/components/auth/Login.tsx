@@ -1,22 +1,163 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { FiEye, FiEyeOff } from "react-icons/fi";
+import { FiArrowLeft, FiEye, FiEyeOff, FiLock } from "react-icons/fi";
 import { useLogin } from "../../hooks/useLogin";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState(["", "", "", "", "", ""]);
+  const inputs = useRef<(HTMLInputElement | null)[]>([]);
   
   const {
     formData,
     error,
     loading,
+    requiresTwoFactor,
+    twoFactorLoading,
     handleChange,
     handleSubmit,
     handleGoogleLogin,
+    handleVerifyTwoFactor,
+    handleBackToLogin,
   } = useLogin();
+
+  useEffect(() => {
+    if (!requiresTwoFactor) {
+      return;
+    }
+
+    inputs.current[0]?.focus();
+  }, [requiresTwoFactor]);
+
+  const handleCodeChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+
+    const next = [...twoFactorCode];
+    next[index] = value.slice(-1);
+    setTwoFactorCode(next);
+
+    if (value && index < next.length - 1) {
+      inputs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleCodeKeyDown = (index: number, event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Backspace" && !twoFactorCode[index] && index > 0) {
+      inputs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleCodePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    const next = [...twoFactorCode];
+    pasted.split("").forEach((digit, idx) => {
+      next[idx] = digit;
+    });
+    setTwoFactorCode(next);
+
+    const firstEmpty = next.findIndex((digit) => !digit);
+    inputs.current[firstEmpty === -1 ? 5 : firstEmpty]?.focus();
+  };
+
+  const onSubmitTwoFactor = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const code = twoFactorCode.join("");
+    const success = await handleVerifyTwoFactor(code);
+    if (!success) {
+      setTwoFactorCode(["", "", "", "", "", ""]);
+      inputs.current[0]?.focus();
+    }
+  };
+
+  if (requiresTwoFactor) {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <div className="flex justify-center mb-4">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-riff-primary-dark to-riff-primary flex items-center justify-center">
+              <FiLock className="w-6 h-6 text-white" />
+            </div>
+          </div>
+
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-riff-primary-dark to-riff-primary bg-clip-text text-transparent text-center">
+            Verificación en dos pasos
+          </h1>
+          <p className="text-riff-text-secondary text-sm text-center">
+            Ingresa el código TOTP de 6 dígitos de Google Authenticator.
+          </p>
+        </div>
+
+        <form onSubmit={onSubmitTwoFactor} className="space-y-6">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm text-center">
+              {error}
+            </div>
+          )}
+
+          <div className="flex justify-center gap-2 sm:gap-3" onPaste={handleCodePaste}>
+            {twoFactorCode.map((digit, index) => (
+              <input
+                key={index}
+                ref={(element) => {
+                  inputs.current[index] = element;
+                }}
+                type="text"
+                inputMode="numeric"
+                autoComplete={index === 0 ? "one-time-code" : "off"}
+                maxLength={1}
+                value={digit}
+                onChange={(event) => handleCodeChange(index, event.target.value)}
+                onKeyDown={(event) => handleCodeKeyDown(index, event)}
+                className={`w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-bold border-1 rounded-lg
+                           transition-all duration-200 text-riff-text-primary
+                           focus:outline-none focus:border-riff-primary focus:ring-2 focus:ring-riff-primary/30
+                           ${digit ? "border-riff-primary bg-riff-primary/5" : "border-riff-login"}`}
+              />
+            ))}
+          </div>
+
+          <button
+            type="submit"
+            disabled={twoFactorLoading || twoFactorCode.join("").length < 6}
+            className="w-full py-2.5
+                      bg-gradient-to-r from-riff-primary-dark to-riff-primary
+                      text-white font-semibold rounded-lg
+                      hover:from-riff-primary hover:to-riff-primary-dark transform hover:scale-[1.02]
+                      transition-all duration-300 shadow-lg shadow-riff-primary/25
+                      focus:outline-none focus:ring-4 focus:ring-riff-primary/30
+                      disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+          >
+            {twoFactorLoading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Verificando...
+              </span>
+            ) : (
+              "Validar y continuar"
+            )}
+          </button>
+        </form>
+
+        <p className="text-center text-riff-text-secondary text-sm">
+          <button
+            type="button"
+            onClick={handleBackToLogin}
+            className="flex items-center justify-center gap-1.5 text-riff-registro font-bold hover:text-riff-primary-dark transition-colors w-full"
+          >
+            <FiArrowLeft className="w-4 h-4" />
+            Volver a ingresar credenciales
+          </button>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
