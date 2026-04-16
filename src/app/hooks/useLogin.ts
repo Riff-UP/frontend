@@ -100,6 +100,87 @@ interface LoginResponseBody {
   expiresInSeconds?: number;
 }
 
+function getFirstString(...values: Array<unknown>): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function toBoolean(value: unknown): boolean | undefined {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === '0') return false;
+  }
+  return undefined;
+}
+
+function toNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function normalizeLoginPayload(payload: unknown): LoginResponseBody {
+  const root = (payload && typeof payload === 'object') ? payload as Record<string, unknown> : {};
+  const nested = [root.data, root.payload, root.result].find(
+    (value): value is Record<string, unknown> => !!value && typeof value === 'object'
+  ) || {};
+
+  const token = getFirstString(
+    root.token,
+    root.accessToken,
+    root.jwt,
+    nested.token,
+    nested.accessToken,
+    nested.jwt
+  );
+
+  const tempToken = getFirstString(
+    root.tempToken,
+    root.temp_token,
+    root.twoFactorTempToken,
+    nested.tempToken,
+    nested.temp_token,
+    nested.twoFactorTempToken
+  );
+
+  const requiresTwoFactor = toBoolean(
+    root.requiresTwoFactor ??
+    root.requires2fa ??
+    root.requires2FA ??
+    root.twoFactorRequired ??
+    nested.requiresTwoFactor ??
+    nested.requires2fa ??
+    nested.requires2FA ??
+    nested.twoFactorRequired
+  );
+
+  const expiresInSeconds = toNumber(
+    root.expiresInSeconds ??
+    root.expires_in_seconds ??
+    nested.expiresInSeconds ??
+    nested.expires_in_seconds
+  );
+
+  const message = (root.message ?? nested.message) as string | string[] | undefined;
+
+  return {
+    token,
+    tempToken,
+    requiresTwoFactor,
+    expiresInSeconds,
+    message,
+  };
+}
+
 export function useLogin() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState<string | null>(null);
@@ -131,7 +212,7 @@ export function useLogin() {
       if (!raw) return {};
 
       try {
-        return JSON.parse(raw) as LoginResponseBody;
+        return normalizeLoginPayload(JSON.parse(raw));
       } catch {
         return { message: raw };
       }
@@ -176,10 +257,9 @@ export function useLogin() {
     const tempTokenFromUrl = searchParams.get('tempToken');
     const expiresInSecondsFromUrl = Number(searchParams.get('expiresInSeconds') || '0');
 
-    if (
-      requiresTwoFactorParam?.toLowerCase() === 'true' &&
-      tempTokenFromUrl
-    ) {
+    const oauthRequires2fa = requiresTwoFactorParam?.toLowerCase() === 'true';
+    const oauthDisables2fa = requiresTwoFactorParam?.toLowerCase() === 'false';
+    if (tempTokenFromUrl && (oauthRequires2fa || !oauthDisables2fa)) {
       const expiresAt = Number.isFinite(expiresInSecondsFromUrl) && expiresInSecondsFromUrl > 0
         ? Date.now() + expiresInSecondsFromUrl * 1000
         : null;
@@ -236,7 +316,8 @@ export function useLogin() {
         return;
       }
 
-      if (data.requiresTwoFactor && data.tempToken) {
+      const shouldRequireTwoFactor = Boolean(data.requiresTwoFactor || (data.tempToken && !data.token));
+      if (shouldRequireTwoFactor && data.tempToken) {
         const expiresAt = Number.isFinite(data.expiresInSeconds) && (data.expiresInSeconds || 0) > 0
           ? Date.now() + (data.expiresInSeconds || 0) * 1000
           : null;
