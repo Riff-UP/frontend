@@ -14,6 +14,7 @@ export default function Settings({ userState }: SettingsProps) {
   const hasPassword = !!user?.hasPassword;
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteMessage, setDeleteMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -33,10 +34,19 @@ export default function Settings({ userState }: SettingsProps) {
   const strength = passwordStrength(newPassword);
 
   const handleConfirmDelete = async () => {
+    setDeleteMessage(null);
     setDeletingAccount(true);
     try {
-      await deleteAccount();
-      setShowDeleteModal(false);
+      const deleted = await deleteAccount();
+      if (deleted) {
+        setDeleteMessage({ type: 'success', text: 'Cuenta eliminada correctamente.' });
+        setShowDeleteModal(false);
+      } else {
+        setDeleteMessage({
+          type: 'error',
+          text: error || 'No se pudo eliminar la cuenta. Intenta nuevamente.',
+        });
+      }
     } finally {
       setDeletingAccount(false);
     }
@@ -205,6 +215,15 @@ export default function Settings({ userState }: SettingsProps) {
           <p className="text-white/75 text-xs sm:text-sm mt-1 mb-4">
             Eliminar tu cuenta borrara de forma permanente tu perfil y datos relacionados.
           </p>
+          {deleteMessage && (
+            <div className={`mb-4 p-3 rounded-sm text-sm ${
+              deleteMessage.type === 'success'
+                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                : 'bg-red-500/20 text-red-400 border border-red-500/30'
+            }`}>
+              {deleteMessage.text}
+            </div>
+          )}
           <button
             onClick={() => setShowDeleteModal(true)}
             className="inline-flex items-center gap-2 rounded-sm border border-red-400/40 px-4 py-2 text-sm font-medium text-red-300 hover:bg-red-500/10 transition-colors"
@@ -221,6 +240,7 @@ export default function Settings({ userState }: SettingsProps) {
         message="Esta accion no se puede deshacer. Se eliminara tu cuenta permanentemente."
         onConfirm={handleConfirmDelete}
         onCancel={() => setShowDeleteModal(false)}
+        isLoading={deletingAccount}
       />
     </div>
   );

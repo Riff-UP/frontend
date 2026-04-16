@@ -277,22 +277,37 @@ export function useUser(): UseUserReturn {
     try {
       setError(null);
 
-      const res = await fetchWithTimeout(`${API_URL}/users/${user.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const deleteFrom = async (url: string) => {
+        return fetchWithTimeout(url, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      };
+
+      // Algunos gateways exponen DELETE /users/me y otros DELETE /users/:id.
+      let res = await deleteFrom(`${API_URL}/users/me`);
+      if (res.status === 404 || res.status === 405) {
+        res = await deleteFrom(`${API_URL}/users/${user.id}`);
+      }
+
+      if (res.status === 401) {
+        redirectToLogin('Tu sesión expiró. Inicia sesión de nuevo.');
+        return false;
+      }
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        setError(errorData.message || 'Error al eliminar cuenta');
+        const message = await getErrorMessage(res, 'Error al eliminar cuenta');
+        setError(message);
         return false;
       }
 
       localStorage.removeItem('token');
-      router.push('/login');
+      setUser(null);
+      window.dispatchEvent(new Event('authChange'));
+      router.replace('/login?accountDeleted=true');
       return true;
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {

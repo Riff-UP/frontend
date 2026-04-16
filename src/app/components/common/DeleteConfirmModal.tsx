@@ -4,8 +4,9 @@ interface DeleteConfirmModalProps {
   isOpen: boolean;
   title: string;
   message: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onCancel: () => void;
+  isLoading?: boolean;
 }
 
 export default function DeleteConfirmModal({
@@ -14,6 +15,7 @@ export default function DeleteConfirmModal({
   message,
   onConfirm,
   onCancel,
+  isLoading = false,
 }: DeleteConfirmModalProps) {
   if (!isOpen) return null;
 
@@ -31,15 +33,17 @@ export default function DeleteConfirmModal({
           <div className="flex gap-3">
             <button
               onClick={onCancel}
+              disabled={isLoading}
               className="flex-1 px-4 py-2.5 bg-riff-text-secondary/30 hover:bg-riff-text-secondary/40 text-white text-sm font-medium rounded-sm border border-white/20 transition-colors duration-200"
             >
               Cancelar
             </button>
             <button
               onClick={onConfirm}
+              disabled={isLoading}
               className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-600 text-white text-sm font-medium rounded-sm transition-all duration-200"
             >
-              Eliminar
+              {isLoading ? 'Eliminando...' : 'Eliminar'}
             </button>
           </div>
         </div>
