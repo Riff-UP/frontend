@@ -29,6 +29,8 @@ interface TwoFactorSetupResponse {
   otpauthUrl?: string;
   manualEntryKey?: string;
   secret?: string;
+  expiresInSeconds?: number;
+  setupExpiresInSeconds?: number;
   data?: {
     qrImageUrl?: string;
     qrDataUrl?: string;
@@ -37,6 +39,8 @@ interface TwoFactorSetupResponse {
     otpauthUrl?: string;
     manualEntryKey?: string;
     secret?: string;
+    expiresInSeconds?: number;
+    setupExpiresInSeconds?: number;
   };
 }
 
@@ -51,6 +55,7 @@ export default function Settings({ userState }: SettingsProps) {
   const [setupQrUrl, setSetupQrUrl] = useState<string | null>(null);
   const [setupOtpAuthUrl, setSetupOtpAuthUrl] = useState<string | null>(null);
   const [setupSecret, setSetupSecret] = useState<string | null>(null);
+  const [setupExpiresAt, setSetupExpiresAt] = useState<number | null>(null);
   const [enableCode, setEnableCode] = useState('');
   const [disableCode, setDisableCode] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -101,6 +106,8 @@ export default function Settings({ userState }: SettingsProps) {
     );
   };
 
+  const normalizeDigitsCode = (value: string): string => value.replace(/\D/g, '').slice(0, 6);
+
   const loadTwoFactorStatus = useCallback(async () => {
     setTwoFactorLoading(true);
     setTwoFactorError(null);
@@ -150,10 +157,16 @@ export default function Settings({ userState }: SettingsProps) {
 
       const payload = (await res.json().catch(() => ({}))) as TwoFactorSetupResponse;
       const source = payload.data || payload;
+      const expiresInSeconds = Number(source.setupExpiresInSeconds ?? source.expiresInSeconds ?? 0);
 
       setSetupQrUrl(source.qrImageUrl || source.qrDataUrl || source.qrCodeUrl || source.qrUrl || null);
       setSetupOtpAuthUrl(source.otpauthUrl || null);
       setSetupSecret(source.manualEntryKey || source.secret || null);
+      setSetupExpiresAt(
+        Number.isFinite(expiresInSeconds) && expiresInSeconds > 0
+          ? Date.now() + expiresInSeconds * 1000
+          : null
+      );
       setTwoFactorSuccess('Escanea el QR y confirma con el código de 6 dígitos.');
     } catch {
       setTwoFactorError('Error de red al iniciar la configuración de 2FA.');
@@ -166,7 +179,19 @@ export default function Settings({ userState }: SettingsProps) {
     setTwoFactorError(null);
     setTwoFactorSuccess(null);
 
-    if (!/^\d{6}$/.test(enableCode)) {
+    if (setupExpiresAt !== null && Date.now() > setupExpiresAt) {
+      setTwoFactorError('El QR de configuración expiró. Genera uno nuevo antes de confirmar el código.');
+      setSetupQrUrl(null);
+      setSetupOtpAuthUrl(null);
+      setSetupSecret(null);
+      setSetupExpiresAt(null);
+      setEnableCode('');
+      return;
+    }
+
+    const normalizedCode = normalizeDigitsCode(enableCode);
+
+    if (!/^\d{6}$/.test(normalizedCode)) {
       setTwoFactorError('Ingresa un código válido de 6 dígitos para activar 2FA.');
       return;
     }
@@ -176,11 +201,30 @@ export default function Settings({ userState }: SettingsProps) {
       const res = await fetch(`${API_BASE_URL}/auth/2fa/enable`, {
         method: 'POST',
         headers: getAuthHeaders(true),
-        body: JSON.stringify({ code: enableCode }),
+        body: JSON.stringify({ code: normalizedCode }),
       });
 
       if (!res.ok) {
-        setTwoFactorError(await readErrorMessage(res, 'No se pudo activar 2FA.'));
+        const message = await readErrorMessage(res, 'No se pudo activar 2FA.');
+        const normalizedMessage = message.toLowerCase();
+
+        if (
+          normalizedMessage.includes('expired') ||
+          normalizedMessage.includes('expir') ||
+          normalizedMessage.includes('setup')
+        ) {
+          setTwoFactorError('La configuración 2FA expiró. Genera un nuevo QR y vuelve a intentarlo.');
+          setSetupQrUrl(null);
+          setSetupOtpAuthUrl(null);
+          setSetupSecret(null);
+          setSetupExpiresAt(null);
+          setEnableCode('');
+          return;
+        }
+
+        setTwoFactorError(
+          `${message} Si tu app genera códigos cada 30s y sigue fallando, sincroniza la hora del teléfono y prueba con el código nuevo.`
+        );
         return;
       }
 
@@ -188,6 +232,7 @@ export default function Settings({ userState }: SettingsProps) {
       setSetupQrUrl(null);
       setSetupOtpAuthUrl(null);
       setSetupSecret(null);
+      setSetupExpiresAt(null);
       setTwoFactorEnabled(true);
       setTwoFactorSuccess('Autenticación en dos pasos activada correctamente.');
       await loadTwoFactorStatus();
@@ -473,7 +518,7 @@ export default function Settings({ userState }: SettingsProps) {
                   inputMode="numeric"
                   maxLength={6}
                   value={enableCode}
-                  onChange={(e) => setEnableCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  onChange={(e) => setEnableCode(normalizeDigitsCode(e.target.value))}
                   placeholder="123456"
                   className="w-full px-3 py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200"
                 />
@@ -492,6 +537,7 @@ export default function Settings({ userState }: SettingsProps) {
                     setSetupQrUrl(null);
                     setSetupOtpAuthUrl(null);
                     setSetupSecret(null);
+                    setSetupExpiresAt(null);
                     setEnableCode('');
                     setTwoFactorError(null);
                     setTwoFactorSuccess(null);
