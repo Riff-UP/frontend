@@ -289,7 +289,8 @@ export function useUser(): UseUserReturn {
 
       // Algunos gateways exponen DELETE /users/me y otros DELETE /users/:id.
       let res = await deleteFrom(`${API_URL}/users/me`);
-      if (res.status === 404 || res.status === 405) {
+      const shouldTryById = res.status === 403 || res.status === 404 || res.status === 405;
+      if (shouldTryById) {
         res = await deleteFrom(`${API_URL}/users/${user.id}`);
       }
 
@@ -300,6 +301,15 @@ export function useUser(): UseUserReturn {
 
       if (!res.ok) {
         const message = await getErrorMessage(res, 'Error al eliminar cuenta');
+
+        if (res.status === 403) {
+          setError(
+            'El gateway rechazó la eliminación por permisos antes de llegar al microservicio. ' +
+            `Detalle: ${message}`
+          );
+          return false;
+        }
+
         setError(message);
         return false;
       }

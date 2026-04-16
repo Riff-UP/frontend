@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FiEye, FiEyeOff, FiLock, FiTrash2 } from 'react-icons/fi';
 import type { UseUserReturn } from '../hooks/useUser';
 import DeleteConfirmModal from './common/DeleteConfirmModal';
@@ -33,6 +33,12 @@ export default function Settings({ userState }: SettingsProps) {
 
   const strength = passwordStrength(newPassword);
 
+  useEffect(() => {
+    if (error) {
+      setDeleteMessage({ type: 'error', text: error });
+    }
+  }, [error]);
+
   const handleConfirmDelete = async () => {
     setDeleteMessage(null);
     setDeletingAccount(true);
@@ -42,10 +48,7 @@ export default function Settings({ userState }: SettingsProps) {
         setDeleteMessage({ type: 'success', text: 'Cuenta eliminada correctamente.' });
         setShowDeleteModal(false);
       } else {
-        setDeleteMessage({
-          type: 'error',
-          text: error || 'No se pudo eliminar la cuenta. Intenta nuevamente.',
-        });
+        setDeleteMessage({ type: 'error', text: 'No se pudo eliminar la cuenta. Intenta nuevamente.' });
       }
     } finally {
       setDeletingAccount(false);
