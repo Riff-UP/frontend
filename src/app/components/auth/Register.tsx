@@ -38,10 +38,6 @@ export default function Register() {
           ¡Regístrate!
         </h1>
         <p className="text-riff-login text-2xsm">Por favor, ingresa la siguiente información</p>
-        <div className="p-3 bg-sky-50 border border-sky-200 rounded-lg text-sky-800 text-xs leading-relaxed">
-          La autenticación en dos pasos no se activa automáticamente al registrarte.
-          Debes activarla dentro de tu cuenta y, a partir de ese momento, se solicitará en cada login.
-        </div>
       </div>
 
       {/* Formulario */}

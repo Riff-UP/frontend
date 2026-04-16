@@ -1,17 +1,52 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { FiEye, FiEyeOff, FiLock, FiTrash2 } from 'react-icons/fi';
+import { useCallback, useEffect, useState } from 'react';
+import { FiEye, FiEyeOff, FiLock, FiShield, FiTrash2 } from 'react-icons/fi';
 import type { UseUserReturn } from '../hooks/useUser';
 import DeleteConfirmModal from './common/DeleteConfirmModal';
+import { API_BASE_URL, getAuthHeaders } from '../config/api';
 
 interface SettingsProps {
   userState: UseUserReturn;
 }
 
+interface TwoFactorStatusResponse {
+  enabled?: boolean;
+  isEnabled?: boolean;
+  twoFactorEnabled?: boolean;
+  data?: {
+    enabled?: boolean;
+    isEnabled?: boolean;
+    twoFactorEnabled?: boolean;
+  };
+}
+
+interface TwoFactorSetupResponse {
+  qrCodeUrl?: string;
+  qrUrl?: string;
+  otpauthUrl?: string;
+  secret?: string;
+  data?: {
+    qrCodeUrl?: string;
+    qrUrl?: string;
+    otpauthUrl?: string;
+    secret?: string;
+  };
+}
+
 export default function Settings({ userState }: SettingsProps) {
   const { user, error, deleteAccount, setPassword } = userState;
   const hasPassword = !!user?.hasPassword;
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean | null>(null);
+  const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+  const [twoFactorBusy, setTwoFactorBusy] = useState(false);
+  const [twoFactorError, setTwoFactorError] = useState<string | null>(null);
+  const [twoFactorSuccess, setTwoFactorSuccess] = useState<string | null>(null);
+  const [setupQrUrl, setSetupQrUrl] = useState<string | null>(null);
+  const [setupOtpAuthUrl, setSetupOtpAuthUrl] = useState<string | null>(null);
+  const [setupSecret, setSetupSecret] = useState<string | null>(null);
+  const [enableCode, setEnableCode] = useState('');
+  const [disableCode, setDisableCode] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteMessage, setDeleteMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -38,6 +73,157 @@ export default function Settings({ userState }: SettingsProps) {
       setDeleteMessage({ type: 'error', text: error });
     }
   }, [error]);
+
+  const readErrorMessage = async (response: Response, fallback: string) => {
+    try {
+      const payload = await response.json();
+      if (Array.isArray(payload?.message)) {
+        return payload.message.join(', ');
+      }
+      return payload?.message || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const readTwoFactorEnabled = (payload: TwoFactorStatusResponse): boolean => {
+    const root = payload || {};
+    const nested = root.data || {};
+    return Boolean(
+      root.enabled ?? root.isEnabled ?? root.twoFactorEnabled ??
+      nested.enabled ?? nested.isEnabled ?? nested.twoFactorEnabled
+    );
+  };
+
+  const loadTwoFactorStatus = useCallback(async () => {
+    setTwoFactorLoading(true);
+    setTwoFactorError(null);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/2fa/status`, {
+        method: 'GET',
+        headers: getAuthHeaders(true),
+      });
+
+      if (!res.ok) {
+        setTwoFactorError(await readErrorMessage(res, 'No se pudo consultar el estado de 2FA.'));
+        setTwoFactorEnabled(null);
+        return;
+      }
+
+      const data = (await res.json().catch(() => ({}))) as TwoFactorStatusResponse;
+      setTwoFactorEnabled(readTwoFactorEnabled(data));
+    } catch {
+      setTwoFactorEnabled(null);
+      setTwoFactorError('Error de red al consultar 2FA.');
+    } finally {
+      setTwoFactorLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    loadTwoFactorStatus();
+  }, [user, loadTwoFactorStatus]);
+
+  const handleStartTwoFactorSetup = async () => {
+    setTwoFactorBusy(true);
+    setTwoFactorError(null);
+    setTwoFactorSuccess(null);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/2fa/setup`, {
+        method: 'POST',
+        headers: getAuthHeaders(true),
+      });
+
+      if (!res.ok) {
+        setTwoFactorError(await readErrorMessage(res, 'No se pudo iniciar la configuración de 2FA.'));
+        return;
+      }
+
+      const payload = (await res.json().catch(() => ({}))) as TwoFactorSetupResponse;
+      const source = payload.data || payload;
+
+      setSetupQrUrl(source.qrCodeUrl || source.qrUrl || null);
+      setSetupOtpAuthUrl(source.otpauthUrl || null);
+      setSetupSecret(source.secret || null);
+      setTwoFactorSuccess('Escanea el QR y confirma con el código de 6 dígitos.');
+    } catch {
+      setTwoFactorError('Error de red al iniciar la configuración de 2FA.');
+    } finally {
+      setTwoFactorBusy(false);
+    }
+  };
+
+  const handleEnableTwoFactor = async () => {
+    setTwoFactorError(null);
+    setTwoFactorSuccess(null);
+
+    if (!/^\d{6}$/.test(enableCode)) {
+      setTwoFactorError('Ingresa un código válido de 6 dígitos para activar 2FA.');
+      return;
+    }
+
+    setTwoFactorBusy(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/2fa/enable`, {
+        method: 'POST',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({ code: enableCode }),
+      });
+
+      if (!res.ok) {
+        setTwoFactorError(await readErrorMessage(res, 'No se pudo activar 2FA.'));
+        return;
+      }
+
+      setEnableCode('');
+      setSetupQrUrl(null);
+      setSetupOtpAuthUrl(null);
+      setSetupSecret(null);
+      setTwoFactorEnabled(true);
+      setTwoFactorSuccess('Autenticación en dos pasos activada correctamente.');
+      await loadTwoFactorStatus();
+    } catch {
+      setTwoFactorError('Error de red al activar 2FA.');
+    } finally {
+      setTwoFactorBusy(false);
+    }
+  };
+
+  const handleDisableTwoFactor = async () => {
+    setTwoFactorError(null);
+    setTwoFactorSuccess(null);
+
+    if (disableCode && !/^\d{6}$/.test(disableCode)) {
+      setTwoFactorError('Si ingresas código para desactivar, debe ser de 6 dígitos.');
+      return;
+    }
+
+    setTwoFactorBusy(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/2fa/disable`, {
+        method: 'POST',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify(disableCode ? { code: disableCode } : {}),
+      });
+
+      if (!res.ok) {
+        setTwoFactorError(await readErrorMessage(res, 'No se pudo desactivar 2FA.'));
+        return;
+      }
+
+      setDisableCode('');
+      setTwoFactorEnabled(false);
+      setTwoFactorSuccess('Autenticación en dos pasos desactivada correctamente.');
+      await loadTwoFactorStatus();
+    } catch {
+      setTwoFactorError('Error de red al desactivar 2FA.');
+    } finally {
+      setTwoFactorBusy(false);
+    }
+  };
 
   const handleConfirmDelete = async () => {
     setDeleteMessage(null);
@@ -212,6 +398,129 @@ export default function Settings({ userState }: SettingsProps) {
             )}
           </div>
         )}
+
+        <div className="rounded-sm border border-white/10 bg-riff-card p-4 sm:p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <FiShield className="w-4 h-4 text-riff-primary" />
+            <h3 className="text-white font-semibold">Autenticación en dos pasos (2FA)</h3>
+          </div>
+
+          <p className="text-white/70 text-xs sm:text-sm mt-1 mb-4">
+            Protege tu cuenta con códigos temporales desde Google Authenticator.
+          </p>
+
+          {twoFactorLoading ? (
+            <p className="text-riff-text-secondary text-sm">Cargando estado de 2FA...</p>
+          ) : (
+            <p className="text-sm mb-4">
+              <span className="text-white/80">Estado actual: </span>
+              <span className={twoFactorEnabled ? 'text-green-400 font-semibold' : 'text-yellow-300 font-semibold'}>
+                {twoFactorEnabled ? 'Activado' : 'Desactivado'}
+              </span>
+            </p>
+          )}
+
+          {twoFactorError && (
+            <div className="mb-3 p-3 rounded-sm text-sm bg-red-500/20 text-red-400 border border-red-500/30">
+              {twoFactorError}
+            </div>
+          )}
+
+          {twoFactorSuccess && (
+            <div className="mb-3 p-3 rounded-sm text-sm bg-green-500/20 text-green-400 border border-green-500/30">
+              {twoFactorSuccess}
+            </div>
+          )}
+
+          {!twoFactorEnabled && !setupQrUrl && (
+            <button
+              onClick={handleStartTwoFactorSetup}
+              disabled={twoFactorBusy || twoFactorLoading}
+              className="inline-flex items-center gap-2 rounded-sm border border-white/20 bg-riff-text-primary/40 px-4 py-2 text-sm font-medium text-white hover:bg-riff-text-primary/60 transition-colors disabled:opacity-50"
+            >
+              <FiShield className="w-4 h-4" />
+              {twoFactorBusy ? 'Preparando...' : 'Activar 2FA'}
+            </button>
+          )}
+
+          {!twoFactorEnabled && setupQrUrl && (
+            <div className="space-y-3">
+              <div className="bg-white rounded-sm p-3 inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={setupQrUrl} alt="QR de configuración 2FA" className="w-40 h-40 object-contain" />
+              </div>
+
+              {setupSecret && (
+                <p className="text-xs text-white/70 break-all">
+                  Clave manual: <span className="text-white">{setupSecret}</span>
+                </p>
+              )}
+
+              {setupOtpAuthUrl && (
+                <p className="text-xs text-white/60 break-all">URI OTP: {setupOtpAuthUrl}</p>
+              )}
+
+              <div className="max-w-sm">
+                <label className="block text-white text-xs sm:text-sm mb-1">Código de verificación</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={enableCode}
+                  onChange={(e) => setEnableCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="123456"
+                  className="w-full px-3 py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleEnableTwoFactor}
+                  disabled={twoFactorBusy || enableCode.length !== 6}
+                  className="px-4 py-2 bg-gradient-to-r from-riff-save to-riff-save-2 hover:from-riff-save-2 hover:to-riff-save text-white text-sm font-medium rounded-sm transition-colors disabled:opacity-50"
+                >
+                  {twoFactorBusy ? 'Activando...' : 'Confirmar activación'}
+                </button>
+                <button
+                  onClick={() => {
+                    setSetupQrUrl(null);
+                    setSetupOtpAuthUrl(null);
+                    setSetupSecret(null);
+                    setEnableCode('');
+                    setTwoFactorError(null);
+                    setTwoFactorSuccess(null);
+                  }}
+                  className="px-4 py-2 border border-white/20 text-white/80 hover:text-white hover:bg-white/5 text-sm rounded-sm transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {twoFactorEnabled && (
+            <div className="space-y-3 max-w-sm">
+              <label className="block text-white text-xs sm:text-sm mb-1">Código actual (si aplica para desactivar)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={disableCode}
+                onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="Opcional"
+                className="w-full px-3 py-2 bg-riff-text-primary/40 border border-white/10 rounded-sm text-white text-sm placeholder-riff-text-secondary focus:outline-none focus:ring-2 focus:ring-riff-primary focus:border-riff-primary transition-all duration-200"
+              />
+
+              <button
+                onClick={handleDisableTwoFactor}
+                disabled={twoFactorBusy || twoFactorLoading}
+                className="inline-flex items-center gap-2 rounded-sm border border-red-400/40 px-4 py-2 text-sm font-medium text-red-300 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+              >
+                {twoFactorBusy ? 'Desactivando...' : 'Desactivar 2FA'}
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="rounded-sm border border-red-400/30 bg-red-500/5 p-4 sm:p-5">
           <h3 className="text-red-300 font-semibold">Zona de peligro</h3>
