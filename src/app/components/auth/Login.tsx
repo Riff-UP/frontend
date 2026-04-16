@@ -166,6 +166,10 @@ export default function Login() {
           ¡Inicia sesión!
         </h1>
         <p className="text-riff-login text-2xsm">Por favor, ingresa tus datos</p>
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs leading-relaxed">
+          Si tu cuenta tiene autenticación en dos pasos activada, después de ingresar correo y contraseña
+          te pediremos un código de 6 dígitos de Google Authenticator.
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
