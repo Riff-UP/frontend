@@ -22,14 +22,20 @@ interface TwoFactorStatusResponse {
 }
 
 interface TwoFactorSetupResponse {
+  qrImageUrl?: string;
+  qrDataUrl?: string;
   qrCodeUrl?: string;
   qrUrl?: string;
   otpauthUrl?: string;
+  manualEntryKey?: string;
   secret?: string;
   data?: {
+    qrImageUrl?: string;
+    qrDataUrl?: string;
     qrCodeUrl?: string;
     qrUrl?: string;
     otpauthUrl?: string;
+    manualEntryKey?: string;
     secret?: string;
   };
 }
@@ -145,9 +151,9 @@ export default function Settings({ userState }: SettingsProps) {
       const payload = (await res.json().catch(() => ({}))) as TwoFactorSetupResponse;
       const source = payload.data || payload;
 
-      setSetupQrUrl(source.qrCodeUrl || source.qrUrl || null);
+      setSetupQrUrl(source.qrImageUrl || source.qrDataUrl || source.qrCodeUrl || source.qrUrl || null);
       setSetupOtpAuthUrl(source.otpauthUrl || null);
-      setSetupSecret(source.secret || null);
+      setSetupSecret(source.manualEntryKey || source.secret || null);
       setTwoFactorSuccess('Escanea el QR y confirma con el código de 6 dígitos.');
     } catch {
       setTwoFactorError('Error de red al iniciar la configuración de 2FA.');
